@@ -1,6 +1,6 @@
-# Threader
+# Pyarallel
 
-A powerful, feature-rich parallel execution library for Python that makes concurrent programming easy and efficient.
+A powerful,feature-rich parallel execution library for Python that makes concurrent programming easy and efficient.
 
 ## Features
 
@@ -20,13 +20,13 @@ A powerful, feature-rich parallel execution library for Python that makes concur
 ## Installation
 
 ```bash
-pip install threader
+pip install pyarallel
 ```
 
 ## Quick Start
 
 ```python
-from threader import parallel
+from pyarallel import parallel
 
 # Basic parallel processing
 @parallel(max_workers=4)
@@ -68,7 +68,7 @@ def func1(): ...
 def func2(): ...
 
 # Custom rate limit object
-from threader import RateLimit
+from pyarallel import RateLimit
 rate = RateLimit(1000, "hour")
 @parallel(rate_limit=rate)
 def func3(): ...
