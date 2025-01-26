@@ -1,4 +1,7 @@
 site_name: Pyarallel
+site_author: Mehmet Oner Yalcin
+version: 0.1.2
+site_url: https://oneryalcin.github.io/pyarallel/
 theme:
   name: material
   palette:

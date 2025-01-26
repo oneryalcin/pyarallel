@@ -1,6 +1,6 @@
 # Pyarallel
 
-[![Docs](https://img.shields.io/badge/docs-live-brightgreen)](https://pyarallel.readthedocs.io/) [![PyPI version](https://img.shields.io/pypi/v/pyarallel)](https://pypi.org/project/pyarallel/) [![PyPI Downloads](https://static.pepy.tech/badge/pyarallel/month)](https://pepy.tech/project/pyarallel)
+[![Docs](https://img.shields.io/badge/docs-live-brightgreen)](https://oneryalcin.github.io/pyarallel/) [![PyPI version](https://img.shields.io/pypi/v/pyarallel)](https://pypi.org/project/pyarallel/) [![PyPI Downloads](https://static.pepy.tech/badge/pyarallel/month)](https://pepy.tech/project/pyarallel)
 
 
 A powerful,feature-rich parallel execution library for Python that makes concurrent programming easy and efficient.
@@ -19,6 +19,10 @@ A powerful,feature-rich parallel execution library for Python that makes concurr
   - Thread-safe implementation
   - Memory-efficient with automatic cleanup
   - Comprehensive error handling
+
+## Documentation
+
+Check out the [documentation](https://oneryalcin.github.io/pyarallel/) for detailed usage instructions and examples.
 
 ## Installation
 

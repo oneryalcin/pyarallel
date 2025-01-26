@@ -1,6 +1,6 @@
 [project]
 name = "pyarallel"
-version = "0.1.1"
+version = "0.1.2"
 description = "A powerful parallel execution library for Python"
 readme = "README.md"
 requires-python = ">=3.12"
