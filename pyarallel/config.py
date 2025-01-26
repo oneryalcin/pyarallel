@@ -7,9 +7,37 @@ with support for loading configurations from different sources and thread-safe o
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from pydantic import BaseModel, Field
-from pydantic_core import ValidationError
+from pydantic import BaseModel, Field, ConfigDict
 
+
+class ExecutionConfig(BaseModel):
+    """Execution configuration settings."""
+    max_workers: int = Field(
+        default=4,
+        description="Maximum number of worker processes/threads",
+        ge=1
+    )
+    timeout: float = Field(
+        default=30.0,
+        description="Default timeout for parallel operations in seconds",
+        ge=0
+    )
+    max_workers: Optional[int] = 4
+    timeout: Optional[float] = 30.0
+    
+    model_config = ConfigDict(extra="allow")  # Allow dynamic fields
+
+class RateLimitingConfig(BaseModel):
+    """Rate limiting configuration settings."""
+    rate: int = Field(
+        default=1000,
+        description="Rate limit per interval",
+        ge=0
+    )
+    interval: str = Field(
+        default="minute",
+        description="Rate limit interval"
+    )
 
 class PyarallelConfig(BaseModel):
     """Base configuration class for pyarallel.
@@ -28,6 +56,28 @@ class PyarallelConfig(BaseModel):
         default=30.0,
         description="Default timeout for parallel operations in seconds",
         ge=0
+    )
+    execution: Optional[ExecutionConfig] = Field(
+        default=None,
+        description="Nested execution settings"
+    )
+
+    # Rate limiting settings
+    rate_limiting: Optional[RateLimitingConfig] = Field(
+        default=None,
+        description="Rate limiting settings"
+    )
+
+    # Error handling settings
+    error_handling: Dict[str, Any] = Field(
+        default_factory=lambda: {"retry_count": 3},
+        description="Error handling settings"
+    )
+
+    # Monitoring settings
+    monitoring: Dict[str, Any] = Field(
+        default_factory=lambda: {"enabled": False},
+        description="Monitoring settings"
     )
 
     # Resource management

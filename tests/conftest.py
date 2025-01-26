@@ -1,7 +1,11 @@
 import os
+import logging
 import pytest
 from pyarallel import parallel, RateLimit
 from pyarallel.config_manager import ConfigManager
+
+logger = logging.getLogger("pyarallel")
+logger.setLevel(logging.DEBUG)
 
 @pytest.fixture
 def config_manager():
@@ -31,6 +35,40 @@ def _process_pool_func(x):
 def process_pool_function():
     """Fixture providing a process pool function for testing CPU-bound operations."""
     return parallel(executor_type="process", max_workers=2)(_process_pool_func)
+
+@pytest.fixture
+def nested_config():
+    """Fixture providing a ConfigManager instance with nested configuration."""
+    
+    manager = ConfigManager()
+    manager.reset()
+    logger.debug("ConfigManager initialized with nested configuration: %s", manager._config)
+
+    manager.update_config({
+        "execution": {
+            "max_workers": 8,
+            "timeout": 60.0
+        },
+        "rate_limiting": {
+            "rate": 1000,
+            "interval": "minute"
+        }
+    })
+    logger.debug("ConfigManager updated with nested configuration: %s", manager._config)
+    yield manager
+    manager.reset()
+    logger.debug("ConfigManager reset after nested configuration test: %s", manager._config)
+
+@pytest.fixture
+def category_config():
+    """Fixture providing a ConfigManager instance with category-specific settings."""
+    manager = ConfigManager()
+    manager.set_execution(max_workers=4, timeout=30.0)
+    manager.set_rate_limiting(rate=500, interval="second")
+    manager.set_error_handling(retry_count=3)
+    manager.set_monitoring(enabled=True)
+    yield manager
+    manager.reset()
 
 @pytest.fixture
 def clean_env():
