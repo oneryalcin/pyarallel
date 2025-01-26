@@ -4,10 +4,14 @@ This module provides a thread-safe singleton configuration manager that handles
 all configuration operations and maintains the global configuration state.
 """
 
+import logging
 from threading import Lock
 from typing import Any, Dict, Optional, Type, TypeVar
 
 from .config import PyarallelConfig
+from .env_config import load_env_vars
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar('T', bound='ConfigManager')
 
@@ -27,7 +31,22 @@ class ConfigManager:
             with cls._lock:
                 if not cls._instance:
                     cls._instance = super().__new__(cls)
-                    cls._instance._config = PyarallelConfig()
+                    # Initialize with default config
+                    config_dict = PyarallelConfig().model_dump()
+                    logger.debug(f"Default config: {config_dict}")
+                    
+                    # Load and apply environment variables
+                    env_config = load_env_vars()
+                    logger.debug(f"Loaded environment config: {env_config}")
+                    
+                    # Update config with environment variables
+                    if env_config:
+                        logger.debug("Updating config with environment variables")
+                        config_dict = {**config_dict, **env_config}  # Use dictionary unpacking for proper update
+                        logger.debug(f"Updated config: {config_dict}")
+                    
+                    cls._instance._config = PyarallelConfig(**config_dict)  # Use direct instantiation
+                    logger.debug(f"Final config: {cls._instance._config}")
         return cls._instance
 
     @classmethod
@@ -93,7 +112,8 @@ class ConfigManager:
         """Reset the configuration to default values.
 
         This method resets the configuration to its default state by creating
-        a new PyarallelConfig instance.
+        a new PyarallelConfig instance and clearing the singleton instance.
         """
         with self._lock:
             self._config = PyarallelConfig()
+            type(self)._instance = None

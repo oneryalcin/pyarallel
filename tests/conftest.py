@@ -1,3 +1,4 @@
+import os
 import pytest
 from pyarallel import parallel, RateLimit
 from pyarallel.config_manager import ConfigManager
@@ -30,6 +31,30 @@ def _process_pool_func(x):
 def process_pool_function():
     """Fixture providing a process pool function for testing CPU-bound operations."""
     return parallel(executor_type="process", max_workers=2)(_process_pool_func)
+
+@pytest.fixture
+def clean_env():
+    """Fixture to provide a clean environment for testing.
+    
+    This fixture cleans up environment variables and resets the ConfigManager
+    before each test to ensure a fresh state.
+    """
+    # Store original environment
+    original_env = dict(os.environ)
+    
+    # Reset ConfigManager to ensure fresh state
+    ConfigManager.get_instance().reset()
+    
+    # Clean environment variables
+    for key in list(os.environ.keys()):
+        if key.startswith('PYARALLEL_'):
+            del os.environ[key]
+    
+    yield
+    
+    # Restore original environment
+    os.environ.clear()
+    os.environ.update(original_env)
 
 @pytest.fixture
 def batch_processor():
