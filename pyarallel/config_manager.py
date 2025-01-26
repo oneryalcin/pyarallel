@@ -88,3 +88,12 @@ class ConfigManager:
             else:
                 result[key] = value
         return result
+
+    def reset(self) -> None:
+        """Reset the configuration to default values.
+
+        This method resets the configuration to its default state by creating
+        a new PyarallelConfig instance.
+        """
+        with self._lock:
+            self._config = PyarallelConfig()
