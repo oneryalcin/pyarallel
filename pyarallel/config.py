@@ -7,9 +7,49 @@ with support for loading configurations from different sources and thread-safe o
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from pydantic import BaseModel, Field
-from pydantic_core import ValidationError
+from pydantic import BaseModel, Field, ConfigDict
 
+
+class ExecutionConfig(BaseModel):
+    """Execution configuration settings."""
+    max_workers: int = Field(
+        default=4,
+        description="Maximum number of worker processes/threads",
+        ge=1
+    )
+    timeout: float = Field(
+        default=30.0,
+        description="Default timeout for parallel operations in seconds",
+        ge=0
+    )
+    default_max_workers: int = Field(
+        default=4,
+        description="Default number of workers for parallel operations",
+        ge=1
+    )
+    default_executor_type: str = Field(
+        default="thread",
+        description="Default executor type (thread or process)"
+    )
+    default_batch_size: int = Field(
+        default=10,
+        description="Default batch size for parallel operations",
+        ge=1
+    )
+    
+    model_config = ConfigDict(extra="allow")  # Allow dynamic fields
+
+class RateLimitingConfig(BaseModel):
+    """Rate limiting configuration settings."""
+    rate: int = Field(
+        default=1000,
+        description="Rate limit per interval",
+        ge=0
+    )
+    interval: str = Field(
+        default="minute",
+        description="Rate limit interval"
+    )
 
 class PyarallelConfig(BaseModel):
     """Base configuration class for pyarallel.
@@ -28,6 +68,28 @@ class PyarallelConfig(BaseModel):
         default=30.0,
         description="Default timeout for parallel operations in seconds",
         ge=0
+    )
+    execution: Optional[ExecutionConfig] = Field(
+        default=None,
+        description="Nested execution settings"
+    )
+
+    # Rate limiting settings
+    rate_limiting: Optional[RateLimitingConfig] = Field(
+        default=None,
+        description="Rate limiting settings"
+    )
+
+    # Error handling settings
+    error_handling: Dict[str, Any] = Field(
+        default_factory=lambda: {"retry_count": 3},
+        description="Error handling settings"
+    )
+
+    # Monitoring settings
+    monitoring: Dict[str, Any] = Field(
+        default_factory=lambda: {"enabled": False},
+        description="Monitoring settings"
     )
 
     # Resource management

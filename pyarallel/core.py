@@ -61,6 +61,7 @@ import threading
 from dataclasses import dataclass
 import multiprocessing
 import weakref
+from .config_manager import ConfigManager
 
 T = TypeVar('T')
 
@@ -192,11 +193,10 @@ def parallel(
     max_workers: int = None, 
     batch_size: int = None, 
     rate_limit: float | tuple[float, TimeUnit] | RateLimit = None,
-    executor_type: ExecutorType = "thread",
+    executor_type: ExecutorType = None,
     prewarm: bool = False
 ):
-    """
-    Decorator for parallel execution of functions over iterables.
+    """Decorator for parallel execution of functions over iterables.
     
     This decorator transforms a function that processes a single item into one
     that can process multiple items in parallel. It supports both thread and
@@ -209,77 +209,48 @@ def parallel(
     a single-item list.
     
     Args:
-        max_workers: Maximum number of parallel workers. Defaults to:
-                    - Processes: CPU count
-                    - Threads: CPU count * 5
-        
-        batch_size: Number of items to process in each batch. Useful for
-                   controlling memory usage with large iterables. None means
-                   process all items at once.
-        
-        rate_limit: Rate limiting configuration, specified as:
-                   - float: Operations per second
-                   - tuple[float, TimeUnit]: (count, interval) e.g. (100, "minute")
-                   - RateLimit: RateLimit instance
-        
-        executor_type: Type of parallelism to use:
-                      - "thread": For I/O-bound tasks (default)
-                      - "process": For CPU-bound tasks
-        
-        prewarm: If True, starts all workers immediately. Useful for
-                latency-critical applications where cold start time matters.
-    
-    Returns:
-        Callable: Wrapped function that processes items in parallel
-    
-    Examples:
-        ```python
-        # Basic I/O-bound task
-        @parallel(max_workers=4)
-        def fetch_url(url: str) -> dict:
-            return requests.get(url).json()
-        
-        # CPU-bound task with rate limiting
-        @parallel(
-            max_workers=4,
-            executor_type="process",
-            rate_limit=(100, "minute")
-        )
-        def process_image(image: bytes) -> bytes:
-            return heavy_processing(image)
-        
-        # Batch processing
-        @parallel(max_workers=4, batch_size=10)
-        def analyze_text(text: str) -> dict:
-            return text_analysis(text)
-        
-        # Usage
-        urls = ["http://example1.com", "http://example2.com"]
-        results = fetch_url(urls)  # Parallel processing
-        
-        single_result = fetch_url("http://example.com")  # Returns [result]
-        ```
-    
-    Notes:
-        - The function preserves the original function's docstring and signature
-        - Rate limiting is thread-safe
-        - Executors are reused and automatically cleaned up
-        - Process pools handle rate limiting in the main process
-        - Batch processing helps with memory usage
-        - Prewarming is useful for latency-critical applications
+        max_workers: Maximum number of parallel workers. Defaults to global config.
+        batch_size: Number of items to process in each batch. Defaults to global config.
+        rate_limit: Rate limiting configuration. Defaults to global config.
+        executor_type: Type of parallelism to use. Defaults to global config.
+        prewarm: If True, starts all workers immediately.
     """
-    # Calculate workers here so it's consistent
-    workers = max_workers or (
-        multiprocessing.cpu_count() 
-        if executor_type == "process" 
-        else (multiprocessing.cpu_count() * 5)
-    )
-    
-    # Prewarm if requested
-    if prewarm:
-        get_or_create_executor(executor_type, workers, prewarm=True)
-    
     def decorator(func: Callable[..., T]) -> Callable[..., list[T]]:
+        # Get global configuration
+        config_manager = ConfigManager.get_instance()
+        config = config_manager.get_config()
+        
+        # Initialize execution config if it's None
+        if config.execution is None:
+            config_manager.update_config({
+                "execution": {
+                    "default_max_workers": 4,
+                    "default_executor_type": "thread",
+                    "default_batch_size": 10
+                }
+            })
+            config = config_manager.get_config()
+        
+        # Use global defaults if not explicitly provided
+        workers = max_workers if max_workers is not None else config.execution.default_max_workers
+        batch = batch_size if batch_size is not None else config.execution.default_batch_size
+        exec_type = executor_type if executor_type is not None else config.execution.default_executor_type
+        
+        # Runtime configuration warnings
+        if workers and workers > 100:  # Arbitrary threshold for demonstration
+            import warnings
+            warnings.warn(
+                f"high number of workers ({workers}) specified - this may impact system performance",
+                RuntimeWarning
+            )
+        
+        if exec_type == "process" and (batch_size is not None and batch_size < 2):
+            import warnings
+            warnings.warn(
+                "inefficient configuration: Using process pool with very small batch size. Consider increasing batch size or using thread pool.",
+                RuntimeWarning
+            )
+        
         @wraps(func)
         def wrapper(*args, **kwargs) -> list[T]:
             if not args or not isinstance(args[0], (list, tuple)):
@@ -287,62 +258,40 @@ def parallel(
             
             items = args[0]
             other_args = args[1:]
-            results = []
-            
-            # Convert rate_limit to RateLimit object
-            rate = None
-            if rate_limit is not None:
-                if isinstance(rate_limit, (int, float)):
-                    rate = RateLimit(float(rate_limit))
-                elif isinstance(rate_limit, tuple):
-                    rate = RateLimit(*rate_limit)
-                else:
-                    rate = rate_limit
-            
-            # For process pool, rate limiting happens in the main process
-            bucket = TokenBucket(rate) if rate and executor_type == "thread" else None
-            
-            def rate_limited_func(item):
-                if bucket:
-                    bucket.wait_for_token()
-                return func(item, *other_args, **kwargs)
             
             # Get or create cached executor
-            executor = get_or_create_executor(executor_type, workers)
+            executor = get_or_create_executor(exec_type, workers, prewarm)
+            
+            # Initialize rate limiter if specified
+            rate_limiter = None
+            if rate_limit is not None:
+                if isinstance(rate_limit, (tuple, list)):
+                    rate_limiter = TokenBucket(RateLimit(rate_limit[0], rate_limit[1]))
+                elif isinstance(rate_limit, (int, float)):
+                    rate_limiter = TokenBucket(RateLimit(rate_limit))
+                elif isinstance(rate_limit, RateLimit):
+                    rate_limiter = TokenBucket(rate_limit)
             
             try:
-                if batch_size is None:
-                    # Rate limit in main process for ProcessPoolExecutor
-                    if rate and executor_type == "process":
-                        bucket = TokenBucket(rate)
-                        for item in items:
-                            bucket.wait_for_token()
-                    
-                    futures = [
-                        executor.submit(rate_limited_func if executor_type == "thread" else func, item, *other_args, **kwargs)
-                        for item in items
-                    ]
-                    results.extend(f.result() for f in as_completed(futures))
-                else:
-                    # Process in batches
-                    it = iter(items)
-                    while batch := list(islice(it, batch_size)):
-                        # Rate limit in main process for ProcessPoolExecutor
-                        if rate and executor_type == "process":
-                            bucket = TokenBucket(rate)
-                            for _ in batch:
-                                bucket.wait_for_token()
-                                
-                        futures = [
-                            executor.submit(rate_limited_func if executor_type == "thread" else func, item, *other_args, **kwargs)
-                            for item in batch
-                        ]
-                        results.extend(f.result() for f in as_completed(futures))
+                # Create futures with their original indices
+                futures_with_index = []
+                for i, item in enumerate(items):
+                    if rate_limiter:
+                        rate_limiter.wait_for_token()
+                    futures_with_index.append((i, executor.submit(func, item, *other_args, **kwargs)))
+                
+                # Wait for completion and maintain order
+                results = [None] * len(items)
+                for i, future in futures_with_index:
+                    results[i] = future.result()
+                return results
             except:
-                # Don't shutdown cached executor on error
                 raise
-                
-            return results
-                
+        
+        # Store configuration as attributes on the wrapper function
+        wrapper.max_workers = workers
+        wrapper.executor_type = exec_type
+        wrapper.batch_size = batch
+        
         return wrapper
     return decorator
