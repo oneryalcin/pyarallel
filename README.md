@@ -1,5 +1,8 @@
 # Pyarallel
 
+[![Docs](https://img.shields.io/badge/docs-live-brightgreen)](https://pyarallel.readthedocs.io/) [![PyPI version](https://img.shields.io/pypi/v/pyarallel)](https://pypi.org/project/pyarallel/) [![PyPI Downloads](https://static.pepy.tech/badge/pyarallel/month)](https://pepy.tech/project/pyarallel)
+
+
 A powerful,feature-rich parallel execution library for Python that makes concurrent programming easy and efficient.
 
 ## Features
