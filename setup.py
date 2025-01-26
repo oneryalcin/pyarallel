@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="pyarallel",
-    version="0.1.0",
+    version="0.1.1",
     author="Mehmet Oner Yalcin",
     author_email="oneryalcin@gmail.com",
     description="A powerful parallel execution library for Python",
