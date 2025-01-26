@@ -41,7 +41,6 @@ def nested_config():
     """Fixture providing a ConfigManager instance with nested configuration."""
     
     manager = ConfigManager()
-    manager.reset()
     logger.debug("ConfigManager initialized with nested configuration: %s", manager._config)
 
     manager.update_config({
