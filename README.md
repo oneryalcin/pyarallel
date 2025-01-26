@@ -242,3 +242,60 @@ Contributions are welcome! Please check out our [Contributing Guide](CONTRIBUTIN
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Configuration
+
+Pyarallel provides a flexible configuration system that allows you to customize its behavior globally or per-function:
+
+### Basic Configuration
+
+```python
+from pyarallel import ConfigManager
+
+# Get the global configuration manager
+config = ConfigManager.get_instance()
+
+# Update configuration
+config.update_config({
+    "max_workers": 8,
+    "timeout": 60.0,
+    "debug": True
+})
+```
+
+### Configuration Options
+
+- **Execution Settings**
+  - `max_workers`: Maximum number of worker processes/threads (default: 4)
+  - `timeout`: Default timeout for parallel operations in seconds (default: 30.0)
+
+- **Resource Management**
+  - `memory_limit`: Memory limit per worker in bytes (default: None)
+  - `cpu_affinity`: Enable CPU affinity for workers (default: False)
+
+- **Logging and Debugging**
+  - `debug`: Enable debug mode (default: False)
+  - `log_level`: Logging level (default: "INFO")
+
+### Environment Variables
+
+You can configure Pyarallel using environment variables with the `PYARALLEL_` prefix:
+
+```bash
+PYARALLEL_MAX_WORKERS=4
+PYARALLEL_TIMEOUT=60.0
+PYARALLEL_DEBUG=true
+```
+
+### Configuration Files
+
+Load configuration from JSON, YAML, or TOML files:
+
+```python
+from pyarallel import PyarallelConfig
+
+# Load from file
+config = PyarallelConfig.from_file("pyarallel.yaml")
+
+# Convert to dictionary
+config_dict = config.to_dict()
