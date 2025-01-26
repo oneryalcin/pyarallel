@@ -248,6 +248,50 @@ The configuration system uses a structured schema with the following categories:
    - Decorator arguments override global configuration
    - Environment variables take precedence over code-based configuration
 
+### Runtime Configuration Warnings
+
+Pyarallel includes built-in warnings to help identify potential performance issues:
+
+```python
+# Warning for high worker count
+@parallel(max_workers=150)  # Triggers warning about system impact
+def high_worker_task(): ...
+
+# Warning for inefficient process pool configuration
+@parallel(
+    executor_type="process",
+    batch_size=1  # Triggers warning about inefficient batch size
+)
+def inefficient_task(): ...
+```
+
+### Configuration Inheritance
+
+Pyarallel uses a hierarchical configuration system:
+
+1. **Default Values**: Built-in defaults (4 workers, thread executor, batch size 10)
+2. **Global Configuration**: Set via ConfigManager
+3. **Environment Variables**: Override global config
+4. **Decorator Arguments**: Highest precedence, override all other settings
+
+```python
+# Global configuration (lowest precedence)
+config = ConfigManager.get_instance()
+config.update_config({
+    "execution": {
+        "default_max_workers": 8,
+        "default_executor_type": "thread"
+    }
+})
+
+# Environment variables (middle precedence)
+# export PYARALLEL_MAX_WORKERS=16
+
+# Decorator arguments (highest precedence)
+@parallel(max_workers=4)  # This value wins
+def my_func(): ...
+```
+
 ## Roadmap
 
 ### Observability & Debugging

@@ -22,8 +22,20 @@ class ExecutionConfig(BaseModel):
         description="Default timeout for parallel operations in seconds",
         ge=0
     )
-    max_workers: Optional[int] = 4
-    timeout: Optional[float] = 30.0
+    default_max_workers: int = Field(
+        default=4,
+        description="Default number of workers for parallel operations",
+        ge=1
+    )
+    default_executor_type: str = Field(
+        default="thread",
+        description="Default executor type (thread or process)"
+    )
+    default_batch_size: int = Field(
+        default=10,
+        description="Default batch size for parallel operations",
+        ge=1
+    )
     
     model_config = ConfigDict(extra="allow")  # Allow dynamic fields
 
