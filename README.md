@@ -141,6 +141,97 @@ results = process_large_dataset(items)
            return {"error": str(e), "item": item}
    ```
 
+## Configuration
+
+Pyarallel features a robust configuration system built on Pydantic, offering type validation, environment variable support, and thread-safe configuration management.
+
+### Basic Configuration
+
+```python
+from pyarallel import ConfigManager
+
+# Get the thread-safe singleton configuration manager
+config = ConfigManager.get_instance()
+
+# Update configuration with type validation
+config.update_config({
+    "execution": {
+        "default_max_workers": 8,
+        "default_executor_type": "thread",
+        "default_batch_size": 100,
+        "prewarm_pools": True
+    },
+    "rate_limiting": {
+        "default_rate": 1000,
+        "default_interval": "minute",
+        "burst_tolerance": 1.5
+    }
+})
+```
+
+### Configuration Schema
+
+The configuration system uses a structured schema with the following categories:
+
+```python
+{
+    "execution": {
+        "default_max_workers": int,        # Default worker count
+        "default_executor_type": str,     # "thread" or "process"
+        "default_batch_size": Optional[int], # Default batch size
+        "prewarm_pools": bool            # Enable worker prewarming
+    },
+    "rate_limiting": {
+        "default_rate": Optional[float],  # Default operations per interval
+        "default_interval": str,         # "second", "minute", "hour"
+        "burst_tolerance": float         # Burst allowance factor
+    },
+    "error_handling": {
+        "max_retries": int,              # Maximum retry attempts
+        "retry_backoff": float,          # Backoff multiplier
+        "fail_fast": bool                # Stop on first error
+    },
+    "monitoring": {
+        "enable_logging": bool,          # Enable detailed logging
+        "log_level": str,               # Logging level
+        "sentry_dsn": Optional[str],    # Sentry integration
+        "metrics_enabled": bool         # Enable metrics collection
+    }
+}
+```
+
+### Environment Variables
+
+Configure Pyarallel using environment variables with the `PYARALLEL_` prefix. The system automatically handles type coercion and validation:
+
+```bash
+# Execution settings
+PYARALLEL_MAX_WORKERS=4
+PYARALLEL_EXECUTOR_TYPE=thread
+PYARALLEL_BATCH_SIZE=100
+
+# Rate limiting
+PYARALLEL_RATE_LIMIT=100/minute
+PYARALLEL_FAIL_FAST=true
+
+# Monitoring
+PYARALLEL_SENTRY_DSN=https://...
+```
+
+### Best Practices
+
+1. **Use Environment Variables for Deployment**:
+   - Keep configuration in environment variables for different environments
+   - Use the `PYARALLEL_` prefix to avoid conflicts
+
+2. **Validate Configuration Early**:
+   - Set up configuration at application startup
+   - Use type validation to catch issues early
+
+3. **Thread-Safe Updates**:
+   - Use `ConfigManager.get_instance()` for thread-safe access
+   - Make configuration changes before starting parallel operations
+
 ## Roadmap
 
 ### Observability & Debugging
@@ -196,7 +287,6 @@ results = process_large_dataset(items)
   - Log analysis utilities
   - Telemetry visualization
 
-
 ### Enterprise Features
 - **Integration**
   - Distributed tracing (OpenTelemetry)
@@ -242,60 +332,3 @@ Contributions are welcome! Please check out our [Contributing Guide](CONTRIBUTIN
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Configuration
-
-Pyarallel provides a flexible configuration system that allows you to customize its behavior globally or per-function:
-
-### Basic Configuration
-
-```python
-from pyarallel import ConfigManager
-
-# Get the global configuration manager
-config = ConfigManager.get_instance()
-
-# Update configuration
-config.update_config({
-    "max_workers": 8,
-    "timeout": 60.0,
-    "debug": True
-})
-```
-
-### Configuration Options
-
-- **Execution Settings**
-  - `max_workers`: Maximum number of worker processes/threads (default: 4)
-  - `timeout`: Default timeout for parallel operations in seconds (default: 30.0)
-
-- **Resource Management**
-  - `memory_limit`: Memory limit per worker in bytes (default: None)
-  - `cpu_affinity`: Enable CPU affinity for workers (default: False)
-
-- **Logging and Debugging**
-  - `debug`: Enable debug mode (default: False)
-  - `log_level`: Logging level (default: "INFO")
-
-### Environment Variables
-
-You can configure Pyarallel using environment variables with the `PYARALLEL_` prefix:
-
-```bash
-PYARALLEL_MAX_WORKERS=4
-PYARALLEL_TIMEOUT=60.0
-PYARALLEL_DEBUG=true
-```
-
-### Configuration Files
-
-Load configuration from JSON, YAML, or TOML files:
-
-```python
-from pyarallel import PyarallelConfig
-
-# Load from file
-config = PyarallelConfig.from_file("pyarallel.yaml")
-
-# Convert to dictionary
-config_dict = config.to_dict()
