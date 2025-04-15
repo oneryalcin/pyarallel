@@ -300,6 +300,63 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#advanced-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Usage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      Method Support
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Method Support">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#instance-method-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Instance Method Example
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#class-method-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Class Method Example
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#argument-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Argument Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#installation" class="md-nav__link">
     <span class="md-ellipsis">
       Installation
@@ -803,6 +860,63 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#advanced-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Advanced Usage
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Advanced Usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      Method Support
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Method Support">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#instance-method-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Instance Method Example
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#class-method-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Class Method Example
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#argument-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Argument Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#installation" class="md-nav__link">
     <span class="md-ellipsis">
       Installation
@@ -887,6 +1001,37 @@
 <span class="n">urls</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;http://api1.com&quot;</span><span class="p">,</span> <span class="s2">&quot;http://api2.com&quot;</span><span class="p">]</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">fetch_url</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span>
 </code></pre></div>
+<h2 id="advanced-usage">Advanced Usage<a class="headerlink" href="#advanced-usage" title="Permanent link">&para;</a></h2>
+<h3 id="method-support">Method Support<a class="headerlink" href="#method-support" title="Permanent link">&para;</a></h3>
+<p>The <code>@parallel</code> decorator works seamlessly with:
+- Regular functions
+- Instance methods (preserves <code>self</code>)
+- Class methods (preserves <code>cls</code>)
+- Static methods</p>
+<h4 id="instance-method-example">Instance Method Example<a class="headerlink" href="#instance-method-example" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DataTransformer</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">base</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">base</span> <span class="o">=</span> <span class="n">base</span>
+
+    <span class="nd">@parallel</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">items</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">base</span> <span class="o">+</span> <span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">items</span><span class="p">]</span>
+</code></pre></div>
+<h4 id="class-method-example">Class Method Example<a class="headerlink" href="#class-method-example" title="Permanent link">&para;</a></h4>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Logger</span><span class="p">:</span>
+    <span class="n">log_prefix</span> <span class="o">=</span> <span class="s2">&quot;APP&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="nd">@parallel</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">log_all</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">messages</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="n">log_prefix</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">msg</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">messages</span><span class="p">]</span>
+</code></pre></div>
+<h3 id="argument-handling">Argument Handling<a class="headerlink" href="#argument-handling" title="Permanent link">&para;</a></h3>
+<p>The decorator intelligently handles:
+- Positional arguments
+- Keyword arguments
+- Mixed argument types
+- Both single items and iterables</p>
 <h2 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>pyarallel
 </code></pre></div>
