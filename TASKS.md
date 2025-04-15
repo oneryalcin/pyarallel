@@ -143,9 +143,11 @@ Implement first-class support for decorating instance, static, and class methods
     - [✅] Test methods with additional arguments.
     - [✅] Ensure no regressions for regular functions.
 - [✅] **5. Update Documentation**
-    - [✅] Update `docs/api-reference/decorators.md` with OOP support details.
-    - [✅] Add examples for each method type to API reference and user guide.
-    - [✅] Review README and other docs for consistency.
+    - [✅] Update `README.md` and `docs/index.md` with clear examples for each method type.
 - [✅] **6. Code Review and Refinement**
     - [✅] Review implementation, tests, and documentation.
     - [✅] Ensure robustness, adherence to standards, and clarity.
+- [✅] **7. Add Type Hints**
+    - [✅] Add type hints to the `@parallel` decorator and inner `wrapper` in `pyarallel/core.py` for better IDE support.
+
+## Future Enhancements / Ideas
