@@ -5,7 +5,6 @@ with the PYARALLEL_ prefix into configuration values.
 """
 
 import os
-import json
 import logging
 from pyarallel.config_manager import ConfigManager
 from pyarallel.env_config import load_env_vars

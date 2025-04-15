@@ -53,8 +53,8 @@ https://github.com/oneryalcin/pyarallel
 """
 
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-from functools import wraps
-from typing import Any, Callable, TypeVar, Literal
+from functools import wraps, partial
+from typing import Any, Callable, TypeVar, Literal, List, Optional, Tuple, Union
 from itertools import islice
 import time
 import threading
@@ -62,14 +62,19 @@ from dataclasses import dataclass
 import multiprocessing
 import weakref
 from .config_manager import ConfigManager
+import inspect
+import logging
 
 T = TypeVar('T')
+U = TypeVar('U')  # Type variable for the items in the list
 
 TimeUnit = Literal["second", "minute", "hour"]
 ExecutorType = Literal["thread", "process"]
 
 # Global executor cache using weak references
 _EXECUTOR_CACHE = weakref.WeakValueDictionary()
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class RateLimit:
@@ -190,12 +195,14 @@ def get_or_create_executor(executor_type: ExecutorType, max_workers: int, prewar
     return executor
 
 def parallel(
-    max_workers: int = None, 
-    batch_size: int = None, 
-    rate_limit: float | tuple[float, TimeUnit] | RateLimit = None,
-    executor_type: ExecutorType = None,
+    func: Optional[Callable[..., T]] = None,
+    *,
+    max_workers: Optional[int] = None,
+    executor_type: Optional[str] = None, 
+    batch_size: Optional[int] = None,
+    rate_limit: Optional[float | tuple[float, TimeUnit] | RateLimit] = None,
     prewarm: bool = False
-):
+) -> Callable[..., List[T]]:
     """Decorator for parallel execution of functions over iterables.
     
     This decorator transforms a function that processes a single item into one
@@ -209,13 +216,14 @@ def parallel(
     a single-item list.
     
     Args:
+        func: The function to be decorated.
         max_workers: Maximum number of parallel workers. Defaults to global config.
+        executor_type: Type of parallelism to use. Defaults to global config.
         batch_size: Number of items to process in each batch. Defaults to global config.
         rate_limit: Rate limiting configuration. Defaults to global config.
-        executor_type: Type of parallelism to use. Defaults to global config.
         prewarm: If True, starts all workers immediately.
     """
-    def decorator(func: Callable[..., T]) -> Callable[..., list[T]]:
+    def decorator(fn: Callable[..., T]) -> Callable[..., List[T]]:
         # Get global configuration
         config_manager = ConfigManager.get_instance()
         config = config_manager.get_config()
@@ -251,13 +259,52 @@ def parallel(
                 RuntimeWarning
             )
         
-        @wraps(func)
-        def wrapper(*args, **kwargs) -> list[T]:
-            if not args or not isinstance(args[0], (list, tuple)):
-                return [func(*args, **kwargs)]
+        @wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any) -> List[T]:
+            logger.debug(f"---> Entering @parallel wrapper for {fn.__name__}")
+            logger.debug(f"Wrapper called with args: {args!r}, kwargs: {kwargs!r}")
             
-            items = args[0]
-            other_args = args[1:]
+            # --- Robust detection of instance/class/static method ---
+            items_arg_index = 0
+            if args:
+                qualname = fn.__qualname__
+                if '.' in qualname:
+                    cls_name = qualname.split('.')[0]
+                    # Instance method: first argument is an instance of the class
+                    if hasattr(args[0], '__class__') and args[0].__class__.__name__ == cls_name:
+                        items_arg_index = 1
+                        logger.debug(f"Detected instance method. fn={fn!r}, self={args[0]!r}")
+                    # Class method: first argument is the class itself
+                    elif isinstance(args[0], type) and args[0].__name__ == cls_name:
+                        items_arg_index = 1
+                        logger.debug(f"Detected class method. fn={fn!r}, cls={args[0]!r}")
+                    else:
+                        logger.debug(f"Detected static method or function. fn={fn!r}")
+                else:
+                    logger.debug(f"Detected function (no class context). fn={fn!r}")
+            else:
+                logger.debug(f"No args provided to wrapper.")
+            
+            # --- Check if the relevant argument is an iterable ---
+            if len(args) <= items_arg_index or not isinstance(args[items_arg_index], (list, tuple)):
+                if items_arg_index:
+                    # For bound methods, include self/cls in the call
+                    single_item_args: Tuple[Any, ...] = (args[0],) + args[items_arg_index:]
+                else:
+                    single_item_args = args[items_arg_index:]
+                logger.debug(f"Single item path. Calling fn({single_item_args=}, {kwargs=})")
+                # Ensure return is always a list, even for single item path
+                result: T = fn(*single_item_args, **kwargs)
+                return [result]
+            
+            # --- List Processing --- 
+            items: Union[List[U], Tuple[U, ...]] = args[items_arg_index]
+            other_args: Tuple[Any, ...] = args[items_arg_index+1:]
+            bound_arg: Optional[Any] = args[0] if items_arg_index else None
+            logger.debug(f"List processing path. {items=}, {other_args=}")
+
+            results: List[T] = [None] * len(items) # Preallocate results list
+            futures_map = {}
             
             # Get or create cached executor
             executor = get_or_create_executor(exec_type, workers, prewarm)
@@ -272,21 +319,42 @@ def parallel(
                 elif isinstance(rate_limit, RateLimit):
                     rate_limiter = TokenBucket(rate_limit)
             
-            try:
-                # Create futures with their original indices
-                futures_with_index = []
-                for i, item in enumerate(items):
-                    if rate_limiter:
-                        rate_limiter.wait_for_token()
-                    futures_with_index.append((i, executor.submit(func, item, *other_args, **kwargs)))
-                
-                # Wait for completion and maintain order
-                results = [None] * len(items)
-                for i, future in futures_with_index:
-                    results[i] = future.result()
-                return results
-            except:
-                raise
+            # Create futures with their original indices
+            for i, item in enumerate(items):
+                if rate_limiter:
+                    rate_limiter.wait_for_token()
+                    
+                # Create task with correct binding
+                if items_arg_index == 1:  # Instance or class method
+                    # args[0] is self/cls
+                    task = partial(fn, bound_arg, item, *other_args, **kwargs)
+                else:  # Static method or function
+                    task = partial(fn, item, *other_args, **kwargs)
+                    
+                future = executor.submit(task)
+                futures_map[future] = i
+                logger.debug(f"LOOP {i}: Submitted task to executor.")
+            
+            # Wait for completion and maintain order
+            logger.debug("Waiting for tasks to complete...")
+            first_exception = None
+            for future in as_completed(futures_map):
+                original_index = futures_map[future]
+                try:
+                    result: T = future.result()
+                    results[original_index] = result
+                    logger.debug(f"Task {original_index} completed with result: {result!r}")
+                except Exception as e:
+                    logger.error(f"Task {original_index} failed: {e}", exc_info=True)
+                    if first_exception is None:
+                        first_exception = e
+                    results[original_index] = e # Or handle error differently
+            
+            if first_exception is not None:
+                raise first_exception
+            
+            logger.debug(f"<--- Exiting @parallel wrapper for {fn.__name__}. Results: {results!r}")
+            return results
         
         # Store configuration as attributes on the wrapper function
         wrapper.max_workers = workers
@@ -294,4 +362,10 @@ def parallel(
         wrapper.batch_size = batch
         
         return wrapper
-    return decorator
+
+    if func is None:
+        # Called as @parallel(...)
+        return decorator
+    else:
+        # Called as @parallel directly on the function
+        return decorator(func)
