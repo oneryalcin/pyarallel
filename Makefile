@@ -1,4 +1,4 @@
-.PHONY: help test docs-serve docs-deploy format lint clean
+.PHONY: help test docs-serve docs-deploy format lint clean build publish
 
 help:
 	@echo "Available commands:"
@@ -8,6 +8,8 @@ help:
 	@echo "  make format      Format code with black and isort"
 	@echo "  make lint        Run mypy for type checking"
 	@echo "  make clean       Remove build artifacts"
+	@echo "  make build       Build package"
+	@echo "  make publish     Publish package to PyPI"
 
 test:
 	pytest tests/ -v
@@ -34,3 +36,10 @@ clean:
 	find . -type f -name '*.pyc' -delete
 	find . -type f -name '*.pyo' -delete
 	find . -type f -name '*.pyd' -delete
+
+build:
+	$(MAKE) clean
+	python -m build
+
+publish: build
+	twine upload dist/*
