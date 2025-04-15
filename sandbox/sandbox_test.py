@@ -1,48 +1,44 @@
-
-
 import os
 import time
-from pyarallel.config_manager import ConfigManager
+
 from pyarallel import parallel
+from pyarallel.config_manager import ConfigManager
 
 manager = ConfigManager()
 # manager.reset()
 
 # Set up test defaults
-manager.update_config({
-    "execution": {
-        "default_max_workers": 4,
-        "default_executor_type": "thread",
-        "default_batch_size": 10
-    }
-})
-
-manager.update_config({
+manager.update_config(
+    {
         "execution": {
-            "default_max_workers": 8,
-            "nested_setting": {
-                "value": "test"
-            }
+            "default_max_workers": 4,
+            "default_executor_type": "thread",
+            "default_batch_size": 10,
         }
-    })
-    
+    }
+)
+
+manager.update_config(
+    {"execution": {"default_max_workers": 8, "nested_setting": {"value": "test"}}}
+)
+
+
 @parallel()
 def sample_function(x):
     return x * 2
+
 
 # Verify nested settings are inherited
 assert sample_function.default_max_workers == 8
 
 # Update nested config and verify changes propagate
-manager.update_config({
-    "execution": {
-        "default_max_workers": 12
-    }
-})
+manager.update_config({"execution": {"default_max_workers": 12}})
+
 
 @parallel()
 def another_function(x):
     return x * 3
+
 
 assert another_function.max_workers == 12
 
@@ -79,8 +75,6 @@ manager.set_error_handling(retry_count=3)
 manager.set_monitoring(enabled=True)
 
 
-
-
 # os.environ["PYARALLEL_MAX_WORKERS"] = "6"
 # os.environ["PYARALLEL_TIMEOUT"] = "45.0"
 
@@ -95,6 +89,3 @@ manager.set_monitoring(enabled=True)
 # manager = ConfigManager()
 # config = manager.get_config()
 # assert config.max_workers == 6
-
-
-

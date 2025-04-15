@@ -7,49 +7,39 @@ with support for loading configurations from different sources and thread-safe o
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExecutionConfig(BaseModel):
     """Execution configuration settings."""
+
     max_workers: int = Field(
-        default=4,
-        description="Maximum number of worker processes/threads",
-        ge=1
+        default=4, description="Maximum number of worker processes/threads", ge=1
     )
     timeout: float = Field(
         default=30.0,
         description="Default timeout for parallel operations in seconds",
-        ge=0
+        ge=0,
     )
     default_max_workers: int = Field(
-        default=4,
-        description="Default number of workers for parallel operations",
-        ge=1
+        default=4, description="Default number of workers for parallel operations", ge=1
     )
     default_executor_type: str = Field(
-        default="thread",
-        description="Default executor type (thread or process)"
+        default="thread", description="Default executor type (thread or process)"
     )
     default_batch_size: int = Field(
-        default=10,
-        description="Default batch size for parallel operations",
-        ge=1
+        default=10, description="Default batch size for parallel operations", ge=1
     )
-    
+
     model_config = ConfigDict(extra="allow")  # Allow dynamic fields
+
 
 class RateLimitingConfig(BaseModel):
     """Rate limiting configuration settings."""
-    rate: int = Field(
-        default=1000,
-        description="Rate limit per interval",
-        ge=0
-    )
-    interval: str = Field(
-        default="minute",
-        description="Rate limit interval"
-    )
+
+    rate: int = Field(default=1000, description="Rate limit per interval", ge=0)
+    interval: str = Field(default="minute", description="Rate limit interval")
+
 
 class PyarallelConfig(BaseModel):
     """Base configuration class for pyarallel.
@@ -60,57 +50,44 @@ class PyarallelConfig(BaseModel):
 
     # Execution settings
     max_workers: int = Field(
-        default=4,
-        description="Maximum number of worker processes/threads",
-        ge=1
+        default=4, description="Maximum number of worker processes/threads", ge=1
     )
     timeout: float = Field(
         default=30.0,
         description="Default timeout for parallel operations in seconds",
-        ge=0
+        ge=0,
     )
     execution: Optional[ExecutionConfig] = Field(
-        default=None,
-        description="Nested execution settings"
+        default=None, description="Nested execution settings"
     )
 
     # Rate limiting settings
     rate_limiting: Optional[RateLimitingConfig] = Field(
-        default=None,
-        description="Rate limiting settings"
+        default=None, description="Rate limiting settings"
     )
 
     # Error handling settings
     error_handling: Dict[str, Any] = Field(
         default_factory=lambda: {"retry_count": 3},
-        description="Error handling settings"
+        description="Error handling settings",
     )
 
     # Monitoring settings
     monitoring: Dict[str, Any] = Field(
-        default_factory=lambda: {"enabled": False},
-        description="Monitoring settings"
+        default_factory=lambda: {"enabled": False}, description="Monitoring settings"
     )
 
     # Resource management
     memory_limit: Optional[int] = Field(
-        default=None,
-        description="Memory limit per worker in bytes, None for no limit"
+        default=None, description="Memory limit per worker in bytes, None for no limit"
     )
     cpu_affinity: bool = Field(
-        default=False,
-        description="Enable CPU affinity for workers"
+        default=False, description="Enable CPU affinity for workers"
     )
 
     # Logging and debugging
-    debug: bool = Field(
-        default=False,
-        description="Enable debug mode"
-    )
-    log_level: str = Field(
-        default="INFO",
-        description="Logging level"
-    )
+    debug: bool = Field(default=False, description="Enable debug mode")
+    log_level: str = Field(default="INFO", description="Logging level")
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "PyarallelConfig":
@@ -148,18 +125,23 @@ class PyarallelConfig(BaseModel):
         # Load based on file extension
         if config_path.suffix == ".json":
             import json
+
             with open(config_path) as f:
                 config_dict = json.load(f)
         elif config_path.suffix in (".yml", ".yaml"):
             import yaml
+
             with open(config_path) as f:
                 config_dict = yaml.safe_load(f)
         elif config_path.suffix == ".toml":
             import toml
+
             with open(config_path) as f:
                 config_dict = toml.load(f)
         else:
-            raise ValueError(f"Unsupported configuration file format: {config_path.suffix}")
+            raise ValueError(
+                f"Unsupported configuration file format: {config_path.suffix}"
+            )
 
         return cls.from_dict(config_dict)
 

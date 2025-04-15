@@ -13,7 +13,7 @@ from .env_config import load_env_vars
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T', bound='ConfigManager')
+T = TypeVar("T", bound="ConfigManager")
 
 
 class ConfigManager:
@@ -22,6 +22,7 @@ class ConfigManager:
     This class ensures thread-safe access to configuration settings and provides
     methods for updating and retrieving configuration values.
     """
+
     _instance: Optional[T] = None
     _lock: RLock = RLock()
     _config: Optional[PyarallelConfig] = None
@@ -34,18 +35,23 @@ class ConfigManager:
                     # Initialize with default config
                     config_dict = PyarallelConfig().model_dump()
                     logger.debug(f"Default config: {config_dict}")
-                    
+
                     # Load and apply environment variables
                     env_config = load_env_vars()
                     logger.debug(f"Loaded environment config: {env_config}")
-                    
+
                     # Update config with environment variables
                     if env_config:
                         logger.debug("Updating config with environment variables")
-                        config_dict = {**config_dict, **env_config}  # Use dictionary unpacking for proper update
+                        config_dict = {
+                            **config_dict,
+                            **env_config,
+                        }  # Use dictionary unpacking for proper update
                         logger.debug(f"Updated config: {config_dict}")
-                    
-                    cls._instance._config = PyarallelConfig(**config_dict)  # Use direct instantiation
+
+                    cls._instance._config = PyarallelConfig(
+                        **config_dict
+                    )  # Use direct instantiation
                     logger.debug(f"Final config: {cls._instance._config}")
         return cls._instance
 
@@ -79,18 +85,20 @@ class ConfigManager:
             current_config = self._config.model_dump()
             logger.debug(f"Current config before update: {current_config}")
             logger.debug(f"Incoming updates: {updates}")
-            
+
             # Validate max_workers before merging
             if "max_workers" in updates and updates["max_workers"] < 1:
                 updates["max_workers"] = 1
-            
+
             # Use deep merge for nested updates
             merged_config = self._deep_merge(current_config, updates)
             logger.debug(f"Merged config: {merged_config}")
             self._config = PyarallelConfig.from_dict(merged_config)
             logger.debug(f"Final config after update: {self._config}")
 
-    def _deep_merge(self, base: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
+    def _deep_merge(
+        self, base: Dict[str, Any], updates: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Recursively merge two configuration dictionaries with special handling for execution settings.
 
         This method implements a specialized merge strategy for configuration dictionaries that:
@@ -123,13 +131,13 @@ class ConfigManager:
         logger.debug(f"Deep merging - Base: {base}")
         logger.debug(f"Deep merging - Updates: {updates}")
         result = base.copy()
-        
+
         # Initialize critical nested structures
         self._ensure_critical_structures(result)
-        
+
         for key, value in updates.items():
             logger.debug(f"Processing key: {key}, value: {value}")
-            
+
             if self._is_execution_update(key, value):
                 self._handle_execution_settings(result, value)
             elif self._is_nested_dict_update(key, value, result):
@@ -137,11 +145,11 @@ class ConfigManager:
             else:
                 result[key] = value
                 logger.debug(f"Direct value assignment for key: {key}")
-            
+
             # Re-ensure critical structures after each update
             self._ensure_critical_structures(result)
             logger.debug(f"Current result after processing {key}: {result}")
-        
+
         return result
 
     def _ensure_critical_structures(self, config: Dict[str, Any]) -> None:
@@ -151,15 +159,17 @@ class ConfigManager:
             config: The configuration dictionary to initialize
         """
         critical_structures = {
-            'execution': {},
-            'rate_limiting': {},
-            'error_handling': {'retry_count': 3},
-            'monitoring': {'enabled': False}
+            "execution": {},
+            "rate_limiting": {},
+            "error_handling": {"retry_count": 3},
+            "monitoring": {"enabled": False},
         }
         for structure, default_value in critical_structures.items():
             if structure not in config or config[structure] is None:
                 config[structure] = default_value.copy()
-                logger.debug(f"Initialized {structure} structure with defaults: {default_value}")
+                logger.debug(
+                    f"Initialized {structure} structure with defaults: {default_value}"
+                )
 
     def _is_execution_update(self, key: str, value: Any) -> bool:
         """Check if the update is for execution settings.
@@ -173,7 +183,9 @@ class ConfigManager:
         """
         return key == "execution" and isinstance(value, dict)
 
-    def _is_nested_dict_update(self, key: str, value: Any, base: Dict[str, Any]) -> bool:
+    def _is_nested_dict_update(
+        self, key: str, value: Any, base: Dict[str, Any]
+    ) -> bool:
         """Check if the update is for a nested dictionary.
 
         Args:
@@ -184,11 +196,11 @@ class ConfigManager:
         Returns:
             bool: True if this is a nested dictionary update
         """
-        return (key in base and 
-                isinstance(base[key], dict) and 
-                isinstance(value, dict))
+        return key in base and isinstance(base[key], dict) and isinstance(value, dict)
 
-    def _handle_execution_settings(self, config: Dict[str, Any], execution_settings: Dict[str, Any]) -> None:
+    def _handle_execution_settings(
+        self, config: Dict[str, Any], execution_settings: Dict[str, Any]
+    ) -> None:
         """Handle special case of execution settings update.
 
         This method maintains both top-level and nested execution settings
@@ -201,19 +213,23 @@ class ConfigManager:
         # Update top-level settings for backward compatibility
         if "max_workers" in execution_settings:
             config["max_workers"] = execution_settings["max_workers"]
-            logger.debug(f"Set top-level max_workers: {execution_settings['max_workers']}")
+            logger.debug(
+                f"Set top-level max_workers: {execution_settings['max_workers']}"
+            )
         if "timeout" in execution_settings:
             config["timeout"] = execution_settings["timeout"]
             logger.debug(f"Set top-level timeout: {execution_settings['timeout']}")
-        
+
         # Initialize execution settings if None
         if config["execution"] is None:
             config["execution"] = {}
             logger.debug("Initialized empty execution settings")
-        
+
         # Merge with existing execution settings
         config["execution"] = {**config["execution"], **execution_settings}
-        logger.debug(f"Merged execution settings in nested structure: {config['execution']}")
+        logger.debug(
+            f"Merged execution settings in nested structure: {config['execution']}"
+        )
 
     def reset(self) -> None:
         """Reset the configuration to default values.
@@ -233,56 +249,66 @@ class ConfigManager:
             value: Value to set
         """
         with self._lock:
-            parts = key.split('.')
+            parts = key.split(".")
             current = self._config.model_dump()
             target = current
             logger.debug(f"Setting config value - Key: {key}, Value: {value}")
             logger.debug(f"Current config state: {current}")
-            
+
             # Handle execution settings at top level
-            if parts[0] == 'execution' and len(parts) == 2:
-                if parts[1] in ['max_workers', 'timeout']:
+            if parts[0] == "execution" and len(parts) == 2:
+                if parts[1] in ["max_workers", "timeout"]:
                     target[parts[1]] = value
-                    logger.debug(f"Setting top-level execution parameter: {parts[1]} = {value}")
+                    logger.debug(
+                        f"Setting top-level execution parameter: {parts[1]} = {value}"
+                    )
                 else:
                     # Create execution dictionary if needed
-                    if 'execution' not in target:
-                        target['execution'] = {}
-                    target['execution'][parts[1]] = value
-                    logger.debug(f"Setting nested execution parameter: {parts[1]} = {value}")
+                    if "execution" not in target:
+                        target["execution"] = {}
+                    target["execution"][parts[1]] = value
+                    logger.debug(
+                        f"Setting nested execution parameter: {parts[1]} = {value}"
+                    )
             else:
                 # Initialize nested configuration objects if needed
-                if parts[0] == 'rate_limiting' and target['rate_limiting'] is None:
-                    target['rate_limiting'] = {'rate': 1000, 'interval': 'minute'}
-                    logger.debug(f"Initialized rate_limiting config: {target['rate_limiting']}")
+                if parts[0] == "rate_limiting" and target["rate_limiting"] is None:
+                    target["rate_limiting"] = {"rate": 1000, "interval": "minute"}
+                    logger.debug(
+                        f"Initialized rate_limiting config: {target['rate_limiting']}"
+                    )
 
                 # Navigate to the nested location
                 for part in parts[:-1]:
                     if part not in target:
                         target[part] = {}
                     target = target[part]
-                    logger.debug(f"Navigating to nested key: {part}, Current target: {target}")
+                    logger.debug(
+                        f"Navigating to nested key: {part}, Current target: {target}"
+                    )
 
                 # Set the value
                 target[parts[-1]] = value
                 logger.debug(f"Set final value at {parts[-1]}: {value}")
-            
+
             logger.debug(f"Updated config state: {current}")
             self._config = PyarallelConfig.from_dict(current)
             logger.debug(f"Final config after update: {self._config}")
 
     def get(self, key: str, default: Any = None) -> Any:
-        parts = key.split('.')
+        parts = key.split(".")
         current = self._config.model_dump()
         logger.debug(f"Getting config value - Key: {key}")
         logger.debug(f"Current config state: {current}")
 
         # Handle execution settings specially
-        if parts[0] == 'execution':
-            if current['execution'] is None:
+        if parts[0] == "execution":
+            if current["execution"] is None:
                 # Check if the value exists at top level
-                if len(parts) == 2 and parts[1] in ['max_workers', 'timeout']:
-                    logger.debug(f"Retrieving top-level {parts[1]} value: {current[parts[1]]}")
+                if len(parts) == 2 and parts[1] in ["max_workers", "timeout"]:
+                    logger.debug(
+                        f"Retrieving top-level {parts[1]} value: {current[parts[1]]}"
+                    )
                     return current[parts[1]]
                 logger.debug("Execution config is None, returning default")
                 return default

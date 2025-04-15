@@ -11,6 +11,7 @@ from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
+
 def load_env_vars() -> Dict[str, Any]:
     """Load configuration from environment variables.
 
@@ -19,7 +20,7 @@ def load_env_vars() -> Dict[str, Any]:
     """
     config = {}
     logger.debug("Starting to load environment variables")
-    
+
     # Map of environment variable names to config keys
     env_map = {
         "PYARALLEL_MAX_WORKERS": "max_workers",
@@ -27,14 +28,14 @@ def load_env_vars() -> Dict[str, Any]:
         "PYARALLEL_DEBUG": "debug",
         "PYARALLEL_LOG_LEVEL": "log_level",
         "PYARALLEL_MEMORY_LIMIT": "memory_limit",
-        "PYARALLEL_CPU_AFFINITY": "cpu_affinity"
+        "PYARALLEL_CPU_AFFINITY": "cpu_affinity",
     }
 
     for env_var, config_key in env_map.items():
         if env_var in os.environ:
             value = os.environ[env_var]
             logger.debug(f"Found environment variable {env_var} = {value}")
-            
+
             # Type conversion based on config key
             if config_key in ("max_workers", "memory_limit"):
                 try:

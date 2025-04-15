@@ -1,4 +1,4 @@
-from .core import parallel, RateLimit
+from .core import RateLimit, parallel
 
 __version__ = "0.1.0"
 __all__ = ["parallel", "RateLimit"]
