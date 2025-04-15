@@ -36,6 +36,46 @@ urls = ["http://api1.com", "http://api2.com"]
 results = fetch_url(urls)
 ```
 
+## Advanced Usage
+
+### Method Support
+
+The `@parallel` decorator works seamlessly with:
+- Regular functions
+- Instance methods (preserves `self`)
+- Class methods (preserves `cls`)
+- Static methods
+
+#### Instance Method Example
+```python
+class DataTransformer:
+    def __init__(self, base):
+        self.base = base
+    
+    @parallel
+    def transform(self, items):
+        return [self.base + x for x in items]
+```
+
+#### Class Method Example
+```python
+class Logger:
+    log_prefix = "APP"
+    
+    @classmethod
+    @parallel
+    def log_all(cls, messages):
+        return [f"{cls.log_prefix}: {msg}" for msg in messages]
+```
+
+### Argument Handling
+
+The decorator intelligently handles:
+- Positional arguments
+- Keyword arguments
+- Mixed argument types
+- Both single items and iterables
+
 ## Installation
 
 ```bash

@@ -97,3 +97,68 @@ def test_rate_limit_object():
     
     assert sorted(results) == [1, 2, 3, 4]
     assert duration >= 1.5
+
+# --- Tests for Class Method Integration --- 
+
+class MethodTester:
+    def __init__(self, multiplier=2):
+        self.multiplier = multiplier
+
+    @parallel()
+    def instance_method(self, x):
+        """Test parallel on an instance method."""
+        return x * self.multiplier
+
+    @parallel(max_workers=2)
+    def instance_method_with_args(self, x, suffix=""):
+        """Test parallel on instance method with extra args."""
+        return str(x * self.multiplier) + suffix
+
+    @staticmethod
+    @parallel()
+    def static_method(x):
+        """Test parallel on a static method."""
+        return x + 1
+
+    @classmethod
+    @parallel()
+    def class_method(cls, x):
+        """Test parallel on a class method."""
+        # Example: Use a class attribute or just demonstrate cls is passed
+        return f"{cls.__name__}-{x}"
+
+def test_instance_method_list():
+    tester = MethodTester(multiplier=3)
+    results = tester.instance_method([1, 2, 3])
+    assert results == [3, 6, 9]
+
+def test_instance_method_single():
+    tester = MethodTester(multiplier=3)
+    result = tester.instance_method(5) # Should handle single item
+    assert result == [15]
+
+def test_instance_method_with_args_list():
+    tester = MethodTester(multiplier=2)
+    results = tester.instance_method_with_args([1, 2], suffix="_test")
+    assert results == ["2_test", "4_test"]
+
+def test_instance_method_with_args_single():
+    tester = MethodTester(multiplier=2)
+    result = tester.instance_method_with_args(5, suffix="_single")
+    assert result == ["10_single"]
+
+def test_static_method_list():
+    results = MethodTester.static_method([10, 20, 30])
+    assert results == [11, 21, 31]
+
+def test_static_method_single():
+    result = MethodTester.static_method(100)
+    assert result == [101]
+
+def test_class_method_list():
+    results = MethodTester.class_method([1, 2])
+    assert results == ["MethodTester-1", "MethodTester-2"]
+
+def test_class_method_single():
+    result = MethodTester.class_method(5)
+    assert result == ["MethodTester-5"]

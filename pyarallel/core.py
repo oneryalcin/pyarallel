@@ -53,7 +53,7 @@ https://github.com/oneryalcin/pyarallel
 """
 
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-from functools import wraps
+from functools import wraps, partial
 from typing import Any, Callable, TypeVar, Literal
 from itertools import islice
 import time
@@ -62,6 +62,8 @@ from dataclasses import dataclass
 import multiprocessing
 import weakref
 from .config_manager import ConfigManager
+import inspect
+import logging
 
 T = TypeVar('T')
 
@@ -70,6 +72,8 @@ ExecutorType = Literal["thread", "process"]
 
 # Global executor cache using weak references
 _EXECUTOR_CACHE = weakref.WeakValueDictionary()
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class RateLimit:
@@ -253,11 +257,44 @@ def parallel(
         
         @wraps(func)
         def wrapper(*args, **kwargs) -> list[T]:
-            if not args or not isinstance(args[0], (list, tuple)):
-                return [func(*args, **kwargs)]
+            logger.debug(f"---> Entering @parallel wrapper for {func.__name__}")
+            logger.debug(f"Wrapper called with args: {args!r}, kwargs: {kwargs!r}")
             
-            items = args[0]
-            other_args = args[1:]
+            # --- Robust detection of instance/class/static method ---
+            items_arg_index = 0
+            if args:
+                qualname = func.__qualname__
+                if '.' in qualname:
+                    cls_name = qualname.split('.')[0]
+                    # Instance method: first argument is an instance of the class
+                    if hasattr(args[0], '__class__') and args[0].__class__.__name__ == cls_name:
+                        items_arg_index = 1
+                        logger.debug(f"Detected instance method. func={func!r}, self={args[0]!r}")
+                    # Class method: first argument is the class itself
+                    elif isinstance(args[0], type) and args[0].__name__ == cls_name:
+                        items_arg_index = 1
+                        logger.debug(f"Detected class method. func={func!r}, cls={args[0]!r}")
+                    else:
+                        logger.debug(f"Detected static method or function. func={func!r}")
+                else:
+                    logger.debug(f"Detected function (no class context). func={func!r}")
+            else:
+                logger.debug(f"No args provided to wrapper.")
+            
+            # --- Check if the relevant argument is an iterable ---
+            if len(args) <= items_arg_index or not isinstance(args[items_arg_index], (list, tuple)):
+                if items_arg_index:
+                    # For bound methods, include self/cls in the call
+                    single_item_args = (args[0],) + args[items_arg_index:]
+                else:
+                    single_item_args = args[items_arg_index:]
+                logger.debug(f"Single item path. Calling func({single_item_args=}, {kwargs=})")
+                return [func(*single_item_args, **kwargs)]
+            
+            # --- List Processing --- 
+            items = args[items_arg_index]
+            other_args = args[items_arg_index + 1:]
+            logger.debug(f"List processing path. items={items!r}, other_args={other_args!r}")
             
             # Get or create cached executor
             executor = get_or_create_executor(exec_type, workers, prewarm)
@@ -275,18 +312,35 @@ def parallel(
             try:
                 # Create futures with their original indices
                 futures_with_index = []
+                logger.debug(f"Executor: {executor}. Submitting tasks for {len(items)} items.")
                 for i, item in enumerate(items):
                     if rate_limiter:
                         rate_limiter.wait_for_token()
-                    futures_with_index.append((i, executor.submit(func, item, *other_args, **kwargs)))
+                    
+                    # Create task with correct binding
+                    if items_arg_index == 1:  # Instance or class method
+                        # args[0] is self/cls
+                        task = partial(func, args[0], item, *other_args, **kwargs)
+                    else:  # Static method or function
+                        task = partial(func, item, *other_args, **kwargs)
+                        
+                    futures_with_index.append((i, executor.submit(task)))
+                    logger.debug(f"LOOP {i}: Submitted task to executor.")
                 
                 # Wait for completion and maintain order
                 results = [None] * len(items)
-                for i, future in futures_with_index:
-                    results[i] = future.result()
-                return results
-            except:
+                logger.debug("Waiting for tasks to complete...")
+                for idx, (i, future) in enumerate(futures_with_index):
+                    result = future.result()
+                    logger.debug(f"Task {idx} completed with result: {result!r}")
+                    results[i] = result
+            except Exception as e:
+                logger.error(f"Task {idx} failed with exception: {e}", exc_info=True)
+                # Handle error based on policy (e.g., raise, collect, log)
+                # Placeholder: re-raise for now
                 raise
+            logger.debug(f"<--- Exiting @parallel wrapper for {func.__name__}. Results: {results!r}")
+            return results
         
         # Store configuration as attributes on the wrapper function
         wrapper.max_workers = workers

@@ -56,6 +56,10 @@ Some of the features we're planning to add in the future:
   - Resource quotas per task
 
 ### Developer Experience
+- **Enhanced Decorator Ergonomics**
+  - First-class, documented support for `@parallel` on instance methods, static methods, and class methods.
+  - Automatic handling of `self` and `cls` arguments.
+  - Clear examples and best practices for OOP usage.
 - **CLI Tools**
   - Task monitoring dashboard
   - Performance profiling

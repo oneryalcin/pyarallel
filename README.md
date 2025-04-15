@@ -59,6 +59,56 @@ def analyze_text(text: str) -> dict:
     return text_analysis(text)
 ```
 
+## Usage Examples
+
+### Basic Function
+```python
+from pyarallel import parallel
+
+@parallel
+def process_item(x):
+    return x * 2
+
+results = process_item([1, 2, 3])  # [2, 4, 6]
+```
+
+### Instance Methods
+```python
+class DataProcessor:
+    def __init__(self, multiplier):
+        self.multiplier = multiplier
+    
+    @parallel
+    def process(self, x):
+        return x * self.multiplier
+
+processor = DataProcessor(3)
+results = processor.process([1, 2, 3])  # [3, 6, 9]
+```
+
+### Class Methods
+```python
+class StringFormatter:
+    @classmethod
+    @parallel
+    def format_all(cls, items):
+        return [f"Formatted-{item}" for item in items]
+
+results = StringFormatter.format_all(['a', 'b', 'c'])
+# ['Formatted-a', 'Formatted-b', 'Formatted-c']
+```
+
+### Static Methods
+```python
+class MathUtils:
+    @staticmethod
+    @parallel
+    def square_all(numbers):
+        return [n**2 for n in numbers]
+
+results = MathUtils.square_all([1, 2, 3])  # [1, 4, 9]
+```
+
 ## Advanced Usage
 
 ### Rate Limiting
