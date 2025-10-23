@@ -22,7 +22,8 @@ A powerful, feature-rich parallel execution library for Python that makes concur
 
 ## Documentation
 
-Check out the [documentation](https://oneryalcin.github.io/pyarallel/) for detailed usage instructions and examples.
+- **[Full Documentation](https://oneryalcin.github.io/pyarallel/)** - Comprehensive guides and API reference
+- **[Examples](examples/)** - Runnable code examples for common use cases
 
 ## Installation
 
@@ -58,6 +59,44 @@ def process_image(image):
 def analyze_text(text):
     return text_analysis(text)
 ```
+
+## How It Works
+
+Pyarallel uses a simple mental model that makes parallel processing intuitive:
+
+### 1. Write Your Function for ONE Item
+
+```python
+def process_number(n):
+    """This function handles a SINGLE number."""
+    return n * 2
+```
+
+### 2. Add the @parallel Decorator
+
+```python
+@parallel(max_workers=4)
+def process_number(n):
+    """Now it can process items in parallel!"""
+    return n * 2
+```
+
+### 3. Pass MANY Items, Get MANY Results
+
+```python
+# Pass a list of items
+numbers = [1, 2, 3, 4, 5]
+results = process_number(numbers)  # Returns: [2, 4, 6, 8, 10]
+
+# Single items work too (returns a list with one item)
+result = process_number(42)  # Returns: [84]
+```
+
+**Key Points:**
+- Write functions that process a **single item**
+- Pass a **list/tuple** to process multiple items in parallel
+- Always returns a **list** of results (even for single items)
+- Results maintain the **same order** as inputs
 
 ## Usage Examples
 
@@ -145,7 +184,7 @@ Control how many operations can be performed in a given time period:
 
 # Using a RateLimit object for more control
 from pyarallel import RateLimit
-@parallel(rate_limit=RateLimit(rate=5, interval="second"))
+@parallel(rate_limit=RateLimit(count=5, interval="second"))
 ```
 
 ### Process vs Thread Pools
