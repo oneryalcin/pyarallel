@@ -15,9 +15,8 @@ The configuration system uses a structured schema with the following categories:
         "prewarm_pools": bool             # Enable worker prewarming
     },
     "rate_limiting": {
-        "default_rate": Optional[float],   # Default operations per interval
-        "default_interval": str,          # "second", "minute", "hour"
-        "burst_tolerance": float          # Burst allowance factor
+        "rate": int,                      # Operations per interval
+        "interval": str,                  # "second", "minute", "hour"
     },
     "error_handling": {
         "max_retries": int,               # Maximum retry attempts
@@ -49,15 +48,14 @@ config.update_config({
         "prewarm_pools": True
     },
     "rate_limiting": {
-        "default_rate": 1000,
-        "default_interval": "minute",
-        "burst_tolerance": 1.5
+        "rate": 1000,
+        "interval": "minute"
     }
 })
 
 # Access configuration using dot notation
 workers = config.execution.default_max_workers
-rate = config.rate_limiting.default_rate
+rate = config.rate_limiting.rate
 
 # Category-specific updates
 config.update_execution(max_workers=16)

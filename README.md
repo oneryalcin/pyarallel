@@ -250,7 +250,7 @@ config.update({
 
 # Access configuration using dot notation
 workers = config.execution.default_max_workers
-rate = config.rate_limiting.default_rate
+rate = config.rate_limiting.rate
 
 # Category-specific updates
 config.update_execution(max_workers=16)

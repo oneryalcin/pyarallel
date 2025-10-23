@@ -421,3 +421,81 @@ class ConfigManager:
         with self._lock:
             updates = {"monitoring": kwargs}
             self.update_config(updates)
+
+    # Convenience aliases for better DevX
+    def update(self, updates: Dict[str, Any]) -> None:
+        """Alias for update_config() for cleaner API.
+
+        Args:
+            updates: Dictionary containing the configuration updates
+        """
+        self.update_config(updates)
+
+    def update_execution(self, **kwargs) -> None:
+        """Alias for set_execution() for consistent naming.
+
+        Args:
+            **kwargs: Execution configuration parameters
+        """
+        self.set_execution(**kwargs)
+
+    def update_rate_limiting(self, **kwargs) -> None:
+        """Alias for set_rate_limiting() for consistent naming.
+
+        Args:
+            **kwargs: Rate limiting configuration parameters
+        """
+        self.set_rate_limiting(**kwargs)
+
+    def update_error_handling(self, **kwargs) -> None:
+        """Alias for set_error_handling() for consistent naming.
+
+        Args:
+            **kwargs: Error handling configuration parameters
+        """
+        self.set_error_handling(**kwargs)
+
+    def update_monitoring(self, **kwargs) -> None:
+        """Alias for set_monitoring() for consistent naming.
+
+        Args:
+            **kwargs: Monitoring configuration parameters
+        """
+        self.set_monitoring(**kwargs)
+
+    # Property accessors for cleaner attribute access
+    @property
+    def execution(self):
+        """Get execution configuration.
+
+        Returns:
+            ExecutionConfig: The execution configuration object
+        """
+        return self.get_config().execution
+
+    @property
+    def rate_limiting(self):
+        """Get rate limiting configuration.
+
+        Returns:
+            RateLimitingConfig: The rate limiting configuration object
+        """
+        return self.get_config().rate_limiting
+
+    @property
+    def error_handling(self):
+        """Get error handling configuration.
+
+        Returns:
+            ErrorHandlingConfig: The error handling configuration object
+        """
+        return self.get_config().error_handling
+
+    @property
+    def monitoring(self):
+        """Get monitoring configuration.
+
+        Returns:
+            MonitoringConfig: The monitoring configuration object
+        """
+        return self.get_config().monitoring

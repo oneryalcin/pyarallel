@@ -53,8 +53,8 @@ config_manager = ConfigManager.get_instance()
         "default_batch_size": 10
     },
     "rate_limiting": {
-        "default_rate": None,
-        "default_interval": "second"
+        "rate": 1000,
+        "interval": "minute"
     }
 }
 ```

@@ -17,9 +17,10 @@ print("Example 1: Default configuration")
 print("=" * 50)
 
 # Check default configuration
+current_config = config.get_config()
 print("Current configuration:")
-print(f"  Max workers: {config.get_config().max_workers}")
-print(f"  Timeout: {config.get_config().timeout}")
+print(f"  Max workers: {current_config.max_workers}")
+print(f"  Timeout: {current_config.timeout}")
 print()
 
 
@@ -39,8 +40,8 @@ config.update_config({
 
 print("Updated configuration:")
 print(f"  Max workers: {config.get_config().max_workers}")
-print(f"  Default executor: {config.get_config().execution.default_executor_type}")
-print(f"  Default batch size: {config.get_config().execution.default_batch_size}")
+print(f"  Default executor: {config.execution.default_executor_type}")
+print(f"  Default batch size: {config.execution.default_batch_size}")
 print()
 
 
@@ -89,14 +90,14 @@ print("=" * 50)
 config.update_execution(default_max_workers=16)
 
 # Update rate limiting defaults
-config.update_rate_limiting(default_rate=100, default_interval="minute")
+config.update_rate_limiting(rate=100, interval="minute")
 
 print("Updated execution config:")
-print(f"  Default max workers: {config.get_config().execution.default_max_workers}")
+print(f"  Default max workers: {config.execution.default_max_workers}")
 print()
 print("Updated rate limiting config:")
-print(f"  Default rate: {config.get_config().rate_limiting.default_rate}")
-print(f"  Default interval: {config.get_config().rate_limiting.default_interval}")
+print(f"  Rate: {config.rate_limiting.rate}")
+print(f"  Interval: {config.rate_limiting.interval}")
 print()
 
 
