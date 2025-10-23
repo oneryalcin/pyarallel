@@ -5,6 +5,7 @@ all configuration operations and maintains the global configuration state.
 """
 
 import logging
+import time
 from threading import RLock
 from typing import Any, Dict, Optional, Type, TypeVar
 
@@ -26,6 +27,7 @@ class ConfigManager:
     _instance: Optional[T] = None
     _lock: RLock = RLock()
     _config: Optional[PyarallelConfig] = None
+    _field_versions: Dict[str, int]
 
     def __new__(cls: Type[T]) -> T:
         if not cls._instance:
@@ -53,6 +55,7 @@ class ConfigManager:
                         **config_dict
                     )  # Use direct instantiation
                     logger.debug(f"Final config: {cls._instance._config}")
+                    cls._instance._field_versions = {}
         return cls._instance
 
     @classmethod
@@ -81,20 +84,66 @@ class ConfigManager:
         Args:
             updates: Dictionary containing the configuration updates
         """
+        update_id = time.monotonic_ns()
         with self._lock:
+            filtered_updates = self._filter_stale_updates(updates, update_id)
+            if not filtered_updates:
+                logger.debug("All updates were stale; skipping")
+                return
             current_config = self._config.model_dump()
             logger.debug(f"Current config before update: {current_config}")
             logger.debug(f"Incoming updates: {updates}")
+            logger.debug(f"Filtered updates: {filtered_updates}")
 
             # Validate max_workers before merging
-            if "max_workers" in updates and updates["max_workers"] < 1:
-                updates["max_workers"] = 1
+            if "max_workers" in filtered_updates and filtered_updates["max_workers"] < 1:
+                filtered_updates["max_workers"] = 1
 
             # Use deep merge for nested updates
-            merged_config = self._deep_merge(current_config, updates)
+            merged_config = self._deep_merge(current_config, filtered_updates)
             logger.debug(f"Merged config: {merged_config}")
             self._config = PyarallelConfig.from_dict(merged_config)
             logger.debug(f"Final config after update: {self._config}")
+
+    def _filter_stale_updates(
+        self, updates: Dict[str, Any], update_id: int
+    ) -> Dict[str, Any]:
+        """Drop updates that are older than the last applied value."""
+
+        if not hasattr(self, "_field_versions"):
+            self._field_versions = {}
+
+        filtered: Dict[str, Any] = {}
+        for key, value in updates.items():
+            if key == "max_workers":
+                if self._should_apply("max_workers", update_id):
+                    filtered[key] = value
+            elif key == "execution" and isinstance(value, dict):
+                exec_updates: Dict[str, Any] = {}
+                for exec_key, exec_value in value.items():
+                    if exec_key == "max_workers":
+                        if self._should_apply("max_workers", update_id):
+                            exec_updates[exec_key] = exec_value
+                    elif exec_key == "timeout":
+                        if self._should_apply("timeout", update_id):
+                            exec_updates[exec_key] = exec_value
+                    else:
+                        exec_updates[exec_key] = exec_value
+                if exec_updates:
+                    filtered[key] = exec_updates
+            elif key == "timeout":
+                if self._should_apply("timeout", update_id):
+                    filtered[key] = value
+            else:
+                filtered[key] = value
+        return filtered
+
+    def _should_apply(self, field: str, update_id: int) -> bool:
+        last_update = self._field_versions.get(field, -1)
+        if update_id >= last_update:
+            self._field_versions[field] = update_id
+            return True
+        return False
 
     def _deep_merge(
         self, base: Dict[str, Any], updates: Dict[str, Any]
@@ -239,6 +288,7 @@ class ConfigManager:
         """
         with self._lock:
             self._config = PyarallelConfig()
+            self._field_versions = {}
             type(self)._instance = None
 
     def set(self, key: str, value: Any) -> None:
@@ -248,6 +298,7 @@ class ConfigManager:
             key: Configuration key in dot notation (e.g., 'execution.max_workers')
             value: Value to set
         """
+        update_id = time.monotonic_ns()
         with self._lock:
             parts = key.split(".")
             current = self._config.model_dump()
@@ -270,6 +321,8 @@ class ConfigManager:
                     logger.debug(
                         f"Setting nested execution parameter: {parts[1]} = {value}"
                     )
+                if parts[1] in ["max_workers", "timeout"]:
+                    self._field_versions[parts[1]] = update_id
             else:
                 # Initialize nested configuration objects if needed
                 if parts[0] == "rate_limiting" and target["rate_limiting"] is None:
@@ -290,6 +343,8 @@ class ConfigManager:
                 # Set the value
                 target[parts[-1]] = value
                 logger.debug(f"Set final value at {parts[-1]}: {value}")
+                if parts[-1] in ["max_workers", "timeout"]:
+                    self._field_versions[parts[-1]] = update_id
 
             logger.debug(f"Updated config state: {current}")
             self._config = PyarallelConfig.from_dict(current)
