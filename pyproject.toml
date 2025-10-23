@@ -21,7 +21,7 @@ dependencies = []
 [project.urls]
 Homepage = "https://github.com/oneryalcin/pyarallel"
 Repository = "https://github.com/oneryalcin/pyarallel.git"
-Documentation = "https://github.com/oneryalcin/pyarallel"
+Documentation = "https://oneryalcin.github.io/pyarallel"
 
 [build-system]
 requires = ["hatchling>=1.17.1"]

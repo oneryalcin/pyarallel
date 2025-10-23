@@ -1,6 +1,6 @@
 # Configuration
 
-Pyarallel features a robust configuration system built on Pydantic, offering type validation, environment variable support, and thread-safe configuration management.
+Pyarallel features a robust configuration system built on lightweight dataclasses, offering type validation, environment variable support, and thread-safe configuration management.
 
 ## Configuration Schema
 
@@ -36,10 +36,9 @@ The configuration system uses a structured schema with the following categories:
 ## Basic Configuration
 
 ```python
-from pyarallel import ConfigManager
+from pyarallel import config
 
-# Get the thread-safe singleton configuration manager
-config = ConfigManager.get_instance()
+# The config object is a thread-safe singleton configuration manager
 
 # Update configuration with type validation
 config.update_config({
@@ -127,13 +126,14 @@ def inefficient_task(): ...
 Pyarallel uses a hierarchical configuration system:
 
 1. **Default Values**: Built-in defaults (4 workers, thread executor, batch size 10)
-2. **Global Configuration**: Set via ConfigManager
+2. **Global Configuration**: Set via config object
 3. **Environment Variables**: Override global config
 4. **Decorator Arguments**: Highest precedence, override all other settings
 
 ```python
+from pyarallel import config
+
 # Global configuration (lowest precedence)
-config = ConfigManager.get_instance()
 config.update_config({
     "execution": {
         "default_max_workers": 8,

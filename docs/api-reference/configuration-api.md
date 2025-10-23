@@ -2,9 +2,32 @@
 
 ## Configuration API
 
-### ConfigManager
+### Simple Access (Recommended)
 
-Singleton class for managing global configuration.
+The easiest way to access and update configuration:
+
+```python
+from pyarallel import config
+
+# Update global configuration
+config.update_config({
+    "execution": {
+        "default_max_workers": 8,
+        "default_executor_type": "process"
+    }
+})
+
+# Access configuration using dot notation
+workers = config.execution.default_max_workers
+
+# Category-specific updates
+config.update_execution(max_workers=16)
+config.update_rate_limiting(rate=2000)
+```
+
+### Advanced: ConfigManager
+
+For advanced use cases, you can import the ConfigManager class directly:
 
 ```python
 from pyarallel import ConfigManager
@@ -16,6 +39,8 @@ config_manager = ConfigManager.get_instance()
 
 - `get_config()`: Get current configuration
 - `update_config(config: dict)`: Update configuration with new values
+- `update_execution(**kwargs)`: Update execution settings
+- `update_rate_limiting(**kwargs)`: Update rate limiting settings
 - `reset_config()`: Reset to default configuration
 
 #### Configuration Options
@@ -26,6 +51,10 @@ config_manager = ConfigManager.get_instance()
         "default_max_workers": 4,
         "default_executor_type": "thread",
         "default_batch_size": 10
+    },
+    "rate_limiting": {
+        "default_rate": None,
+        "default_interval": "second"
     }
 }
 ```
@@ -33,11 +62,10 @@ config_manager = ConfigManager.get_instance()
 #### Examples
 
 ```python
-# Get config manager instance
-config_manager = ConfigManager.get_instance()
+from pyarallel import config
 
 # Update global configuration
-config_manager.update_config({
+config.update_config({
     "execution": {
         "default_max_workers": 8,
         "default_executor_type": "process"
@@ -45,5 +73,5 @@ config_manager.update_config({
 })
 
 # Get current configuration
-config = config_manager.get_config()
+current_config = config.get_config()
 ```
