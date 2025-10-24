@@ -7,6 +7,9 @@ This example demonstrates how to efficiently process large datasets
 using batch processing to control memory usage.
 
 Run with: python examples/04_batch_processing.py
+
+Note: Example 5 uses process-based parallelism, so all execution code
+must be wrapped in if __name__ == "__main__" for proper pickling.
 """
 
 from pyarallel import parallel
@@ -21,10 +24,6 @@ def process_record(record_id):
     # Simulate processing
     time.sleep(0.01)
     return f"Record {record_id} processed"
-
-
-print("Example 1: Basic batch processing")
-print("=" * 50)
 
 # Process 100 records in batches of 10
 start = time.time()
