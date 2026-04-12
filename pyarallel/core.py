@@ -47,13 +47,19 @@ class RateLimit:
     count: float
     per: Literal["second", "minute", "hour"] = "second"
 
+    _VALID_INTERVALS = {"second": 1, "minute": 60, "hour": 3600}
+
     def __post_init__(self) -> None:
         if self.count <= 0:
             raise ValueError(f"RateLimit count must be positive, got {self.count}")
+        if self.per not in self._VALID_INTERVALS:
+            raise ValueError(
+                f'RateLimit per must be "second", "minute", or "hour", got {self.per!r}'
+            )
 
     @property
     def per_second(self) -> float:
-        return self.count / {"second": 1, "minute": 60, "hour": 3600}[self.per]
+        return self.count / self._VALID_INTERVALS[self.per]
 
 
 @dataclass(frozen=True, slots=True)
