@@ -1,60 +1,60 @@
-# API Reference
+# Rate Limiting
 
-## Rate Limiting API
+Pyarallel includes a token-bucket rate limiter for controlling execution rates.
 
-### RateLimit
+## Basic Usage
 
-Configuration class for rate limiting parallel operations.
-
-```python
-from pyarallel import RateLimit
-
-rate = RateLimit(
-    count: float,
-    interval: Literal["second", "minute", "hour"] = "second"
-)
-```
-
-#### Parameters
-
-- `count` (float): Number of operations allowed per interval
-- `interval` (str): Time interval for rate limiting ("second", "minute", "hour")
-
-#### Properties
-
-- `per_second` (float): Converts the rate to operations per second
-
-#### Examples
+### With `RateLimit` Object
 
 ```python
-# Define rate limits
-per_minute = RateLimit(100, "minute")  # 100 ops/minute
-per_hour = RateLimit(1000, "hour")    # 1000 ops/hour
+from pyarallel import parallel_map, RateLimit
 
-# Use with parallel decorator
-@parallel(rate_limit=per_minute)
-def rate_limited_function(item): ...
+# 100 operations per minute
+results = parallel_map(call_api, ids, workers=4,
+                       rate_limit=RateLimit(100, "minute"))
+
+# 1000 per hour
+results = parallel_map(process, items,
+                       rate_limit=RateLimit(1000, "hour"))
 ```
 
-### TokenBucket
+### Shorthand (ops per second)
 
-Thread-safe implementation of the token bucket algorithm for rate limiting.
+Pass a number for simple per-second limits:
 
 ```python
-from pyarallel import TokenBucket
-
-bucket = TokenBucket(
-    rate_limit: RateLimit,
-    capacity: int = None
-)
+results = parallel_map(fn, items, rate_limit=10)  # 10 per second
 ```
 
-#### Parameters
+## How It Works
 
-- `rate_limit` (RateLimit): Rate limiting configuration
-- `capacity` (int, optional): Maximum number of tokens the bucket can hold
+Rate limiting uses a **token bucket** algorithm:
 
-#### Methods
+1. Each operation claims a time-slot
+2. Slots are spaced at `1 / rate_per_second` intervals
+3. If a slot is in the future, the caller sleeps until that slot
+4. Thread-safe — the lock is held only for bookkeeping, never during sleep
 
-- `get_token() -> bool`: Try to get a token from the bucket
-- `wait_for_token()`: Block until a token is available
+For the async API, an equivalent `asyncio.Lock`-based bucket is used with `asyncio.sleep`.
+
+## With the Decorator
+
+Set a default rate limit, override per-call:
+
+```python
+@parallel(workers=4, rate_limit=RateLimit(100, "minute"))
+def call_api(item_id):
+    return api.get(item_id)
+
+# Uses default rate limit
+results = call_api.map(ids)
+
+# Override for this call
+results = call_api.map(ids, rate_limit=RateLimit(500, "minute"))
+```
+
+## Tips
+
+- **Leave buffer** below actual API limits (use 90% of the limit)
+- **Rate limiting is at submission time** (sync) — items are submitted to the pool at the controlled rate
+- **Rate limiting is at execution time** (async) — tasks acquire the rate token inside the semaphore

@@ -1,101 +1,57 @@
 # Pyarallel
 
-A powerful, feature-rich parallel execution library for Python that makes concurrent programming easy and efficient.
+Simple, explicit parallel execution for Python.
 
 ## Overview
 
-Pyarallel simplifies parallel processing in Python by providing a decorator-based API that handles both I/O-bound and CPU-bound tasks efficiently. With features like automatic worker pool management, rate limiting, and batch processing, it's designed to make concurrent programming accessible while maintaining high performance.
+Pyarallel wraps Python's `concurrent.futures` and `asyncio.TaskGroup` with better ergonomics: structured error handling, rate limiting, progress callbacks, and async support.
 
-## Key Features
+**Design principles:**
 
-- **Simple Decorator-Based API**: Just add `@parallel` to your functions
-- **Flexible Parallelism**: Choose between threads (I/O-bound) and processes (CPU-bound)
-- **Smart Rate Limiting**: Control execution rates with per-second, per-minute, or per-hour limits
-- **Batch Processing**: Handle large datasets efficiently with automatic batching
-- **Performance Optimized**: 
-  - Automatic worker pool reuse
-  - Optional worker prewarming for latency-critical applications
-  - Smart defaults based on your system
-- **Production Ready**:
-  - Thread-safe implementation
-  - Memory-efficient with automatic cleanup
-  - Comprehensive error handling
+- **Explicit over implicit** — `.map()` for parallel, normal calls stay normal
+- **No magic** — no type-sniffing, no global config, no singletons
+- **Structured errors** — all failures collected via `ExceptionGroup`, never silently lost
+- **Sync + async** — mirror APIs, you choose explicitly
 
 ## Quick Example
 
 ```python
+from pyarallel import parallel_map, RateLimit
+
+# Fan out 200 API calls, rate-limited to 100/min, with progress
+results = parallel_map(
+    fetch_url,
+    urls,
+    workers=10,
+    rate_limit=RateLimit(100, "minute"),
+    on_progress=lambda done, total: print(f"{done}/{total}"),
+)
+
+for item in results:        # raises ExceptionGroup if any failed
+    process(item)
+```
+
+Or with the decorator:
+
+```python
 from pyarallel import parallel
 
-# Basic parallel processing
-@parallel(max_workers=4)
-def fetch_url(url: str) -> dict:
+@parallel(workers=4)
+def fetch(url):
     return requests.get(url).json()
 
-# Process multiple URLs in parallel
-urls = ["http://api1.com", "http://api2.com"]
-results = fetch_url(urls)
-```
-
-## Advanced Usage
-
-### Method Support
-
-The `@parallel` decorator works seamlessly with:
-- Regular functions
-- Instance methods (preserves `self`)
-- Class methods (preserves `cls`)
-- Static methods
-
-#### Instance Method Example
-```python
-class DataTransformer:
-    def __init__(self, base):
-        self.base = base
-    
-    @parallel
-    def transform(self, items):
-        return [self.base + x for x in items]
-```
-
-#### Class Method Example
-```python
-class Logger:
-    log_prefix = "APP"
-    
-    @classmethod
-    @parallel
-    def log_all(cls, messages):
-        return [f"{cls.log_prefix}: {msg}" for msg in messages]
-```
-
-### Argument Handling
-
-The decorator intelligently handles:
-- Positional arguments
-- Keyword arguments
-- Mixed argument types
-- Both single items and iterables
-
-## Installation
-
-```bash
-pip install pyarallel
+data = fetch("http://example.com")        # normal call, returns dict
+results = fetch.map(["u1", "u2", "u3"])   # parallel, returns ParallelResult
 ```
 
 ## Documentation
 
-Explore our comprehensive documentation to learn more:
-
-- [Quick Start Guide](getting-started/quickstart.md)
-- [Basic Usage](user-guide/basic-usage.md)
+- [Installation](getting-started/installation.md)
+- [Quick Start](getting-started/quickstart.md)
 - [Advanced Features](user-guide/advanced-features.md)
-- [Configuration](user-guide/configuration.md)
 - [Best Practices](user-guide/best-practices.md)
-
-## Contributing
-
-We welcome contributions! Check out our [Contributing Guide](development/contributing.md) to get started.
+- [API Reference](api-reference/core.md)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/oneryalcin/pyarallel/blob/main/LICENSE.md) file for details.
+MIT — see [LICENSE](https://github.com/oneryalcin/pyarallel/blob/main/LICENSE.md).

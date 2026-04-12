@@ -1,78 +1,35 @@
-## Roadmap
+# Roadmap
 
-Some of the features we're planning to add in the future:
+## Current (v0.2.0)
 
-### Observability & Debugging
-- **Advanced Telemetry System**
-  - Task execution metrics (duration, wait times, queue times)
-  - Worker utilization tracking
-  - Error frequency analysis
-  - SQLite persistence for historical data
-  - Interactive visualizations with Plotly
-  - Performance bottleneck identification
+- `parallel_map()` — explicit parallel execution over iterables
+- `@parallel` decorator with `.map()` — preserves function signature
+- `async_parallel_map()` and `@async_parallel` — full async support
+- `ParallelResult` with structured error handling (`ExceptionGroup`)
+- `RateLimit` — token bucket rate limiting (sync and async)
+- `Retry` — per-item retry with exponential backoff, jitter, and exception filtering
+- `batch_size` — process items in chunks to control memory
+- Progress callbacks via `on_progress`
+- Timeout support (total for sync, per-task for async)
+- Instance method support via descriptor protocol
 
------- 
+## Planned
 
-- **Rich Logging System**
-  - Configurable log levels per component
-  - Structured logging for machine parsing
-  - Contextual information for debugging
-  - Log rotation and management
-  - Integration with popular logging frameworks
+### Near Term
 
-### Advanced Features
-- **Callback System**
-  - Pre/post execution hooks
-  - Error handling callbacks
-  - Progress tracking
-  - Custom metrics collection
-  - State management hooks
+- **`starmap` support** — map over multi-argument inputs
+- **Result streaming** — yield results as they complete (iterator API)
+- **tqdm/rich integration** — built-in progress bar support
 
------- 
+### Medium Term
 
-- **Smart Scheduling**
-  - Priority queues for tasks
-  - Deadline-aware scheduling
-  - Resource-aware task distribution
-  - Adaptive batch sizing
-  - Dynamic worker scaling
+- **Per-task timeout (sync)** — individual task deadlines for thread/process pools
 
------- 
+### Exploring
 
-- **Fault Tolerance**
-  - Automatic retries with backoff
-  - Circuit breaker pattern
-  - Fallback strategies
-  - Dead letter queues
-  - Task timeout handling
+- **Free-threading support** — leverage Python 3.13+ no-GIL for true thread parallelism
+- **Resource-aware scheduling** — adaptive worker counts based on system load
 
------- 
+---
 
-- **Resource Management**
-  - Memory usage monitoring
-  - CPU utilization tracking
-  - Network bandwidth control
-  - Disk I/O rate limiting
-  - Resource quotas per task
-
-### Developer Experience
-- **Enhanced Decorator Ergonomics**
-  - First-class, documented support for `@parallel` on instance methods, static methods, and class methods.
-  - Automatic handling of `self` and `cls` arguments.
-  - Clear examples and best practices for OOP usage.
-- **CLI Tools**
-  - Task monitoring dashboard
-  - Performance profiling
-  - Configuration management
-  - Log analysis utilities
-  - Telemetry visualization
-
-### Enterprise Features
-- **Integration**
-  - Distributed tracing (OpenTelemetry)
-  - Metrics export (Prometheus)
-  - Log aggregation (ELK Stack)
-
-If you have any ideas or suggestions, feel free to open an issue or submit a pull request!
-
-Want to contribute? Check out our [CONTRIBUTING.md](CONTRIBUTING.md) guide!
+Want to contribute? Check out our [Contributing Guide](CONTRIBUTING.md)!

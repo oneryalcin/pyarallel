@@ -1,174 +1,181 @@
 # Advanced Features
 
-## Configuration Options
+## Progress Tracking
 
-### Executor Types
-
-Pyarallel supports both thread and process-based executors:
+Track progress for long-running operations:
 
 ```python
-# Thread-based for I/O-bound tasks (default)
-@parallel(executor_type="thread")
-def io_task(): ...
+from pyarallel import parallel_map
 
-# Process-based for CPU-bound tasks
-@parallel(executor_type="process")
-def cpu_task(): ...
+def my_progress(done, total):
+    print(f"\r{done}/{total} ({100*done//total}%)", end="", flush=True)
+
+results = parallel_map(process, items, workers=8, on_progress=my_progress)
 ```
 
-### Worker Management
-
-#### Worker Prewarming
-
-Reduce initial latency by prewarming workers:
+Works with both `parallel_map` and `.map()`:
 
 ```python
-@parallel(
-    max_workers=4,
-    prewarm=True  # Start workers immediately
-)
-def latency_sensitive_task(): ...
+@parallel(workers=4)
+def fetch(url): ...
+
+results = fetch.map(urls, on_progress=lambda d, t: print(f"{d}/{t}"))
 ```
 
-#### Dynamic Worker Pools
+## Timeouts
 
-Pyarallel automatically manages worker lifecycles:
+### Total Timeout (sync)
+
+Set a wall-clock limit for the entire operation:
 
 ```python
-# Workers are reused across calls
-@parallel(max_workers=4)
-def reused_pool_task(): ...
+results = parallel_map(fetch, urls, workers=10, timeout=30.0)
 
-# Workers are cleaned up when no longer needed
+# Tasks that didn't complete are marked as failures
+if not results.ok:
+    for idx, exc in results.failures():
+        if isinstance(exc, TimeoutError):
+            print(f"Item {idx} timed out")
 ```
 
-## Rate Limiting
+### Per-Task Timeout (async)
 
-### Time-Based Rate Limits
+The async API supports per-task timeouts via `asyncio.wait_for`:
 
 ```python
-# Operations per second
-@parallel(rate_limit=10)  # 10 ops/second
+from pyarallel import async_parallel_map
 
-# Operations per minute
-@parallel(rate_limit=(100, "minute"))  # 100 ops/minute
-
-# Operations per hour
-@parallel(rate_limit=(1000, "hour"))  # 1000 ops/hour
+results = await async_parallel_map(fetch, urls, concurrency=10, timeout=5.0)
+# Each individual task gets 5 seconds before timing out
 ```
 
-### Custom Rate Limiting
+## Method Support
+
+The `@parallel` decorator works with instance methods via the descriptor protocol:
+
+### Instance Methods
 
 ```python
-from pyarallel import RateLimit
+class Scraper:
+    def __init__(self, session):
+        self.session = session
 
-# Create custom rate limit
-rate = RateLimit(count=50, interval="minute")
+    @parallel(workers=4)
+    def fetch(self, url):
+        return self.session.get(url).text
 
-@parallel(rate_limit=rate)
-def rate_limited_task(): ...
+s = Scraper(requests.Session())
+s.fetch("http://example.com")       # normal — returns str
+s.fetch.map(urls)                   # parallel — returns ParallelResult
 ```
 
-## Batch Processing
-
-### Automatic Batching
+### Static Methods
 
 ```python
-@parallel(
-    max_workers=4,
-    batch_size=10,  # Process 10 items at a time
-    executor_type="process"
-)
-def process_batch(items: list) -> list:
-    return [process_item(item) for item in items]
+class MathUtils:
+    @staticmethod
+    @parallel(workers=4)
+    def square(x):
+        return x ** 2
 
-# Process large dataset
-items = list(range(1000))
-results = process_batch(items)  # Processed in batches of 10
+MathUtils.square(5)                 # 25
+MathUtils.square.map([1, 2, 3])    # ParallelResult([1, 4, 9])
 ```
 
-### Memory-Efficient Processing
+### Using parallel_map with Methods
+
+You can always use `parallel_map` directly with bound methods:
 
 ```python
-@parallel(
-    max_workers=4,
-    batch_size=100  # Larger batches for better throughput
-)
-def process_large_dataset(data: list) -> list:
-    return heavy_processing(data)
-
-# Process millions of items efficiently
-results = process_large_dataset(large_dataset)
+scraper = Scraper(session)
+results = parallel_map(scraper.fetch, urls, workers=8)
 ```
 
-## Advanced Error Handling
+## Overriding Decorator Defaults
 
-### Batch Error Handling
+Per-call overrides on `.map()`:
 
 ```python
-from typing import List, Optional
+@parallel(workers=2, rate_limit=RateLimit(10, "second"))
+def process(item): ...
 
-@parallel(batch_size=10)
-def process_with_errors(items: List[str]) -> List[Optional[dict]]:
-    results = []
-    for item in items:
-        try:
-            results.append(process_item(item))
-        except Exception as e:
-            results.append(None)  # Continue on error
-            print(f"Error processing {item}: {e}")
-    return results
+# Override workers and rate limit for this specific call
+results = process.map(big_list, workers=16, rate_limit=RateLimit(1000, "minute"))
 ```
 
-### Custom Exception Handling
+## Async Decorator
+
+Same pattern as sync, with `async`/`await`:
 
 ```python
-class ProcessingError(Exception):
-    pass
+from pyarallel import async_parallel
 
-@parallel(max_workers=4)
-def safe_process(item):
-    try:
-        result = process_item(item)
-        if not validate_result(result):
-            raise ProcessingError(f"Invalid result for {item}")
-        return result
-    except ProcessingError as e:
-        # Handle specific errors
-        handle_processing_error(e)
-    except Exception as e:
-        # Handle unexpected errors
-        handle_unexpected_error(e)
+@async_parallel(concurrency=10)
+async def fetch(url):
+    async with httpx.AsyncClient() as c:
+        return (await c.get(url)).json()
+
+data = await fetch("http://example.com")       # single call
+results = await fetch.map(urls)                 # parallel
+results = await fetch.map(urls, timeout=5.0)    # with per-task timeout
 ```
 
-## Performance Optimization
+## Retry
 
-### Worker Pool Optimization
+Built-in per-item retry with exponential backoff and jitter:
 
 ```python
-# Optimize for CPU-bound tasks
-@parallel(
-    max_workers=multiprocessing.cpu_count(),
-    executor_type="process"
-)
-def cpu_optimized_task(): ...
+from pyarallel import parallel_map, Retry
 
-# Optimize for I/O-bound tasks
-@parallel(
-    max_workers=32,  # Higher worker count for I/O
-    executor_type="thread"
-)
-def io_optimized_task(): ...
+# Retry up to 3 times with 1s base exponential backoff
+results = parallel_map(fetch, urls, workers=10, retry=Retry(attempts=3, backoff=1.0))
+
+# Only retry transient network errors — fail immediately on bad input
+results = parallel_map(fetch, urls, workers=10,
+                       retry=Retry(on=(ConnectionError, TimeoutError)))
 ```
 
-### Batch Size Optimization
+Retries happen *inside the worker* — only the failing item is retried, not the entire batch. This composes cleanly with rate limiting and batching.
+
+For the full `Retry` API, see [API Reference](../api-reference/core.md#retry).
+
+## Batching
+
+Control memory for large datasets by processing in chunks:
 
 ```python
-# Small batches for low latency
-@parallel(batch_size=5)
-def low_latency_task(): ...
+# Submit 500 items at a time instead of 500,000 at once
+results = parallel_map(process, huge_list, workers=8, batch_size=500)
+```
 
-# Large batches for high throughput
-@parallel(batch_size=100)
-def high_throughput_task(): ...
+Errors in one batch don't prevent subsequent batches from running.
+
+## Structured Error Handling
+
+`ParallelResult` never silently drops errors:
+
+```python
+result = parallel_map(process, items, workers=4)
+
+# Inspect successes and failures separately
+for idx, value in result.successes():
+    save(idx, value)
+
+for idx, error in result.failures():
+    log_error(idx, error)
+
+# Retry just the failed items
+failed_items = [items[idx] for idx, _ in result.failures()]
+retry_result = parallel_map(process, failed_items, workers=2)
+```
+
+When you iterate or call `.values()`, failures raise an `ExceptionGroup`:
+
+```python
+try:
+    values = list(result)
+except ExceptionGroup as eg:
+    print(f"{len(eg.exceptions)} tasks failed")
+    for exc in eg.exceptions:
+        print(f"  {type(exc).__name__}: {exc}")
 ```

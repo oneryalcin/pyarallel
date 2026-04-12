@@ -1,6 +1,6 @@
 site_name: Pyarallel
 site_author: Mehmet Oner Yalcin
-version: 0.1.2
+version: 0.2.0
 site_url: https://oneryalcin.github.io/pyarallel/
 theme:
   name: material
@@ -26,12 +26,11 @@ nav:
     - Quick Start: getting-started/quickstart.md
   - User Guide:
     - Advanced Features: user-guide/advanced-features.md
-    - Configuration: user-guide/configuration.md
     - Best Practices: user-guide/best-practices.md
   - API Reference:
-    - Decorators: api-reference/decorators.md
+    - Core: api-reference/core.md
+    - Async: api-reference/async.md
     - Rate Limiting: api-reference/rate-limiting.md
-    - Configuration API: api-reference/configuration-api.md
   - Development:
     - Contributing: development/CONTRIBUTING.md
     - Roadmap: development/roadmap.md
