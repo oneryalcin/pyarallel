@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+from collections.abc import AsyncIterator
 from typing import Any, Callable, Iterable, TypeVar
 
 from .core import ParallelResult, RateLimit, Retry, _Failure, _make_chunks, _merge_opts, _PENDING
@@ -152,6 +153,91 @@ async def async_parallel_map(
     return ParallelResult(results)
 
 
+async def async_parallel_starmap(
+    fn: Callable[..., Any],
+    items: Iterable[tuple[Any, ...]],
+    *,
+    concurrency: int = 4,
+    rate_limit: RateLimit | float | None = None,
+    task_timeout: float | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
+    batch_size: int | None = None,
+    retry: Retry | None = None,
+) -> ParallelResult[R]:
+    """Like ``async_parallel_map`` but unpacks each item as ``fn(*args)``."""
+    async def _unpack(args: tuple[Any, ...]) -> Any:
+        return await fn(*args)
+
+    return await async_parallel_map(
+        _unpack, items,
+        concurrency=concurrency, rate_limit=rate_limit,
+        task_timeout=task_timeout, on_progress=on_progress,
+        batch_size=batch_size, retry=retry,
+    )
+
+
+async def async_parallel_iter(
+    fn: Callable[..., Any],
+    items: Iterable[Any],
+    *,
+    concurrency: int = 4,
+    rate_limit: RateLimit | float | None = None,
+    task_timeout: float | None = None,
+    batch_size: int | None = None,
+    retry: Retry | None = None,
+) -> AsyncIterator[tuple[int, Any]]:
+    """Execute async *fn* over *items*, yielding ``(index, result)``
+    in completion order. Constant memory — results are not accumulated.
+    """
+    if isinstance(rate_limit, (int, float)):
+        rate_limit = RateLimit(rate_limit)
+    if batch_size is not None and batch_size < 1:
+        raise ValueError(f"batch_size must be >= 1, got {batch_size}")
+    if concurrency < 1:
+        raise ValueError(f"concurrency must be >= 1, got {concurrency}")
+
+    items_list = list(items)
+    n = len(items_list)
+    if n == 0:
+        return
+
+    semaphore = asyncio.Semaphore(concurrency)
+    limiter = _AsyncTokenBucket(rate_limit) if rate_limit else None
+    queue: asyncio.Queue[tuple[int, Any] | None] = asyncio.Queue()
+
+    async def _run(i: int, item: Any) -> None:
+        async with semaphore:
+            if limiter:
+                await limiter.wait()
+            try:
+                if retry is not None:
+                    result = await _async_run_with_retry(fn, item, retry, task_timeout=task_timeout)
+                elif task_timeout is not None:
+                    result = await asyncio.wait_for(fn(item), timeout=task_timeout)
+                else:
+                    result = await fn(item)
+                await queue.put((i, result))
+            except Exception as exc:
+                await queue.put((i, exc))
+
+    tasks_remaining = 0
+    for chunk in _make_chunks(n, batch_size):
+        chunk_tasks = []
+        for i in chunk:
+            tasks_remaining += 1
+            chunk_tasks.append(asyncio.create_task(_run(i, items_list[i])))
+
+        yielded_in_chunk = 0
+        while yielded_in_chunk < len(chunk_tasks):
+            item = await queue.get()
+            if item is not None:
+                yield item
+                yielded_in_chunk += 1
+
+        for t in chunk_tasks:
+            await t
+
+
 # ---------------------------------------------------------------------------
 # @async_parallel decorator
 # ---------------------------------------------------------------------------
@@ -185,6 +271,13 @@ class _BoundAsyncParallel:
             task_timeout=task_timeout, on_progress=on_progress, batch_size=batch_size,
             retry=retry,
         ))
+
+    async def starmap(self, items: Iterable[tuple[Any, ...]], **kwargs: Any) -> ParallelResult[Any]:
+        return await async_parallel_starmap(self._fn, items, **_merge_opts(self._defaults, **kwargs))
+
+    async def stream(self, items: Iterable[Any], **kwargs: Any) -> AsyncIterator[tuple[int, Any]]:
+        async for item in async_parallel_iter(self._fn, items, **_merge_opts(self._defaults, **kwargs)):
+            yield item
 
 
 class _AsyncParallelFunc:
@@ -228,6 +321,13 @@ class _AsyncParallelFunc:
             task_timeout=task_timeout, on_progress=on_progress, batch_size=batch_size,
             retry=retry,
         ))
+
+    async def starmap(self, items: Iterable[tuple[Any, ...]], **kwargs: Any) -> ParallelResult[Any]:
+        return await async_parallel_starmap(self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs))
+
+    async def stream(self, items: Iterable[Any], **kwargs: Any) -> AsyncIterator[tuple[int, Any]]:
+        async for item in async_parallel_iter(self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs)):
+            yield item
 
 
 def async_parallel(

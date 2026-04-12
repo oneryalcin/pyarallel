@@ -368,6 +368,98 @@ def parallel_map(
     return ParallelResult(results)
 
 
+def parallel_starmap(
+    fn: Callable[..., R],
+    items: Iterable[tuple[Any, ...]],
+    *,
+    workers: int = 4,
+    executor: ExecutorType = "thread",
+    rate_limit: RateLimit | float | None = None,
+    timeout: float | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
+    batch_size: int | None = None,
+    retry: Retry | None = None,
+) -> ParallelResult[R]:
+    """Like ``parallel_map`` but unpacks each item as ``fn(*args)``.
+
+    Example::
+
+        def add(a, b): return a + b
+        parallel_starmap(add, [(1, 2), (3, 4)])  # [3, 7]
+    """
+    return parallel_map(
+        lambda args: fn(*args), items,
+        workers=workers, executor=executor, rate_limit=rate_limit,
+        timeout=timeout, on_progress=on_progress, batch_size=batch_size,
+        retry=retry,
+    )
+
+
+def parallel_iter(
+    fn: Callable[..., R],
+    items: Iterable[Any],
+    *,
+    workers: int = 4,
+    executor: ExecutorType = "thread",
+    rate_limit: RateLimit | float | None = None,
+    batch_size: int | None = None,
+    retry: Retry | None = None,
+) -> Iterator[tuple[int, R | Exception]]:
+    """Execute *fn* over *items* in parallel, yielding ``(index, result)``
+    in completion order.
+
+    Unlike ``parallel_map``, results are not accumulated in memory — they
+    are yielded as they complete. For failed tasks, the value is the
+    exception instance.
+
+    Example::
+
+        for index, value in parallel_iter(process, huge_list, batch_size=1000):
+            if isinstance(value, Exception):
+                log_error(index, value)
+            else:
+                db.save(value)
+    """
+    if isinstance(rate_limit, (int, float)):
+        rate_limit = RateLimit(rate_limit)
+    if batch_size is not None and batch_size < 1:
+        raise ValueError(f"batch_size must be >= 1, got {batch_size}")
+    if workers < 1:
+        raise ValueError(f"workers must be >= 1, got {workers}")
+    if executor not in ("thread", "process"):
+        raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
+
+    items_list = list(items)
+    n = len(items_list)
+    if n == 0:
+        return
+
+    task_fn = fn
+    if retry is not None:
+        task_fn = functools.partial(_run_with_retry, fn, retry=retry)
+
+    pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
+    bucket = _TokenBucket(rate_limit) if rate_limit else None
+
+    pool = pool_cls(max_workers=workers)
+    try:
+        for chunk in _make_chunks(n, batch_size):
+            futures: dict[Future[R], int] = {}
+            for i in chunk:
+                if bucket:
+                    bucket.wait()
+                futures[pool.submit(task_fn, items_list[i])] = i
+
+            for future in as_completed(futures):
+                idx = futures[future]
+                try:
+                    yield (idx, future.result())
+                except Exception as exc:
+                    yield (idx, exc)
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+
 # ---------------------------------------------------------------------------
 # @parallel decorator
 # ---------------------------------------------------------------------------
@@ -403,6 +495,22 @@ class _BoundParallel:
             rate_limit=rate_limit, timeout=timeout, on_progress=on_progress,
             batch_size=batch_size, retry=retry,
         ))
+
+    def starmap(
+        self,
+        items: Iterable[tuple[Any, ...]],
+        **kwargs: Any,
+    ) -> ParallelResult[Any]:
+        """Like ``.map()`` but unpacks each item as ``fn(*args)``."""
+        return parallel_starmap(self._fn, items, **_merge_opts(self._defaults, **kwargs))
+
+    def stream(
+        self,
+        items: Iterable[Any],
+        **kwargs: Any,
+    ) -> Iterator[tuple[int, Any]]:
+        """Yield ``(index, result)`` in completion order — constant memory."""
+        return parallel_iter(self._fn, items, **_merge_opts(self._defaults, **kwargs))
 
 
 class _ParallelFunc:
@@ -455,6 +563,22 @@ class _ParallelFunc:
             rate_limit=rate_limit, timeout=timeout, on_progress=on_progress,
             batch_size=batch_size, retry=retry,
         ))
+
+    def starmap(
+        self,
+        items: Iterable[tuple[Any, ...]],
+        **kwargs: Any,
+    ) -> ParallelResult[Any]:
+        """Like ``.map()`` but unpacks each item as ``fn(*args)``."""
+        return parallel_starmap(self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs))
+
+    def stream(
+        self,
+        items: Iterable[Any],
+        **kwargs: Any,
+    ) -> Iterator[tuple[int, Any]]:
+        """Yield ``(index, result)`` in completion order — constant memory."""
+        return parallel_iter(self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs))
 
 
 def parallel(
