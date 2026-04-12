@@ -15,7 +15,7 @@ results = await async_parallel_map(
     *,
     concurrency=4,                   # Max concurrent tasks
     rate_limit=None,                 # RateLimit or ops/second
-    timeout=None,                    # Per-task timeout in seconds
+    task_timeout=None,                    # Per-task timeout in seconds
     on_progress=None,                # callback(completed, total)
     batch_size=None,                 # Process in chunks to control memory
     retry=None,                      # Retry(attempts=3, backoff=1.0)
@@ -32,7 +32,7 @@ results = await async_parallel_map(
 | `items` | `Iterable` | required | Any iterable |
 | `concurrency` | `int` | `4` | Maximum concurrent tasks |
 | `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting |
-| `timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
+| `task_timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback |
 | `batch_size` | `int \| None` | `None` | Process items in chunks (controls memory) |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
@@ -40,7 +40,7 @@ results = await async_parallel_map(
 ### Key Difference from Sync
 
 - Uses `concurrency` (not `workers`) — controls task concurrency, not pool size
-- `timeout` is **per-task** (via `asyncio.wait_for`), not total
+- `task_timeout` is **per-task** (via `asyncio.wait_for`), not total
 - Uses `asyncio.TaskGroup` for structured concurrency — proper cleanup on errors
 
 ### Examples
@@ -60,7 +60,7 @@ results = await async_parallel_map(
     fetch, urls,
     concurrency=10,
     rate_limit=RateLimit(100, "minute"),
-    timeout=5.0,
+    task_timeout=5.0,
 )
 ```
 
@@ -97,7 +97,7 @@ data = await fetch("http://example.com")
 
 # Parallel
 results = await fetch.map(urls)
-results = await fetch.map(urls, concurrency=20, timeout=5.0)
+results = await fetch.map(urls, concurrency=20, task_timeout=5.0)
 ```
 
 ### Method Support

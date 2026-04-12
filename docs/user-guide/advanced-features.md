@@ -45,7 +45,7 @@ The async API supports per-task timeouts via `asyncio.wait_for`:
 ```python
 from pyarallel import async_parallel_map
 
-results = await async_parallel_map(fetch, urls, concurrency=10, timeout=5.0)
+results = await async_parallel_map(fetch, urls, concurrency=10, task_timeout=5.0)
 # Each individual task gets 5 seconds before timing out
 ```
 
@@ -117,7 +117,7 @@ async def fetch(url):
 
 data = await fetch("http://example.com")       # single call
 results = await fetch.map(urls)                 # parallel
-results = await fetch.map(urls, timeout=5.0)    # with per-task timeout
+results = await fetch.map(urls, task_timeout=5.0)  # with per-task timeout
 ```
 
 ## Retry
