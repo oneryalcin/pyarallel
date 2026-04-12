@@ -48,6 +48,21 @@ class RateLimit:
         return self.count / {"second": 1, "minute": 60, "hour": 3600}[self.per]
 
 
+@dataclass(frozen=True, slots=True)
+class Retry:
+    """Per-item retry configuration.
+
+    Examples::
+
+        Retry()                    # 3 attempts, no backoff
+        Retry(attempts=5)          # 5 attempts, no backoff
+        Retry(attempts=3, backoff=1.0)  # 3 attempts, 1s between retries
+    """
+
+    attempts: int = 3
+    backoff: float = 0.0
+
+
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
@@ -172,6 +187,19 @@ class ParallelResult(Generic[R]):
 # ---------------------------------------------------------------------------
 
 
+def _run_with_retry(fn: Callable[..., Any], item: Any, retry: Retry) -> Any:
+    """Call *fn(item)*, retrying up to *retry.attempts* times on failure."""
+    last_exc: Exception | None = None
+    for attempt in range(retry.attempts):
+        try:
+            return fn(item)
+        except Exception as exc:
+            last_exc = exc
+            if attempt < retry.attempts - 1 and retry.backoff > 0:
+                time.sleep(retry.backoff * (attempt + 1))
+    raise last_exc  # type: ignore[misc]
+
+
 def parallel_map(
     fn: Callable[..., R],
     items: Iterable[Any],
@@ -181,6 +209,8 @@ def parallel_map(
     rate_limit: RateLimit | float | None = None,
     timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    batch_size: int | None = None,
+    retry: Retry | None = None,
 ) -> ParallelResult[R]:
     """Execute *fn* over *items* in parallel, returning ordered results.
 
@@ -192,6 +222,9 @@ def parallel_map(
         rate_limit: ``RateLimit`` object, or a plain number (ops per second).
         timeout: Total wall-clock timeout in seconds for the whole operation.
         on_progress: ``callback(completed, total)`` fired after each task.
+        batch_size: Process items in chunks of this size to control memory.
+            Without batching, all items are submitted at once.
+        retry: ``Retry`` object for per-item retry with backoff.
 
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
@@ -205,39 +238,54 @@ def parallel_map(
     if n == 0:
         return ParallelResult([], 0)
 
+    # Wrap fn with retry logic if requested
+    task_fn = fn
+    if retry is not None:
+        task_fn = functools.partial(_run_with_retry, fn, retry=retry)
+
     pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
     bucket = _TokenBucket(rate_limit) if rate_limit else None
     results: list[Any] = [None] * n
     completed = 0
 
     with pool_cls(max_workers=workers) as pool:
-        futures: dict[Future[R], int] = {}
-        for i, item in enumerate(items_list):
-            if bucket:
-                bucket.wait()
-            futures[pool.submit(fn, item)] = i
+        # Determine chunks — either batched or all-at-once
+        if batch_size is not None and batch_size < n:
+            chunks = [
+                range(start, min(start + batch_size, n))
+                for start in range(0, n, batch_size)
+            ]
+        else:
+            chunks = [range(n)]
 
-        try:
-            for future in as_completed(futures, timeout=timeout):
-                idx = futures[future]
-                try:
-                    results[idx] = future.result()
-                except Exception as exc:
-                    results[idx] = _Failure(idx, exc)
-                completed += 1
-                if on_progress:
-                    on_progress(completed, n)
-        except TimeoutError:
-            for f, idx in futures.items():
-                if not f.done():
-                    f.cancel()
-                    if results[idx] is None:
-                        results[idx] = _Failure(
-                            idx,
-                            TimeoutError(
-                                f"Task {idx} did not complete within {timeout}s"
-                            ),
-                        )
+        for chunk in chunks:
+            futures: dict[Future[R], int] = {}
+            for i in chunk:
+                if bucket:
+                    bucket.wait()
+                futures[pool.submit(task_fn, items_list[i])] = i
+
+            try:
+                for future in as_completed(futures, timeout=timeout):
+                    idx = futures[future]
+                    try:
+                        results[idx] = future.result()
+                    except Exception as exc:
+                        results[idx] = _Failure(idx, exc)
+                    completed += 1
+                    if on_progress:
+                        on_progress(completed, n)
+            except TimeoutError:
+                for f, idx in futures.items():
+                    if not f.done():
+                        f.cancel()
+                        if results[idx] is None:
+                            results[idx] = _Failure(
+                                idx,
+                                TimeoutError(
+                                    f"Task {idx} did not complete within {timeout}s"
+                                ),
+                            )
 
     return ParallelResult(results, n)
 
@@ -268,6 +316,8 @@ class _BoundParallel:
         rate_limit: RateLimit | float | None = None,
         timeout: float | None = None,
         on_progress: Callable[[int, int], None] | None = None,
+        batch_size: int | None = None,
+        retry: Retry | None = None,
     ) -> ParallelResult[Any]:
         """Run this function over *items* in parallel."""
         opts = dict(self._defaults)
@@ -281,6 +331,10 @@ class _BoundParallel:
             opts["timeout"] = timeout
         if on_progress is not None:
             opts["on_progress"] = on_progress
+        if batch_size is not None:
+            opts["batch_size"] = batch_size
+        if retry is not None:
+            opts["retry"] = retry
         return parallel_map(self._fn, items, **opts)
 
 
@@ -324,6 +378,8 @@ class _ParallelFunc:
         rate_limit: RateLimit | float | None = None,
         timeout: float | None = None,
         on_progress: Callable[[int, int], None] | None = None,
+        batch_size: int | None = None,
+        retry: Retry | None = None,
     ) -> ParallelResult[Any]:
         """Run this function over *items* in parallel."""
         opts = dict(self._defaults)
@@ -337,6 +393,10 @@ class _ParallelFunc:
             opts["timeout"] = timeout
         if on_progress is not None:
             opts["on_progress"] = on_progress
+        if batch_size is not None:
+            opts["batch_size"] = batch_size
+        if retry is not None:
+            opts["retry"] = retry
         return parallel_map(self.__wrapped__, items, **opts)
 
 

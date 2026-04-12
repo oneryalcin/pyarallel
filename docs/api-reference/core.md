@@ -16,6 +16,8 @@ results = parallel_map(
     rate_limit=None,                 # RateLimit object or ops/second (float)
     timeout=None,                    # Total timeout in seconds
     on_progress=None,                # callback(completed, total)
+    batch_size=None,                 # Process in chunks to control memory
+    retry=None,                      # Retry(attempts=3, backoff=1.0)
 )
 ```
 
@@ -32,6 +34,8 @@ results = parallel_map(
 | `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting (float = ops/second) |
 | `timeout` | `float \| None` | `None` | Total wall-clock timeout in seconds |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback `(completed, total)` |
+| `batch_size` | `int \| None` | `None` | Process items in chunks of this size (controls memory) |
+| `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 
 ### Examples
 
@@ -48,6 +52,12 @@ results = parallel_map(fetch, urls, rate_limit=10)  # 10 per second
 # With timeout and progress
 results = parallel_map(fetch, urls, timeout=60.0,
                        on_progress=lambda d, t: print(f"{d}/{t}"))
+
+# Batched — controls memory for large datasets
+results = parallel_map(process, million_items, workers=8, batch_size=500)
+
+# With retry — flaky network calls
+results = parallel_map(fetch, urls, workers=10, retry=Retry(attempts=3, backoff=1.0))
 ```
 
 ---
@@ -180,4 +190,48 @@ Or use the shorthand — pass a number directly to `rate_limit=`:
 
 ```python
 parallel_map(fn, items, rate_limit=10)  # same as RateLimit(10)
+```
+
+---
+
+## `Retry`
+
+Immutable per-item retry configuration. Retries happen inside each worker — only the failing item is retried, not the whole batch.
+
+```python
+from pyarallel import Retry
+
+retry = Retry(attempts=3, backoff=1.0)
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `attempts` | `int` | `3` | Total attempts (1 = no retry, 3 = up to 2 retries) |
+| `backoff` | `float` | `0.0` | Seconds between retries, multiplied by attempt number |
+
+### Backoff Behavior
+
+With `backoff=1.0` and `attempts=3`:
+
+- Attempt 1: immediate
+- Attempt 2: sleep 1.0s, then retry
+- Attempt 3: sleep 2.0s, then retry
+
+### Examples
+
+```python
+# Basic retry — 3 attempts, no wait
+results = parallel_map(fetch, urls, retry=Retry())
+
+# Retry with exponential-ish backoff
+results = parallel_map(fetch, urls, retry=Retry(attempts=5, backoff=0.5))
+
+# Retry + rate limit + batch — the full production stack
+results = parallel_map(
+    call_api, ids,
+    workers=10,
+    rate_limit=RateLimit(100, "minute"),
+    retry=Retry(attempts=3, backoff=1.0),
+    batch_size=500,
+)
 ```

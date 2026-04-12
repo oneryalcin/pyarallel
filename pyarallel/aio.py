@@ -10,7 +10,7 @@ import asyncio
 import functools
 from typing import Any, Callable, Iterable, TypeVar
 
-from .core import ParallelResult, RateLimit, _Failure
+from .core import ParallelResult, RateLimit, Retry, _Failure
 
 R = TypeVar("R")
 
@@ -49,6 +49,19 @@ class _AsyncTokenBucket:
 # ---------------------------------------------------------------------------
 
 
+async def _async_run_with_retry(fn: Callable[..., Any], item: Any, retry: Retry) -> Any:
+    """Call async *fn(item)*, retrying up to *retry.attempts* times."""
+    last_exc: Exception | None = None
+    for attempt in range(retry.attempts):
+        try:
+            return await fn(item)
+        except Exception as exc:
+            last_exc = exc
+            if attempt < retry.attempts - 1 and retry.backoff > 0:
+                await asyncio.sleep(retry.backoff * (attempt + 1))
+    raise last_exc  # type: ignore[misc]
+
+
 async def async_parallel_map(
     fn: Callable[..., Any],
     items: Iterable[Any],
@@ -57,6 +70,8 @@ async def async_parallel_map(
     rate_limit: RateLimit | float | None = None,
     timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    batch_size: int | None = None,
+    retry: Retry | None = None,
 ) -> ParallelResult[R]:
     """Execute an async *fn* over *items* concurrently.
 
@@ -67,6 +82,8 @@ async def async_parallel_map(
         rate_limit: ``RateLimit`` object, or ops-per-second as a number.
         timeout: Per-task timeout in seconds.
         on_progress: ``callback(completed, total)`` after each task.
+        batch_size: Process items in chunks to control memory.
+        retry: ``Retry`` object for per-item retry with backoff.
 
     Returns:
         ``ParallelResult`` — same container as the sync API.
@@ -90,19 +107,32 @@ async def async_parallel_map(
             if limiter:
                 await limiter.wait()
             try:
-                if timeout is not None:
-                    results[i] = await asyncio.wait_for(fn(item), timeout=timeout)
+                if retry is not None:
+                    result = await _async_run_with_retry(fn, item, retry)
+                elif timeout is not None:
+                    result = await asyncio.wait_for(fn(item), timeout=timeout)
                 else:
-                    results[i] = await fn(item)
+                    result = await fn(item)
+                results[i] = result
             except Exception as exc:
                 results[i] = _Failure(i, exc)
             completed += 1
             if on_progress:
                 on_progress(completed, n)
 
-    async with asyncio.TaskGroup() as tg:
-        for i, item in enumerate(items_list):
-            tg.create_task(_run(i, item))
+    # Batched or all-at-once
+    if batch_size is not None and batch_size < n:
+        chunks = [
+            range(start, min(start + batch_size, n))
+            for start in range(0, n, batch_size)
+        ]
+    else:
+        chunks = [range(n)]
+
+    for chunk in chunks:
+        async with asyncio.TaskGroup() as tg:
+            for i in chunk:
+                tg.create_task(_run(i, items_list[i]))
 
     return ParallelResult(results, n)
 
@@ -132,6 +162,8 @@ class _BoundAsyncParallel:
         rate_limit: RateLimit | float | None = None,
         timeout: float | None = None,
         on_progress: Callable[[int, int], None] | None = None,
+        batch_size: int | None = None,
+        retry: Retry | None = None,
     ) -> ParallelResult[Any]:
         opts = dict(self._defaults)
         if concurrency is not None:
@@ -142,6 +174,10 @@ class _BoundAsyncParallel:
             opts["timeout"] = timeout
         if on_progress is not None:
             opts["on_progress"] = on_progress
+        if batch_size is not None:
+            opts["batch_size"] = batch_size
+        if retry is not None:
+            opts["retry"] = retry
         return await async_parallel_map(self._fn, items, **opts)
 
 
@@ -178,6 +214,8 @@ class _AsyncParallelFunc:
         rate_limit: RateLimit | float | None = None,
         timeout: float | None = None,
         on_progress: Callable[[int, int], None] | None = None,
+        batch_size: int | None = None,
+        retry: Retry | None = None,
     ) -> ParallelResult[Any]:
         opts = dict(self._defaults)
         if concurrency is not None:
@@ -188,6 +226,10 @@ class _AsyncParallelFunc:
             opts["timeout"] = timeout
         if on_progress is not None:
             opts["on_progress"] = on_progress
+        if batch_size is not None:
+            opts["batch_size"] = batch_size
+        if retry is not None:
+            opts["retry"] = retry
         return await async_parallel_map(self.__wrapped__, items, **opts)
 
 
