@@ -287,6 +287,8 @@ def parallel_map(
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if workers < 1:
         raise ValueError(f"workers must be >= 1, got {workers}")
+    if executor not in ("thread", "process"):
+        raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
 
     items_list = list(items)
     n = len(items_list)
@@ -302,10 +304,11 @@ def parallel_map(
     results: list[Any] = [_PENDING] * n
     completed = 0
     deadline = (time.monotonic() + timeout) if timeout is not None else None
+    timed_out = False
 
-    with pool_cls(max_workers=workers) as pool:
+    pool = pool_cls(max_workers=workers)
+    try:
         for chunk in _make_chunks(n, batch_size):
-            # Compute remaining time budget for this batch
             chunk_timeout: float | None = None
             if deadline is not None:
                 chunk_timeout = max(0.0, deadline - time.monotonic())
@@ -315,6 +318,7 @@ def parallel_map(
                             results[i] = _Failure(
                                 TimeoutError(f"Task {i} did not complete within {timeout}s")
                             )
+                    timed_out = True
                     continue
 
             futures: dict[Future[R], int] = {}
@@ -334,6 +338,7 @@ def parallel_map(
                     if on_progress:
                         on_progress(completed, n)
             except TimeoutError:
+                timed_out = True
                 for f, idx in futures.items():
                     if not f.done():
                         f.cancel()
@@ -341,6 +346,8 @@ def parallel_map(
                             results[idx] = _Failure(
                                 TimeoutError(f"Task {idx} did not complete within {timeout}s")
                             )
+    finally:
+        pool.shutdown(wait=not timed_out, cancel_futures=timed_out)
 
     return ParallelResult(results)
 

@@ -1,15 +1,15 @@
-from .config_manager import ConfigManager
-from .core import RateLimit, parallel
+"""Pyarallel — simple, explicit parallel execution for Python."""
 
-__version__ = "0.1.3"
+from .core import ParallelResult, RateLimit, Retry, parallel, parallel_map
+from .aio import async_parallel, async_parallel_map
 
-# Singleton config instance for easy access
-config = ConfigManager.get_instance()
-
-__all__ = ["parallel", "RateLimit", "config", "ConfigManager"]
-
-__doc__ = f"""
-pyarallel v{__version__}
-
-Simple parallel processing framework for Python.
-"""
+__version__ = "0.2.0"
+__all__ = [
+    "ParallelResult",
+    "RateLimit",
+    "Retry",
+    "parallel",
+    "parallel_map",
+    "async_parallel",
+    "async_parallel_map",
+]
