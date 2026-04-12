@@ -262,20 +262,23 @@ def parallel_map(
     fn: Callable[..., R],
     items: Iterable[Any],
     *,
-    workers: int = 4,
+    workers: int | None = None,
     executor: ExecutorType = "thread",
     rate_limit: RateLimit | float | None = None,
     timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    task_timeout: float | None = None,
 ) -> ParallelResult[R]:
     """Execute *fn* over *items* in parallel, returning ordered results.
 
     Args:
         fn: Function applied to each item.
         items: Any iterable (list, generator, range, …).
-        workers: Number of parallel workers.
+        workers: Number of parallel workers. Defaults to ``None`` which lets
+            the executor decide — ``min(32, cpu_count+4)`` for threads,
+            ``cpu_count()`` for processes.
         executor: ``"thread"`` for I/O-bound, ``"process"`` for CPU-bound.
         rate_limit: ``RateLimit`` object, or a plain number (ops per second).
         timeout: Total wall-clock timeout in seconds for the whole operation.
@@ -291,10 +294,17 @@ def parallel_map(
         rate_limit = RateLimit(rate_limit)
     if batch_size is not None and batch_size < 1:
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
-    if workers < 1:
+    if workers is not None and workers < 1:
         raise ValueError(f"workers must be >= 1, got {workers}")
     if executor not in ("thread", "process"):
         raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
+    if task_timeout is not None:
+        raise NotImplementedError(
+            "task_timeout is not supported in sync parallel_map — Python threads "
+            "cannot be cancelled mid-execution. Use timeout= for a total wall-clock "
+            "limit, or put timeouts inside your function (e.g. requests.get(url, timeout=5)). "
+            "For per-task timeouts, use async_parallel_map with task_timeout=."
+        )
 
     items_list = list(items)
     n = len(items_list)
@@ -406,12 +416,14 @@ class _ParallelFunc:
         self,
         fn: Callable[..., Any],
         *,
-        workers: int,
+        workers: int | None,
         executor: ExecutorType,
         rate_limit: RateLimit | float | None,
     ) -> None:
         self.__wrapped__ = fn
-        self._defaults: dict[str, Any] = {"workers": workers, "executor": executor}
+        self._defaults: dict[str, Any] = {"executor": executor}
+        if workers is not None:
+            self._defaults["workers"] = workers
         if rate_limit is not None:
             self._defaults["rate_limit"] = rate_limit
         functools.update_wrapper(self, fn)
@@ -448,7 +460,7 @@ class _ParallelFunc:
 def parallel(
     fn: Callable[..., R] | None = None,
     *,
-    workers: int = 4,
+    workers: int | None = None,
     executor: ExecutorType = "thread",
     rate_limit: RateLimit | float | None = None,
 ) -> Any:

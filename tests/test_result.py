@@ -145,6 +145,11 @@ class TestValidation:
         with pytest.raises(ValueError, match=">= 1"):
             parallel_map(lambda x: x, [1], workers=0)
 
+    def test_task_timeout_in_sync_raises(self):
+        from pyarallel import parallel_map
+        with pytest.raises(NotImplementedError, match="task_timeout is not supported"):
+            parallel_map(lambda x: x, [1], task_timeout=5.0)
+
     def test_rate_limit_invalid_per_raises(self):
         from pyarallel import RateLimit
         with pytest.raises(ValueError, match='"second", "minute", or "hour"'):

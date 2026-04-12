@@ -81,6 +81,7 @@ async def async_parallel_map(
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    workers: int | None = None,
 ) -> ParallelResult[R]:
     """Execute an async *fn* over *items* concurrently.
 
@@ -93,10 +94,20 @@ async def async_parallel_map(
         on_progress: ``callback(completed, total)`` after each task.
         batch_size: Process items in chunks to control memory.
         retry: ``Retry`` object for per-item retry with backoff.
+        workers: Alias for ``concurrency`` (for convenience when switching
+            from sync API). Emits a warning; prefer ``concurrency``.
 
     Returns:
         ``ParallelResult`` — same container as the sync API.
     """
+    if workers is not None:
+        import warnings
+        warnings.warn(
+            "workers= is not used in async_parallel_map — "
+            "did you mean concurrency=? Setting concurrency to the workers value.",
+            stacklevel=2,
+        )
+        concurrency = workers
     if isinstance(rate_limit, (int, float)):
         rate_limit = RateLimit(rate_limit)
     if batch_size is not None and batch_size < 1:

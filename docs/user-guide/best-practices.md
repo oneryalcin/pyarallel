@@ -30,21 +30,24 @@ results = parallel_map(compute, data, workers=4, executor="process")
 !!! warning
     Process executor requires picklable functions. Use module-level named functions, not lambdas or closures.
 
-### Worker Count Guidelines
+### Worker Count
 
-- **CPU-bound**: `multiprocessing.cpu_count()` or fewer
-- **I/O-bound**: 10-50x the number of cores, depending on latency
+By default, `workers=None` — the stdlib picks a sensible number automatically:
+
+- **Threads**: `min(32, cpu_count + 4)` — Python's `ThreadPoolExecutor` default
+- **Processes**: `cpu_count()` — Python's `ProcessPoolExecutor` default
+
+Most of the time you don't need to set `workers` at all. Override only when you have a reason:
 
 ```python
-import multiprocessing
+# Just use the defaults — they're good
+results = parallel_map(fetch, urls)
+results = parallel_map(crunch, data, executor="process")
 
-# CPU-bound
-results = parallel_map(crunch, data,
-                       workers=multiprocessing.cpu_count(),
-                       executor="process")
-
-# I/O-bound
-results = parallel_map(fetch, urls, workers=32)
+# Override when you know better
+results = parallel_map(fetch, urls, workers=100)       # high concurrency for fast APIs
+results = parallel_map(crunch, data, executor="process",
+                       workers=multiprocessing.cpu_count() - 1)  # leave a core free
 ```
 
 ## Rate Limiting
