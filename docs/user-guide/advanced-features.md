@@ -128,12 +128,19 @@ Built-in per-item retry with exponential backoff and jitter:
 from pyarallel import parallel_map, Retry
 
 # Retry up to 3 times with 1s base exponential backoff
+# Jitter is ON by default — randomizes delay ±50% to prevent thundering herd
 results = parallel_map(fetch, urls, workers=10, retry=Retry(attempts=3, backoff=1.0))
 
 # Only retry transient network errors — fail immediately on bad input
 results = parallel_map(fetch, urls, workers=10,
                        retry=Retry(on=(ConnectionError, TimeoutError)))
+
+# Cap max delay and disable jitter (useful for testing)
+results = parallel_map(fetch, urls, workers=10,
+                       retry=Retry(attempts=5, backoff=2.0, max_delay=30.0, jitter=False))
 ```
+
+**How backoff works:** delay = `backoff * 2^attempt`, capped at `max_delay`. With `jitter=True` (default), the delay is multiplied by a random factor between 0.5 and 1.5 — this prevents all workers from retrying at the exact same moment when a service recovers.
 
 Retries happen *inside the worker* — only the failing item is retried, not the entire batch. This composes cleanly with rate limiting and batching.
 
