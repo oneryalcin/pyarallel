@@ -24,6 +24,9 @@ R = TypeVar("R")
 
 ExecutorType = Literal["thread", "process"]
 
+# Sentinel for "slot not yet filled" — distinct from a legitimate None return.
+_PENDING = object()
+
 
 # ---------------------------------------------------------------------------
 # Configuration objects — small, frozen, composable
@@ -43,6 +46,10 @@ class RateLimit:
 
     count: float
     per: Literal["second", "minute", "hour"] = "second"
+
+    def __post_init__(self) -> None:
+        if self.count <= 0:
+            raise ValueError(f"RateLimit count must be positive, got {self.count}")
 
     @property
     def per_second(self) -> float:
@@ -69,6 +76,10 @@ class Retry:
     jitter: bool = True
     on: tuple[type[Exception], ...] | None = None
 
+    def __post_init__(self) -> None:
+        if self.attempts < 1:
+            raise ValueError(f"Retry attempts must be >= 1, got {self.attempts}")
+
     def _delay(self, attempt: int) -> float:
         """Compute delay before retry *attempt* (0-indexed)."""
         delay = min(self.backoff * (2 ** attempt), self.max_delay)
@@ -91,10 +102,9 @@ class Retry:
 class _Failure:
     """Sentinel wrapping a failed task result."""
 
-    __slots__ = ("index", "exception")
+    __slots__ = ("exception",)
 
-    def __init__(self, index: int, exception: Exception) -> None:
-        self.index = index
+    def __init__(self, exception: Exception) -> None:
         self.exception = exception
 
 
@@ -122,6 +132,23 @@ class _TokenBucket:
             time.sleep(delay)
 
 
+def _merge_opts(defaults: dict[str, Any], **overrides: Any) -> dict[str, Any]:
+    """Merge decorator defaults with per-call overrides (skip None values)."""
+    opts = dict(defaults)
+    opts.update({k: v for k, v in overrides.items() if v is not None})
+    return opts
+
+
+def _make_chunks(n: int, batch_size: int | None) -> list[range]:
+    """Split range(n) into chunks for batched processing."""
+    if batch_size is not None and batch_size < n:
+        return [
+            range(start, min(start + batch_size, n))
+            for start in range(0, n, batch_size)
+        ]
+    return [range(n)]
+
+
 # ---------------------------------------------------------------------------
 # ParallelResult
 # ---------------------------------------------------------------------------
@@ -138,11 +165,10 @@ class ParallelResult(Generic[R]):
     if any task failed — you always see errors, never silently.
     """
 
-    __slots__ = ("_entries", "_n")
+    __slots__ = ("_entries",)
 
-    def __init__(self, entries: list[Any], n: int) -> None:
+    def __init__(self, entries: list[Any]) -> None:
         self._entries = entries
-        self._n = n
 
     # --- Introspection ---
 
@@ -167,8 +193,8 @@ class ParallelResult(Generic[R]):
     def failures(self) -> list[tuple[int, Exception]]:
         """``(index, exception)`` for each task that failed."""
         return [
-            (f.index, f.exception)
-            for f in self._entries
+            (i, f.exception)
+            for i, f in enumerate(self._entries)
             if isinstance(f, _Failure)
         ]
 
@@ -176,8 +202,9 @@ class ParallelResult(Generic[R]):
         """Raise ``ExceptionGroup`` containing all task failures."""
         fails = self.failures()
         if fails:
+            n = len(self._entries)
             raise ExceptionGroup(
-                f"{len(fails)} of {self._n} tasks failed",
+                f"{len(fails)} of {n} tasks failed",
                 [e for _, e in fails],
             )
 
@@ -187,13 +214,14 @@ class ParallelResult(Generic[R]):
         return iter(self.values())
 
     def __getitem__(self, index: int | slice) -> Any:
-        return self.values()[index]
+        self.raise_on_failure()
+        return self._entries[index]
 
     def __len__(self) -> int:
-        return self._n
+        return len(self._entries)
 
     def __bool__(self) -> bool:
-        return self._n > 0
+        return len(self._entries) > 0
 
     def __repr__(self) -> str:
         if self.ok:
@@ -253,36 +281,42 @@ def parallel_map(
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
     """
-    # Normalise rate_limit
     if isinstance(rate_limit, (int, float)):
         rate_limit = RateLimit(rate_limit)
+    if batch_size is not None and batch_size < 1:
+        raise ValueError(f"batch_size must be >= 1, got {batch_size}")
+    if workers < 1:
+        raise ValueError(f"workers must be >= 1, got {workers}")
 
     items_list = list(items)
     n = len(items_list)
     if n == 0:
-        return ParallelResult([], 0)
+        return ParallelResult([])
 
-    # Wrap fn with retry logic if requested
     task_fn = fn
     if retry is not None:
         task_fn = functools.partial(_run_with_retry, fn, retry=retry)
 
     pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
     bucket = _TokenBucket(rate_limit) if rate_limit else None
-    results: list[Any] = [None] * n
+    results: list[Any] = [_PENDING] * n
     completed = 0
+    deadline = (time.monotonic() + timeout) if timeout is not None else None
 
     with pool_cls(max_workers=workers) as pool:
-        # Determine chunks — either batched or all-at-once
-        if batch_size is not None and batch_size < n:
-            chunks = [
-                range(start, min(start + batch_size, n))
-                for start in range(0, n, batch_size)
-            ]
-        else:
-            chunks = [range(n)]
+        for chunk in _make_chunks(n, batch_size):
+            # Compute remaining time budget for this batch
+            chunk_timeout: float | None = None
+            if deadline is not None:
+                chunk_timeout = max(0.0, deadline - time.monotonic())
+                if chunk_timeout <= 0:
+                    for i in chunk:
+                        if results[i] is _PENDING:
+                            results[i] = _Failure(
+                                TimeoutError(f"Task {i} did not complete within {timeout}s")
+                            )
+                    continue
 
-        for chunk in chunks:
             futures: dict[Future[R], int] = {}
             for i in chunk:
                 if bucket:
@@ -290,12 +324,12 @@ def parallel_map(
                 futures[pool.submit(task_fn, items_list[i])] = i
 
             try:
-                for future in as_completed(futures, timeout=timeout):
+                for future in as_completed(futures, timeout=chunk_timeout):
                     idx = futures[future]
                     try:
                         results[idx] = future.result()
                     except Exception as exc:
-                        results[idx] = _Failure(idx, exc)
+                        results[idx] = _Failure(exc)
                     completed += 1
                     if on_progress:
                         on_progress(completed, n)
@@ -303,15 +337,12 @@ def parallel_map(
                 for f, idx in futures.items():
                     if not f.done():
                         f.cancel()
-                        if results[idx] is None:
+                        if results[idx] is _PENDING:
                             results[idx] = _Failure(
-                                idx,
-                                TimeoutError(
-                                    f"Task {idx} did not complete within {timeout}s"
-                                ),
+                                TimeoutError(f"Task {idx} did not complete within {timeout}s")
                             )
 
-    return ParallelResult(results, n)
+    return ParallelResult(results)
 
 
 # ---------------------------------------------------------------------------
@@ -344,22 +375,11 @@ class _BoundParallel:
         retry: Retry | None = None,
     ) -> ParallelResult[Any]:
         """Run this function over *items* in parallel."""
-        opts = dict(self._defaults)
-        if workers is not None:
-            opts["workers"] = workers
-        if executor is not None:
-            opts["executor"] = executor
-        if rate_limit is not None:
-            opts["rate_limit"] = rate_limit
-        if timeout is not None:
-            opts["timeout"] = timeout
-        if on_progress is not None:
-            opts["on_progress"] = on_progress
-        if batch_size is not None:
-            opts["batch_size"] = batch_size
-        if retry is not None:
-            opts["retry"] = retry
-        return parallel_map(self._fn, items, **opts)
+        return parallel_map(self._fn, items, **_merge_opts(
+            self._defaults, workers=workers, executor=executor,
+            rate_limit=rate_limit, timeout=timeout, on_progress=on_progress,
+            batch_size=batch_size, retry=retry,
+        ))
 
 
 class _ParallelFunc:
@@ -386,7 +406,6 @@ class _ParallelFunc:
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return self.__wrapped__(*args, **kwargs)
 
-    # Descriptor — makes .map() work on instance methods
     def __get__(self, obj: Any, objtype: type | None = None) -> Any:
         if obj is None:
             return self
@@ -406,22 +425,11 @@ class _ParallelFunc:
         retry: Retry | None = None,
     ) -> ParallelResult[Any]:
         """Run this function over *items* in parallel."""
-        opts = dict(self._defaults)
-        if workers is not None:
-            opts["workers"] = workers
-        if executor is not None:
-            opts["executor"] = executor
-        if rate_limit is not None:
-            opts["rate_limit"] = rate_limit
-        if timeout is not None:
-            opts["timeout"] = timeout
-        if on_progress is not None:
-            opts["on_progress"] = on_progress
-        if batch_size is not None:
-            opts["batch_size"] = batch_size
-        if retry is not None:
-            opts["retry"] = retry
-        return parallel_map(self.__wrapped__, items, **opts)
+        return parallel_map(self.__wrapped__, items, **_merge_opts(
+            self._defaults, workers=workers, executor=executor,
+            rate_limit=rate_limit, timeout=timeout, on_progress=on_progress,
+            batch_size=batch_size, retry=retry,
+        ))
 
 
 def parallel(
