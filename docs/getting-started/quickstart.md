@@ -1,94 +1,118 @@
-# Quick Start Guide
+# Quick Start
 
-## Basic Usage
+## The Function: `parallel_map`
 
-Pyarallel makes parallel processing in Python simple and efficient. Here's how to get started:
+The simplest way to parallelize work:
+
+```python
+from pyarallel import parallel_map
+
+def fetch_url(url):
+    import requests
+    return requests.get(url).json()
+
+urls = ["https://api.example.com/1", "https://api.example.com/2"]
+results = parallel_map(fetch_url, urls, workers=4)
+
+for item in results:
+    print(item)
+```
+
+`parallel_map` accepts **any iterable** — lists, generators, ranges, sets:
+
+```python
+# All of these work
+parallel_map(process, [1, 2, 3], workers=4)
+parallel_map(process, range(100), workers=4)
+parallel_map(process, (x for x in data), workers=4)
+```
+
+## The Decorator: `@parallel`
+
+For functions you use repeatedly. The function keeps its normal behavior — `.map()` is explicit:
 
 ```python
 from pyarallel import parallel
 
-# Basic parallel processing with threads
-@parallel(max_workers=4)
-def fetch_url(url: str) -> dict:
-    import requests
+@parallel(workers=4)
+def fetch(url):
     return requests.get(url).json()
 
-# Process multiple URLs in parallel
-urls = [
-    "https://api.example.com/data/1",
-    "https://api.example.com/data/2"
-]
-results = fetch_url(urls)  # Returns list of results
+# Normal call — returns dict
+data = fetch("http://example.com")
+
+# Parallel call — returns ParallelResult
+results = fetch.map(["http://a.com", "http://b.com"])
 ```
 
-## Common Patterns
+## CPU-Bound Work
 
-### CPU-Bound Tasks
-
-For CPU-intensive operations, use process-based parallelism:
+Use `executor="process"` for CPU-intensive tasks:
 
 ```python
-@parallel(
-    max_workers=4,
-    executor_type="process"  # Use processes instead of threads
-)
-def process_data(data: bytes) -> bytes:
-    # CPU-intensive computation
+def crunch(data):
     return heavy_computation(data)
+
+results = parallel_map(crunch, datasets, workers=4, executor="process")
 ```
 
-### Rate-Limited Operations
+!!! note
+    Functions must be picklable for process execution — use module-level functions, not lambdas.
 
-Control execution rates for API calls or resource-intensive operations:
+## Rate Limiting
 
-```python
-@parallel(
-    max_workers=4,
-    rate_limit=(100, "minute")  # 100 operations per minute
-)
-def api_call(item_id: str) -> dict:
-    return api.get_item(item_id)
-```
-
-### Batch Processing
-
-Handle large datasets efficiently with automatic batching:
+Control execution rate for API calls:
 
 ```python
-@parallel(
-    max_workers=4,
-    batch_size=10  # Process items in batches of 10
-)
-def analyze_text(text: str) -> dict:
-    return text_analysis(text)
+from pyarallel import RateLimit
 
-# Process a large list of texts
-texts = ["text1", "text2", ..., "text1000"]
-results = analyze_text(texts)  # Processed in batches
+# 100 operations per minute
+results = parallel_map(call_api, ids, workers=4,
+                       rate_limit=RateLimit(100, "minute"))
+
+# Shorthand: 10 per second
+results = parallel_map(call_api, ids, workers=4, rate_limit=10)
 ```
 
 ## Error Handling
 
-Pyarallel provides comprehensive error handling:
+Errors are never silently lost. `ParallelResult` gives you structured access:
 
 ```python
-@parallel(max_workers=4)
-def process_item(item):
-    try:
-        return do_work(item)
-    except Exception as e:
-        # Errors are propagated to the caller
-        raise RuntimeError(f"Failed to process {item}: {e}")
+result = parallel_map(process, items, workers=4)
 
-# Handle errors in the caller
-try:
-    results = process_item(items)
-except Exception as e:
-    print(f"Processing failed: {e}")
+if result.ok:
+    # All succeeded
+    for value in result:
+        print(value)
+else:
+    # Some failed — inspect both
+    print(f"{len(result.successes())} succeeded")
+    print(f"{len(result.failures())} failed")
+
+    for idx, exc in result.failures():
+        print(f"  Item {idx}: {exc}")
+
+    # Or raise all errors at once
+    result.raise_on_failure()  # ExceptionGroup
+```
+
+## Async
+
+Mirror API for async functions:
+
+```python
+from pyarallel import async_parallel_map
+
+async def fetch(url):
+    async with httpx.AsyncClient() as client:
+        return (await client.get(url)).json()
+
+results = await async_parallel_map(fetch, urls, concurrency=10)
 ```
 
 ## Next Steps
 
-- Explore [Advanced Features](../user-guide/advanced-features.md) for more capabilities
-- Check [Configuration](../user-guide/configuration.md) for customization options
-- Review [Best Practices](../user-guide/best-practices.md) for optimization tips
+- [Advanced Features](../user-guide/advanced-features.md) — timeouts, progress, methods
+- [Best Practices](../user-guide/best-practices.md) — choosing executors, error patterns
+- [API Reference](../api-reference/core.md) — full parameter docs

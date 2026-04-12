@@ -2,60 +2,27 @@
 
 ## Requirements
 
-- Python 3.9 or higher
-- pip package manager
+- Python 3.12 or higher
 
-## Basic Installation
-
-Install Pyarallel using pip:
+## Install
 
 ```bash
 pip install pyarallel
 ```
 
-## Development Installation
+## Development Install
 
-For development or contributing to Pyarallel:
-
-1. Clone the repository:
 ```bash
 git clone https://github.com/oneryalcin/pyarallel.git
 cd pyarallel
-```
-
-2. Install development dependencies:
-```bash
 pip install -e ".[dev]"
 ```
 
-## Verifying Installation
-
-Verify your installation by running Python and importing Pyarallel:
+## Verify
 
 ```python
-from pyarallel import parallel
+from pyarallel import parallel_map
 
-# Test with a simple parallel function
-@parallel(max_workers=2)
-def test_func(x):
-    return x * 2
-
-result = test_func([1, 2, 3])
-print(result)  # Should print: [2, 4, 6]
+results = parallel_map(lambda x: x * 2, [1, 2, 3], workers=2)
+print(list(results))  # [2, 4, 6]
 ```
-
-## Troubleshooting
-
-If you encounter any issues during installation:
-
-1. Ensure you have the latest pip version:
-```bash
-pip install --upgrade pip
-```
-
-2. Check Python version compatibility:
-```bash
-python --version
-```
-
-3. For platform-specific issues or additional help, please refer to our [GitHub Issues](https://github.com/oneryalcin/pyarallel/issues) page.
