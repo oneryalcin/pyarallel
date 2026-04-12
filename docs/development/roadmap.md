@@ -21,14 +21,11 @@
 - **Result streaming** — yield results as they complete (iterator API)
 - **tqdm/rich integration** — built-in progress bar support
 
-### Medium Term
-
-- **Per-task timeout (sync)** — individual task deadlines for thread/process pools
-
 ### Exploring
 
 - **Free-threading support** — leverage Python 3.13+ no-GIL for true thread parallelism
 - **Resource-aware scheduling** — adaptive worker counts based on system load
+- **Per-task timeout (sync)** — Python threads cannot be cancelled mid-execution, so per-task timeout in sync is a hard problem with no clean solution. The async API supports `task_timeout` natively via `asyncio.wait_for`. For sync, use `timeout=` for total wall-clock limits and put timeouts inside your function (e.g., `requests.get(url, timeout=5)`).
 
 ---
 

@@ -269,6 +269,7 @@ def parallel_map(
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    task_timeout: float | None = None,
 ) -> ParallelResult[R]:
     """Execute *fn* over *items* in parallel, returning ordered results.
 
@@ -297,6 +298,13 @@ def parallel_map(
         raise ValueError(f"workers must be >= 1, got {workers}")
     if executor not in ("thread", "process"):
         raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
+    if task_timeout is not None:
+        raise NotImplementedError(
+            "task_timeout is not supported in sync parallel_map — Python threads "
+            "cannot be cancelled mid-execution. Use timeout= for a total wall-clock "
+            "limit, or put timeouts inside your function (e.g. requests.get(url, timeout=5)). "
+            "For per-task timeouts, use async_parallel_map with task_timeout=."
+        )
 
     items_list = list(items)
     n = len(items_list)
