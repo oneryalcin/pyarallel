@@ -37,10 +37,15 @@ results = await async_parallel_map(
 | `batch_size` | `int \| None` | `None` | Process items in chunks (controls memory) |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 
-### Key Difference from Sync
+### Why `concurrency` instead of `workers`?
 
-- Uses `concurrency` (not `workers`) — controls task concurrency, not pool size
-- `task_timeout` is **per-task** (via `asyncio.wait_for`), not total
+The sync API uses `workers` because it sizes a thread/process **pool** — you're creating real OS threads or processes. The async API uses `concurrency` because there's no pool — everything runs on one event loop, and `concurrency` controls how many tasks are allowed to run at the same time via a semaphore.
+
+Calling both `workers` would be misleading (async has no workers). Calling both `concurrency` would be wrong for sync (you're literally setting `ThreadPoolExecutor(max_workers=N)`). The names match what each actually controls.
+
+### Other Differences from Sync
+
+- `task_timeout` is **per-task** (via `asyncio.wait_for`), not total wall-clock like sync `timeout`
 - Uses `asyncio.TaskGroup` for structured concurrency — proper cleanup on errors
 
 ### Examples
