@@ -157,6 +157,59 @@ results = parallel_map(process, huge_list, workers=8, batch_size=500)
 
 Errors in one batch don't prevent subsequent batches from running.
 
+## Starmap — Multi-Argument Functions
+
+For functions that take multiple arguments, use `parallel_starmap` or `.starmap()`:
+
+```python
+from pyarallel import parallel_starmap
+
+def fetch_with_auth(url, token):
+    return requests.get(url, headers={"Authorization": token}).json()
+
+results = parallel_starmap(fetch_with_auth,
+                           [(url, token) for url in urls],
+                           workers=10)
+
+# Or with the decorator
+@parallel(workers=10)
+def fetch_with_auth(url, token): ...
+
+results = fetch_with_auth.starmap([(url1, token), (url2, token)])
+```
+
+## Streaming — Constant Memory
+
+For large-scale processing where results shouldn't accumulate in memory, use `parallel_iter` or `.stream()`:
+
+```python
+from pyarallel import parallel_iter
+
+# Process 10M items — only one batch of results in memory at a time
+for index, value in parallel_iter(process, ten_million_items,
+                                  workers=8, batch_size=1000):
+    if isinstance(value, Exception):
+        log_error(index, value)
+    else:
+        db.save(value)
+
+# Or with the decorator
+@parallel(workers=8)
+def process(item): ...
+
+for index, value in process.stream(huge_list, batch_size=1000):
+    db.save(value)
+```
+
+Results arrive in **completion order** (fastest tasks first), not input order. Each `(index, value)` tuple includes the original index so you can match results to inputs.
+
+**When to use which:**
+
+| API | Memory | Use case |
+|---|---|---|
+| `.map()` / `parallel_map` | All results in memory | Results fit in memory, need `.ok`, `.failures()` |
+| `.stream()` / `parallel_iter` | Constant (one batch) | ETL, streaming to DB, 10M+ items |
+
 ## Structured Error Handling
 
 `ParallelResult` never silently drops errors:

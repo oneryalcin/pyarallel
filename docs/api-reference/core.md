@@ -124,6 +124,91 @@ Service.compute.map([1, 2, 3])  # static method
 
 ---
 
+## `parallel_starmap`
+
+Like `parallel_map` but unpacks each item as `fn(*args)` — for functions that take multiple arguments.
+
+```python
+from pyarallel import parallel_starmap
+
+results = parallel_starmap(fn, [(arg1, arg2), (arg3, arg4), ...], workers=4)
+```
+
+Takes the same options as `parallel_map` (workers, executor, rate_limit, timeout, batch_size, retry).
+
+### Examples
+
+```python
+def add(a, b):
+    return a + b
+
+results = parallel_starmap(add, [(1, 2), (3, 4), (5, 6)])  # [3, 7, 11]
+
+# With retry
+results = parallel_starmap(fetch_with_auth, [(url, token) for url in urls],
+                           workers=10, retry=Retry(attempts=3))
+```
+
+Also available as `.starmap()` on `@parallel` decorated functions:
+
+```python
+@parallel(workers=4)
+def add(a, b): return a + b
+
+add.starmap([(1, 2), (3, 4)])  # ParallelResult([3, 7])
+```
+
+---
+
+## `parallel_iter`
+
+Streaming version of `parallel_map` — yields `(index, result_or_exception)` in completion order. Results are **not accumulated in memory**.
+
+```python
+from pyarallel import parallel_iter
+
+for index, value in parallel_iter(fn, items, workers=4, batch_size=1000):
+    if isinstance(value, Exception):
+        log_error(index, value)
+    else:
+        db.save(value)
+```
+
+### When to Use
+
+- **`parallel_map`** — results fit in memory, you need `ParallelResult` features (.ok, .successes(), .failures())
+- **`parallel_iter`** — large-scale processing where results should be consumed and discarded (10M+ items, ETL pipelines, streaming to DB)
+
+### Parameters
+
+Same as `parallel_map` except no `timeout` or `on_progress` (results stream as they complete).
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `fn` | `Callable` | required | Function to apply to each item |
+| `items` | `Iterable` | required | Any iterable |
+| `workers` | `int` | `4` | Number of parallel workers |
+| `executor` | `"thread" \| "process"` | `"thread"` | Thread pool or process pool |
+| `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting |
+| `batch_size` | `int \| None` | `None` | Process in chunks (controls memory) |
+| `retry` | `Retry \| None` | `None` | Per-item retry |
+
+### Yields
+
+`(int, T | Exception)` — index and result in **completion order** (not input order). Failed tasks yield the exception as the value.
+
+Also available as `.stream()` on `@parallel` decorated functions:
+
+```python
+@parallel(workers=8)
+def process(item): ...
+
+for index, value in process.stream(huge_list, batch_size=1000):
+    db.save(value)
+```
+
+---
+
 ## `ParallelResult`
 
 Container for parallel execution results. Behaves like a `list` when all tasks succeed. Provides structured access when some fail.
