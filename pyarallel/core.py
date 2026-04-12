@@ -7,6 +7,7 @@ no global config singletons, no enterprise astronautics.
 from __future__ import annotations
 
 import functools
+import random
 import threading
 import time
 from concurrent.futures import (
@@ -50,17 +51,36 @@ class RateLimit:
 
 @dataclass(frozen=True, slots=True)
 class Retry:
-    """Per-item retry configuration.
+    """Per-item retry with exponential backoff and jitter.
 
     Examples::
 
-        Retry()                    # 3 attempts, no backoff
-        Retry(attempts=5)          # 5 attempts, no backoff
-        Retry(attempts=3, backoff=1.0)  # 3 attempts, 1s between retries
+        Retry()                          # 3 attempts, 1s base, exponential + jitter
+        Retry(attempts=5, backoff=2.0)   # 5 attempts, 2s base
+        Retry(on=(ConnectionError, TimeoutError))  # only retry these
+        Retry(jitter=False)              # deterministic delays (testing)
+
+    Delay formula: ``min(backoff * 2^attempt, max_delay) * jitter``
     """
 
     attempts: int = 3
-    backoff: float = 0.0
+    backoff: float = 1.0
+    max_delay: float = 60.0
+    jitter: bool = True
+    on: tuple[type[Exception], ...] | None = None
+
+    def _delay(self, attempt: int) -> float:
+        """Compute delay before retry *attempt* (0-indexed)."""
+        delay = min(self.backoff * (2 ** attempt), self.max_delay)
+        if self.jitter:
+            delay *= random.uniform(0.5, 1.5)
+        return delay
+
+    def _should_retry(self, exc: Exception) -> bool:
+        """True if this exception type is retryable."""
+        if self.on is None:
+            return True
+        return isinstance(exc, self.on)
 
 
 # ---------------------------------------------------------------------------
@@ -188,15 +208,19 @@ class ParallelResult(Generic[R]):
 
 
 def _run_with_retry(fn: Callable[..., Any], item: Any, retry: Retry) -> Any:
-    """Call *fn(item)*, retrying up to *retry.attempts* times on failure."""
+    """Call *fn(item)*, retrying on failure with exponential backoff."""
     last_exc: Exception | None = None
     for attempt in range(retry.attempts):
         try:
             return fn(item)
         except Exception as exc:
             last_exc = exc
-            if attempt < retry.attempts - 1 and retry.backoff > 0:
-                time.sleep(retry.backoff * (attempt + 1))
+            if not retry._should_retry(exc):
+                raise
+            if attempt < retry.attempts - 1:
+                delay = retry._delay(attempt)
+                if delay > 0:
+                    time.sleep(delay)
     raise last_exc  # type: ignore[misc]
 
 

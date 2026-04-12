@@ -50,15 +50,19 @@ class _AsyncTokenBucket:
 
 
 async def _async_run_with_retry(fn: Callable[..., Any], item: Any, retry: Retry) -> Any:
-    """Call async *fn(item)*, retrying up to *retry.attempts* times."""
+    """Call async *fn(item)*, retrying on failure with exponential backoff."""
     last_exc: Exception | None = None
     for attempt in range(retry.attempts):
         try:
             return await fn(item)
         except Exception as exc:
             last_exc = exc
-            if attempt < retry.attempts - 1 and retry.backoff > 0:
-                await asyncio.sleep(retry.backoff * (attempt + 1))
+            if not retry._should_retry(exc):
+                raise
+            if attempt < retry.attempts - 1:
+                delay = retry._delay(attempt)
+                if delay > 0:
+                    await asyncio.sleep(delay)
     raise last_exc  # type: ignore[misc]
 
 
