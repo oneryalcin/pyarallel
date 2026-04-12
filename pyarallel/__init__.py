@@ -1,7 +1,12 @@
+from .config_manager import ConfigManager
 from .core import RateLimit, parallel
 
-__version__ = "0.1.0"
-__all__ = ["parallel", "RateLimit"]
+__version__ = "0.1.3"
+
+# Singleton config instance for easy access
+config = ConfigManager.get_instance()
+
+__all__ = ["parallel", "RateLimit", "config", "ConfigManager"]
 
 __doc__ = f"""
 pyarallel v{__version__}

@@ -1,6 +1,6 @@
 # Configuration
 
-Pyarallel features a robust configuration system built on Pydantic, offering type validation, environment variable support, and thread-safe configuration management.
+Pyarallel features a robust configuration system built on lightweight dataclasses, offering type validation, environment variable support, and thread-safe configuration management.
 
 ## Configuration Schema
 
@@ -15,9 +15,8 @@ The configuration system uses a structured schema with the following categories:
         "prewarm_pools": bool             # Enable worker prewarming
     },
     "rate_limiting": {
-        "default_rate": Optional[float],   # Default operations per interval
-        "default_interval": str,          # "second", "minute", "hour"
-        "burst_tolerance": float          # Burst allowance factor
+        "rate": int,                      # Operations per interval
+        "interval": str,                  # "second", "minute", "hour"
     },
     "error_handling": {
         "max_retries": int,               # Maximum retry attempts
@@ -36,10 +35,9 @@ The configuration system uses a structured schema with the following categories:
 ## Basic Configuration
 
 ```python
-from pyarallel import ConfigManager
+from pyarallel import config
 
-# Get the thread-safe singleton configuration manager
-config = ConfigManager.get_instance()
+# The config object is a thread-safe singleton configuration manager
 
 # Update configuration with type validation
 config.update_config({
@@ -50,15 +48,14 @@ config.update_config({
         "prewarm_pools": True
     },
     "rate_limiting": {
-        "default_rate": 1000,
-        "default_interval": "minute",
-        "burst_tolerance": 1.5
+        "rate": 1000,
+        "interval": "minute"
     }
 })
 
 # Access configuration using dot notation
 workers = config.execution.default_max_workers
-rate = config.rate_limiting.default_rate
+rate = config.rate_limiting.rate
 
 # Category-specific updates
 config.update_execution(max_workers=16)
@@ -127,13 +124,14 @@ def inefficient_task(): ...
 Pyarallel uses a hierarchical configuration system:
 
 1. **Default Values**: Built-in defaults (4 workers, thread executor, batch size 10)
-2. **Global Configuration**: Set via ConfigManager
+2. **Global Configuration**: Set via config object
 3. **Environment Variables**: Override global config
 4. **Decorator Arguments**: Highest precedence, override all other settings
 
 ```python
+from pyarallel import config
+
 # Global configuration (lowest precedence)
-config = ConfigManager.get_instance()
 config.update_config({
     "execution": {
         "default_max_workers": 8,

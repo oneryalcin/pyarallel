@@ -1,11 +1,23 @@
 from setuptools import find_packages, setup
+import os
+import re
+
+# Read version from __init__.py to maintain single source of truth
+def get_version():
+    init_file = os.path.join(os.path.dirname(__file__), "pyarallel", "__init__.py")
+    with open(init_file, "r", encoding="utf-8") as f:
+        content = f.read()
+        match = re.search(r'^__version__\s*=\s*[\'"]([^\'"]+)[\'"]', content, re.MULTILINE)
+        if match:
+            return match.group(1)
+    raise RuntimeError("Unable to find version string.")
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
     name="pyarallel",
-    version="0.1.2",
+    version=get_version(),
     author="Mehmet Oner Yalcin",
     author_email="oneryalcin@gmail.com",
     description="A powerful parallel execution library for Python",
