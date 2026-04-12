@@ -74,6 +74,31 @@ results = parallel_map(call_api, ids, workers=4,
 results = parallel_map(call_api, ids, workers=4, rate_limit=10)
 ```
 
+## Retry
+
+Built-in per-item retry with exponential backoff — no tenacity needed:
+
+```python
+from pyarallel import Retry
+
+# Retry flaky network calls up to 3 times with exponential backoff
+results = parallel_map(fetch, urls, workers=10, retry=Retry(attempts=3, backoff=1.0))
+
+# Only retry network errors, fail immediately on bad input
+results = parallel_map(fetch, urls, workers=10,
+                       retry=Retry(on=(ConnectionError, TimeoutError)))
+```
+
+## Batching
+
+Control memory for large datasets — process in chunks:
+
+```python
+# Without batching: 500K futures in memory at once
+# With batching: only 500 at a time
+results = parallel_map(process, huge_list, workers=8, batch_size=500)
+```
+
 ## Error Handling
 
 Errors are never silently lost. `ParallelResult` gives you structured access:

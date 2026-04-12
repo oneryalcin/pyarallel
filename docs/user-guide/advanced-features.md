@@ -120,6 +120,36 @@ results = await fetch.map(urls)                 # parallel
 results = await fetch.map(urls, timeout=5.0)    # with per-task timeout
 ```
 
+## Retry
+
+Built-in per-item retry with exponential backoff and jitter:
+
+```python
+from pyarallel import parallel_map, Retry
+
+# Retry up to 3 times with 1s base exponential backoff
+results = parallel_map(fetch, urls, workers=10, retry=Retry(attempts=3, backoff=1.0))
+
+# Only retry transient network errors — fail immediately on bad input
+results = parallel_map(fetch, urls, workers=10,
+                       retry=Retry(on=(ConnectionError, TimeoutError)))
+```
+
+Retries happen *inside the worker* — only the failing item is retried, not the entire batch. This composes cleanly with rate limiting and batching.
+
+For the full `Retry` API, see [API Reference](../api-reference/core.md#retry).
+
+## Batching
+
+Control memory for large datasets by processing in chunks:
+
+```python
+# Submit 500 items at a time instead of 500,000 at once
+results = parallel_map(process, huge_list, workers=8, batch_size=500)
+```
+
+Errors in one batch don't prevent subsequent batches from running.
+
 ## Structured Error Handling
 
 `ParallelResult` never silently drops errors:
@@ -134,7 +164,7 @@ for idx, value in result.successes():
 for idx, error in result.failures():
     log_error(idx, error)
 
-# Retry failed items
+# Retry just the failed items
 failed_items = [items[idx] for idx, _ in result.failures()]
 retry_result = parallel_map(process, failed_items, workers=2)
 ```

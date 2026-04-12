@@ -69,6 +69,17 @@ For simple per-second limits, pass a number:
 results = parallel_map(fn, items, rate_limit=10)  # 10 per second
 ```
 
+## Memory Control with Batching
+
+For large datasets, use `batch_size` to limit how many futures exist at once:
+
+```python
+# 500K items — only 1000 futures in memory at a time
+results = parallel_map(process, huge_list, workers=8, batch_size=1000)
+```
+
+Without `batch_size`, all items are submitted at once. On memory-constrained environments (K8s pods, Lambda), this prevents OOM kills.
+
 ## Error Handling Patterns
 
 ### Fail-Fast
@@ -84,18 +95,30 @@ except ExceptionGroup as eg:
         log.error(exc)
 ```
 
-### Collect-and-Retry
+### Built-in Retry
 
-Inspect partial results, retry failures:
+Use `Retry` for automatic per-item retry with exponential backoff:
+
+```python
+from pyarallel import Retry
+
+# Retry transient failures, fail fast on bad input
+results = parallel_map(
+    fetch, urls, workers=10,
+    retry=Retry(attempts=3, backoff=1.0, on=(ConnectionError, TimeoutError)),
+)
+```
+
+### Collect-and-Retry Manually
+
+For more control, inspect partial results and retry selectively:
 
 ```python
 result = parallel_map(process, items, workers=4)
 
-# Save successes
 for idx, value in result.successes():
     save(items[idx], value)
 
-# Retry failures
 if not result.ok:
     failed = [items[idx] for idx, _ in result.failures()]
     retry_result = parallel_map(process, failed, workers=2)
@@ -103,7 +126,7 @@ if not result.ok:
 
 ### Composing with Tenacity
 
-Use tenacity for per-item retries inside your function:
+For complex retry strategies (circuit breakers, custom stop conditions), use tenacity inside your function:
 
 ```python
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -112,7 +135,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 def resilient_fetch(url):
     return requests.get(url, timeout=10).json()
 
-# Each item retries up to 3 times internally
 results = parallel_map(resilient_fetch, urls, workers=10)
 ```
 

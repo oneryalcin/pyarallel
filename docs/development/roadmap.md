@@ -7,7 +7,7 @@
 - `async_parallel_map()` and `@async_parallel` — full async support
 - `ParallelResult` with structured error handling (`ExceptionGroup`)
 - `RateLimit` — token bucket rate limiting (sync and async)
-- `Retry` — per-item retry with linear backoff (sync and async)
+- `Retry` — per-item retry with exponential backoff, jitter, and exception filtering
 - `batch_size` — process items in chunks to control memory
 - Progress callbacks via `on_progress`
 - Timeout support (total for sync, per-task for async)

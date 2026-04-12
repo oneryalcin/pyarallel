@@ -17,6 +17,8 @@ results = await async_parallel_map(
     rate_limit=None,                 # RateLimit or ops/second
     timeout=None,                    # Per-task timeout in seconds
     on_progress=None,                # callback(completed, total)
+    batch_size=None,                 # Process in chunks to control memory
+    retry=None,                      # Retry(attempts=3, backoff=1.0)
 )
 ```
 
@@ -32,6 +34,8 @@ results = await async_parallel_map(
 | `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting |
 | `timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback |
+| `batch_size` | `int \| None` | `None` | Process items in chunks (controls memory) |
+| `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 
 ### Key Difference from Sync
 
