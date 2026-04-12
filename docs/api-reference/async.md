@@ -15,7 +15,7 @@ results = await async_parallel_map(
     *,
     concurrency=4,                   # Max concurrent tasks
     rate_limit=None,                 # RateLimit or ops/second
-    timeout=None,                    # Per-task timeout in seconds
+    task_timeout=None,                    # Per-task timeout in seconds
     on_progress=None,                # callback(completed, total)
     batch_size=None,                 # Process in chunks to control memory
     retry=None,                      # Retry(attempts=3, backoff=1.0)
@@ -32,15 +32,20 @@ results = await async_parallel_map(
 | `items` | `Iterable` | required | Any iterable |
 | `concurrency` | `int` | `4` | Maximum concurrent tasks |
 | `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting |
-| `timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
+| `task_timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback |
 | `batch_size` | `int \| None` | `None` | Process items in chunks (controls memory) |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 
-### Key Difference from Sync
+### Why `concurrency` instead of `workers`?
 
-- Uses `concurrency` (not `workers`) — controls task concurrency, not pool size
-- `timeout` is **per-task** (via `asyncio.wait_for`), not total
+The sync API uses `workers` because it sizes a thread/process **pool** — you're creating real OS threads or processes. The async API uses `concurrency` because there's no pool — everything runs on one event loop, and `concurrency` controls how many tasks are allowed to run at the same time via a semaphore.
+
+Calling both `workers` would be misleading (async has no workers). Calling both `concurrency` would be wrong for sync (you're literally setting `ThreadPoolExecutor(max_workers=N)`). The names match what each actually controls.
+
+### Other Differences from Sync
+
+- `task_timeout` is **per-task** (via `asyncio.wait_for`), not total wall-clock like sync `timeout`
 - Uses `asyncio.TaskGroup` for structured concurrency — proper cleanup on errors
 
 ### Examples
@@ -60,7 +65,7 @@ results = await async_parallel_map(
     fetch, urls,
     concurrency=10,
     rate_limit=RateLimit(100, "minute"),
-    timeout=5.0,
+    task_timeout=5.0,
 )
 ```
 
@@ -97,7 +102,7 @@ data = await fetch("http://example.com")
 
 # Parallel
 results = await fetch.map(urls)
-results = await fetch.map(urls, concurrency=20, timeout=5.0)
+results = await fetch.map(urls, concurrency=20, task_timeout=5.0)
 ```
 
 ### Method Support

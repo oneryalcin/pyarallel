@@ -144,3 +144,14 @@ class TestValidation:
         from pyarallel import parallel_map
         with pytest.raises(ValueError, match=">= 1"):
             parallel_map(lambda x: x, [1], workers=0)
+
+    def test_rate_limit_invalid_per_raises(self):
+        from pyarallel import RateLimit
+        with pytest.raises(ValueError, match='"second", "minute", or "hour"'):
+            RateLimit(10, "minuet")
+
+    def test_rate_limit_valid_per_accepted(self):
+        from pyarallel import RateLimit
+        for per in ("second", "minute", "hour"):
+            r = RateLimit(10, per)
+            assert r.per_second > 0

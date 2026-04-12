@@ -102,7 +102,7 @@ class TestAsyncTimeout:
             return x
 
         result = await async_parallel_map(
-            slow, [1, 2], concurrency=2, timeout=0.1
+            slow, [1, 2], concurrency=2, task_timeout=0.1
         )
         assert not result.ok
         assert len(result.failures()) == 2
