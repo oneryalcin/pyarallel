@@ -11,7 +11,7 @@ results = parallel_map(
     fn,                              # Function to apply to each item
     items,                           # Any iterable
     *,
-    workers=4,                       # Number of parallel workers
+    workers=None,                    # Number of parallel workers
     executor="thread",               # "thread" or "process"
     rate_limit=None,                 # RateLimit object or ops/second (float)
     timeout=None,                    # Total timeout in seconds
@@ -29,7 +29,7 @@ results = parallel_map(
 |---|---|---|---|
 | `fn` | `Callable` | required | Function to apply to each item |
 | `items` | `Iterable` | required | Any iterable (list, generator, range, set, ...) |
-| `workers` | `int` | `4` | Number of parallel workers |
+| `workers` | `int \| None` | `None` | Number of parallel workers. `None` lets the executor choose |
 | `executor` | `"thread" \| "process"` | `"thread"` | Thread pool or process pool |
 | `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting (float = ops/second) |
 | `timeout` | `float \| None` | `None` | Total wall-clock timeout in seconds |
@@ -85,7 +85,7 @@ def fn(item): ...
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `workers` | `int` | `4` | Default worker count for `.map()` |
+| `workers` | `int \| None` | `None` | Default worker count for `.map()` |
 | `executor` | `"thread" \| "process"` | `"thread"` | Default executor type |
 | `rate_limit` | `RateLimit \| float \| None` | `None` | Default rate limiting |
 
@@ -224,6 +224,36 @@ for item in process.stream(huge_list, batch_size=1000):
 
 ---
 
+## `ItemResult`
+
+Single streaming result item returned by `parallel_iter`, `async_parallel_iter`,
+and `.stream()`.
+
+### Properties
+
+| Member | Returns | Description |
+|---|---|---|
+| `.index` | `int` | Original input index |
+| `.ok` | `bool` | `True` when this item succeeded |
+| `.value` | `T \| None` | Result value for successful items. May legitimately be `None` |
+| `.error` | `Exception \| None` | Exception for failed items |
+
+### Invariant
+
+Exactly one of `.value` or `.error` is set. Success and failure are explicit.
+
+### Example
+
+```python
+for item in parallel_iter(process, items, workers=4):
+    if item.ok:
+        handle(item.index, item.value)
+    else:
+        log(item.index, item.error)
+```
+
+---
+
 ## `ParallelResult`
 
 Container for parallel execution results. Behaves like a `list` when all tasks succeed. Provides structured access when some fail.
@@ -307,24 +337,41 @@ retry = Retry(attempts=3, backoff=1.0)
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `attempts` | `int` | `3` | Total attempts (1 = no retry, 3 = up to 2 retries) |
-| `backoff` | `float` | `0.0` | Seconds between retries, multiplied by attempt number |
+| `backoff` | `float` | `1.0` | Base delay for exponential backoff |
+| `max_delay` | `float` | `60.0` | Maximum sleep between retries |
+| `jitter` | `bool` | `True` | Randomize delays to avoid retry bursts |
+| `on` | `tuple[type[Exception], ...] \| None` | `None` | Retry only these exception types. `None` means retry all exceptions |
 
 ### Backoff Behavior
 
-With `backoff=1.0` and `attempts=3`:
+With `backoff=1.0`, `attempts=3`, and the default exponential logic:
 
 - Attempt 1: immediate
 - Attempt 2: sleep 1.0s, then retry
 - Attempt 3: sleep 2.0s, then retry
 
+The actual delay formula is `min(backoff * 2^attempt, max_delay)`, optionally
+multiplied by jitter.
+
 ### Examples
 
 ```python
-# Basic retry — 3 attempts, no wait
+# Basic retry — 3 attempts, exponential backoff starting at 1s
 results = parallel_map(fetch, urls, retry=Retry())
 
-# Retry with exponential-ish backoff
-results = parallel_map(fetch, urls, retry=Retry(attempts=5, backoff=0.5))
+# Retry only transient network failures
+results = parallel_map(
+    fetch,
+    urls,
+    retry=Retry(on=(ConnectionError, TimeoutError)),
+)
+
+# Retry with custom caps and deterministic delays
+results = parallel_map(
+    fetch,
+    urls,
+    retry=Retry(attempts=5, backoff=0.5, max_delay=5.0, jitter=False),
+)
 
 # Retry + rate limit + batch — the full production stack
 results = parallel_map(
