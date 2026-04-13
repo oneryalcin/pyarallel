@@ -1,7 +1,20 @@
 """Pyarallel — simple, explicit parallel execution for Python."""
 
-from .core import ParallelResult, RateLimit, Retry, parallel, parallel_map
-from .aio import async_parallel, async_parallel_map
+from .core import (
+    ParallelResult,
+    RateLimit,
+    Retry,
+    parallel,
+    parallel_iter,
+    parallel_map,
+    parallel_starmap,
+)
+from .aio import (
+    async_parallel,
+    async_parallel_iter,
+    async_parallel_map,
+    async_parallel_starmap,
+)
 
 __version__ = "0.2.0"
 __all__ = [
@@ -9,7 +22,11 @@ __all__ = [
     "RateLimit",
     "Retry",
     "parallel",
+    "parallel_iter",
     "parallel_map",
+    "parallel_starmap",
     "async_parallel",
+    "async_parallel_iter",
     "async_parallel_map",
+    "async_parallel_starmap",
 ]

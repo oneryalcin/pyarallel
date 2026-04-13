@@ -71,6 +71,46 @@ results = await async_parallel_map(
 
 ---
 
+## `async_parallel_starmap`
+
+Like `async_parallel_map` but unpacks each item as `fn(*args)`.
+
+```python
+from pyarallel import async_parallel_starmap
+
+async def add(a, b): return a + b
+
+results = await async_parallel_starmap(add, [(1, 2), (3, 4)], concurrency=4)
+# ParallelResult([3, 7])
+```
+
+Takes the same options as `async_parallel_map`. Also available as `.starmap()` on `@async_parallel` decorated functions.
+
+---
+
+## `async_parallel_iter`
+
+Async streaming — yields `(index, result_or_exception)` in completion order. Constant memory.
+
+```python
+from pyarallel import async_parallel_iter
+
+async for index, value in async_parallel_iter(fetch, urls, concurrency=10):
+    await db.save(value)
+```
+
+Also available as `.stream()` on `@async_parallel` decorated functions:
+
+```python
+@async_parallel(concurrency=10)
+async def fetch(url): ...
+
+async for index, value in fetch.stream(urls, batch_size=1000):
+    await db.save(value)
+```
+
+---
+
 ## `@async_parallel`
 
 Decorator that adds `.map()` for async parallel execution.
