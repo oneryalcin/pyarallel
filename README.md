@@ -1,31 +1,25 @@
 # Pyarallel
 
-[![Docs](https://img.shields.io/badge/docs-live-brightgreen)](https://oneryalcin.github.io/pyarallel/) [![PyPI version](https://img.shields.io/pypi/v/pyarallel)](https://pypi.org/project/pyarallel/) [![PyPI Downloads](https://static.pepy.tech/badge/pyarallel/month)](https://pepy.tech/project/pyarallel)
+[![PyPI version](https://img.shields.io/pypi/v/pyarallel)](https://pypi.org/project/pyarallel/) [![PyPI Downloads](https://static.pepy.tech/badge/pyarallel/month)](https://pepy.tech/project/pyarallel)
 
-A powerful, feature-rich parallel execution library for Python that makes concurrent programming easy and efficient.
+Simple, explicit parallel execution for Python. No magic, no global config, no enterprise astronautics.
 
-## Features
+## What It Does
 
-- **Simple Decorator-Based API**: Just add `@parallel` to your functions
-- **Flexible Parallelism**: Choose between threads (I/O-bound) and processes (CPU-bound)
-- **Smart Rate Limiting**: Control execution rates with per-second, per-minute, or per-hour limits
-- **Batch Processing**: Handle large datasets efficiently with automatic batching
-- **Method Support**: Works with regular functions, instance methods, class methods, and static methods
-- **Performance Optimized**: 
-  - Automatic worker pool reuse
-  - Optional worker prewarming for latency-critical applications
-  - Smart defaults based on your system
-- **Production Ready**:
-  - Thread-safe implementation
-  - Memory-efficient with automatic cleanup
-  - Comprehensive error handling
+`concurrent.futures` with better ergonomics: structured error handling, rate limiting, retry, batching, streaming, and async support.
 
-## Documentation
+```python
+from pyarallel import parallel_map, RateLimit, Retry
 
-- **[Full Documentation](https://oneryalcin.github.io/pyarallel/)** - Comprehensive guides and API reference
-- **[Examples](examples/)** - Runnable code examples for common use cases
+results = parallel_map(
+    fetch_url, urls,
+    workers=10,
+    rate_limit=RateLimit(100, "minute"),
+    retry=Retry(attempts=3, on=(ConnectionError, TimeoutError)),
+)
+```
 
-## Installation
+## Install
 
 ```bash
 pip install pyarallel
@@ -33,240 +27,137 @@ pip install pyarallel
 
 ## Quick Start
 
+### The Function — `parallel_map`
+
+```python
+from pyarallel import parallel_map, RateLimit, Retry
+
+# Basic — fan out over a list, get ordered results
+results = parallel_map(fetch_url, urls, workers=10)
+
+# With rate limiting
+results = parallel_map(call_api, ids, rate_limit=RateLimit(100, "minute"))
+
+# With per-item retry for flaky calls
+results = parallel_map(fetch, urls, retry=Retry(attempts=3, backoff=1.0))
+
+# Batched — controls memory for large datasets (no K8s OOM kills)
+results = parallel_map(process, million_items, batch_size=500)
+
+# CPU-bound work with processes
+results = parallel_map(crunch, data, executor="process")
+
+# Progress tracking
+results = parallel_map(process, items,
+                       on_progress=lambda done, total: print(f"{done}/{total}"))
+```
+
+### The Decorator — `@parallel`
+
+For functions you call repeatedly. Adds `.map()` without changing the function:
+
 ```python
 from pyarallel import parallel
 
-# Basic parallel processing - decorate a function that processes a single item
-@parallel(max_workers=4)
-def fetch_url(url):
+@parallel(workers=4, rate_limit=RateLimit(100, "minute"))
+def fetch(url):
     return requests.get(url).json()
 
-# Process multiple URLs in parallel by passing a list
-urls = ["http://api1.com", "http://api2.com"]
-results = fetch_url(urls)  # Returns a list of JSON results
+# Normal call — returns dict, not [dict]
+data = fetch("http://example.com")
 
-# Rate-limited CPU-intensive task
-@parallel(
-    max_workers=4,
-    executor_type="process",
-    rate_limit=(100, "minute")  # 100 ops/minute
-)
-def process_image(image):
-    return heavy_processing(image)
-
-# Memory-efficient batch processing
-@parallel(max_workers=4, batch_size=10)
-def analyze_text(text):
-    return text_analysis(text)
+# Parallel — explicit .map()
+results = fetch.map(["http://a.com", "http://b.com", "http://c.com"])
 ```
 
-## How It Works
-
-Pyarallel uses a simple mental model that makes parallel processing intuitive:
-
-### 1. Write Your Function for ONE Item
+### Multi-Argument Functions — `starmap`
 
 ```python
-def process_number(n):
-    """This function handles a SINGLE number."""
-    return n * 2
+from pyarallel import parallel_starmap
+
+def fetch_with_auth(url, token):
+    return requests.get(url, headers={"Authorization": token}).json()
+
+results = parallel_starmap(fetch_with_auth, [(url, token) for url in urls])
 ```
 
-### 2. Add the @parallel Decorator
+### Streaming — Constant Memory
+
+For large-scale processing where results shouldn't accumulate:
 
 ```python
-@parallel(max_workers=4)
-def process_number(n):
-    """Now it can process items in parallel!"""
-    return n * 2
+from pyarallel import parallel_iter
+
+for index, value in parallel_iter(process, ten_million_items, batch_size=1000):
+    db.save(value)  # yielded and discarded — no accumulation
 ```
 
-### 3. Pass MANY Items, Get MANY Results
+### Async Support
+
+Mirror API using `asyncio.TaskGroup` for structured concurrency:
 
 ```python
-# Pass a list of items
-numbers = [1, 2, 3, 4, 5]
-results = process_number(numbers)  # Returns: [2, 4, 6, 8, 10]
+from pyarallel import async_parallel_map
 
-# Single items work too (returns a list with one item)
-result = process_number(42)  # Returns: [84]
+results = await async_parallel_map(fetch_async, urls, concurrency=10, task_timeout=5.0)
 ```
 
-**Key Points:**
-- Write functions that process a **single item**
-- Pass a **list/tuple** to process multiple items in parallel
-- Always returns a **list** of results (even for single items)
-- Results maintain the **same order** as inputs
+## Error Handling
 
-## Usage Examples
-
-### Basic Function
-```python
-from pyarallel import parallel
-
-@parallel
-def process_item(x):
-    return x * 2
-
-# Single item: Returns [2]
-result = process_item(1)  
-
-# Multiple items: Returns [2, 4, 6]
-results = process_item([1, 2, 3])  
-```
-
-### Instance Methods
-```python
-class DataProcessor:
-    def __init__(self, multiplier):
-        self.multiplier = multiplier
-    
-    @parallel
-    def process(self, x):
-        # Process a single item
-        return x * self.multiplier
-
-processor = DataProcessor(3)
-# Single item: Returns [15]
-result = processor.process(5)  
-
-# Multiple items: Returns [3, 6, 9]
-results = processor.process([1, 2, 3])  
-```
-
-### Class Methods
-```python
-class StringFormatter:
-    @classmethod
-    @parallel
-    def format_item(cls, item):
-        # Process a single item
-        return f"Formatted-{item}"
-
-# Single item: Returns ["Formatted-x"]
-result = StringFormatter.format_item("x")  
-
-# Multiple items: Returns ["Formatted-a", "Formatted-b", "Formatted-c"]
-results = StringFormatter.format_item(['a', 'b', 'c'])
-```
-
-### Static Methods
-```python
-class MathUtils:
-    @staticmethod
-    @parallel
-    def square(x):
-        # Process a single item
-        return x**2
-
-# Single item: Returns [4]
-result = MathUtils.square(2)  
-
-# Multiple items: Returns [1, 4, 9]
-results = MathUtils.square([1, 2, 3])
-```
-
-## Advanced Usage
-
-### Rate Limiting
-
-Control how many operations can be performed in a given time period:
+No more lost exceptions. All errors collected, never silently swallowed:
 
 ```python
-# 10 operations per second
-@parallel(rate_limit=10)
+result = parallel_map(process, items)
 
-# 100 operations per minute
-@parallel(rate_limit=(100, "minute"))
+if result.ok:
+    values = result.values()
+else:
+    for idx, val in result.successes():
+        print(f"Item {idx}: {val}")
+    for idx, exc in result.failures():
+        print(f"Item {idx} failed: {exc}")
 
-# 1000 operations per hour
-@parallel(rate_limit=(1000, "hour"))
-
-# Using a RateLimit object for more control
-from pyarallel import RateLimit
-@parallel(rate_limit=RateLimit(count=5, interval="second"))
+    result.raise_on_failure()  # ExceptionGroup with all errors
 ```
 
-### Process vs Thread Pools
+## Methods
 
-Choose the right parallelism type based on your workload:
+Works with instance methods and static methods:
 
 ```python
-# Thread pool (default) - good for I/O bound tasks
-@parallel(executor_type="thread")
+class Scraper:
+    def __init__(self, session):
+        self.session = session
 
-# Process pool - good for CPU bound tasks
-@parallel(executor_type="process")
+    @parallel(workers=4)
+    def fetch(self, url):
+        return self.session.get(url).text
+
+s = Scraper(requests.Session())
+s.fetch("http://example.com")        # normal call
+s.fetch.map(urls)                    # parallel over urls
+s.fetch.stream(urls, batch_size=100) # streaming
 ```
 
-### Batch Processing
+## API Summary
 
-Efficiently handle large datasets by processing in batches:
+| Function | Decorator | Returns | Use case |
+|---|---|---|---|
+| `parallel_map(fn, items)` | `.map(items)` | `ParallelResult` | Results fit in memory |
+| `parallel_starmap(fn, items)` | `.starmap(items)` | `ParallelResult` | Multi-arg, fits in memory |
+| `parallel_iter(fn, items)` | `.stream(items)` | `Iterator[(int, T)]` | Streaming, constant memory |
 
-```python
-# Process in batches of 100 items
-@parallel(batch_size=100)
-def process_large_dataset(item):
-    return heavy_computation(item)
+Async variants: `async_parallel_map`, `async_parallel_starmap`, `async_parallel_iter`
 
-# Call with a very large list
-results = process_large_dataset(large_list)
-```
+| Config | Description |
+|---|---|
+| `RateLimit(count, per)` | Rate limit: `RateLimit(100, "minute")` |
+| `Retry(attempts, backoff)` | Per-item retry: `Retry(attempts=3, on=(ConnectionError,))` |
 
-### Worker Prewarming
+## Documentation
 
-Reduce latency for time-critical applications:
-
-```python
-@parallel(max_workers=10, prewarm=True)
-def latency_critical_function(item):
-    return process(item)
-```
-
-## Configuration System
-
-Pyarallel features a robust configuration system built on a solid foundation, offering type validation, environment variable support, and thread-safe configuration management.
-
-### Basic Configuration
-
-```python
-from pyarallel import config
-
-# Update global default configuration
-config.update({
-    "max_workers": 8,
-    "execution": {
-        "default_executor_type": "process",
-        "default_batch_size": 50
-    },
-    "rate_limiting": {
-        "rate": 500,
-        "interval": "minute"
-    },
-    "error_handling": {
-        "retry_count": 3
-    }
-})
-
-# Access configuration using dot notation
-workers = config.execution.default_max_workers
-rate = config.rate_limiting.rate
-
-# Category-specific updates
-config.update_execution(max_workers=16)
-config.update_rate_limiting(rate=2000)
-```
-
-### Environment Variables
-
-Override configuration with environment variables:
-
-```bash
-export PYARALLEL_MAX_WORKERS=16
-export PYARALLEL_EXECUTION__DEFAULT_EXECUTOR_TYPE=process
-export PYARALLEL_RATE_LIMITING__RATE=1000
-```
+[Full documentation](https://oneryalcin.github.io/pyarallel/) with API reference, advanced features, and best practices.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE.md file for details.
+MIT — see [LICENSE.md](LICENSE.md).
