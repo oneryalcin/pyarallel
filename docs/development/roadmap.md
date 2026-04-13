@@ -1,6 +1,6 @@
 # Roadmap
 
-## Current (v0.2.0)
+## Current (v0.3.0)
 
 - `parallel_map()` / `.map()` — explicit parallel execution over iterables
 - `parallel_starmap()` / `.starmap()` — multi-argument parallel execution
@@ -22,13 +22,31 @@
 - **`max_errors`** — stop early after N failures instead of processing all items. When hitting a dead API, don't waste 10,000 calls when the first 10 all failed. Returns partial results.
 - **Ordered streaming** — `parallel_iter(..., ordered=True)` yields results in input order instead of completion order. Essential for ETL, CSV writing, and pipelines where output order must match input.
 - **`max_tasks_per_worker`** — restart process workers after N tasks to prevent memory leaks in long-running pools. Passes through to `ProcessPoolExecutor(max_tasks_per_child=)`.
-- **tqdm/rich integration** — built-in progress bar support
+- **Sequential/testing mode** — `workers=0` or `sequential=True` runs everything in the calling thread. Makes debugging deterministic, breakpoints work, stack traces are readable.
+- **Worker initializer** — `worker_init=` callback run once per worker thread/process (e.g., open a DB connection, load a model). Passes through to executor `initializer=`.
+- **Shared kwargs** — `kwargs={"timeout": 5}` passed to every `fn` call alongside the item. Removes the need for `functools.partial` in common cases.
+- **`on_progress` for streaming** — `parallel_iter` currently has no progress callback. Add it for parity with `parallel_map`.
 
 ### Exploring
 
-- **Free-threading support** — leverage Python 3.13+ no-GIL for true thread parallelism
-- **Resource-aware scheduling** — adaptive worker counts based on system load
-- **Per-task timeout (sync)** — Python threads cannot be cancelled mid-execution, so per-task timeout in sync is a hard problem with no clean solution. The async API supports `task_timeout` natively via `asyncio.wait_for`. For sync, use `timeout=` for total wall-clock limits and put timeouts inside your function (e.g., `requests.get(url, timeout=5)`).
+- **`.then()` chaining** — `parallel_map(fn, items).then(fn2)` for lightweight pipelines without building a DAG engine. Chain a second parallel operation on results without extracting values manually.
+- **Circuit breaker** — composable with `Retry` for API-heavy workloads. When a downstream service is failing, stop hammering it and fail fast for a cooldown period.
+- **Context variable propagation** — copy `contextvars.Context` into worker threads so structured logging (correlation IDs) and request tracing work correctly.
+- **Free-threading support** — leverage Python 3.13+ no-GIL for true thread parallelism.
+- **Resource-aware scheduling** — adaptive worker counts based on system load.
+- **Per-task timeout (sync)** — Python threads can't be cancelled mid-execution, so this is a hard problem. For now, use `timeout=` for total wall-clock or put timeouts inside your function.
+
+## Not Planned
+
+Things we've considered and decided against. Pyarallel is a parallelization library, not a distributed computing framework.
+
+- **Telemetry / metrics dashboards** — use your existing observability stack (OpenTelemetry, Prometheus, Datadog). We give you `on_progress` and `ParallelResult`; instrument from there.
+- **CLI tools** — no dashboard, no profiler. Use `htop`, `py-spy`, or your IDE.
+- **Logging framework** — Python's `logging` module is fine. We don't add our own.
+- **Smart scheduling** (priority queues, deadlines, DAGs) — use Celery, Airflow, or Prefect.
+- **Dead letter queues** — message queue concept, not a parallelization concern.
+- **Resource monitoring** (memory, CPU, disk, network) — OS-level. `batch_size` is the right abstraction for memory control.
+- **Plugin / hook system** — slippery slope. `on_progress` callback covers the real use case.
 
 ---
 
