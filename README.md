@@ -2,21 +2,67 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/pyarallel)](https://pypi.org/project/pyarallel/) [![PyPI Downloads](https://static.pepy.tech/badge/pyarallel/month)](https://pepy.tech/project/pyarallel)
 
-Simple, explicit parallel execution for Python. No magic, no global config, no enterprise astronautics.
+Apply one function to many inputs — with rate limiting, retry, batching, and structured errors. Sync and async.
 
-## What It Does
+Pyarallel is for "fan out one function over N items" workloads: API calls, file processing, data crunching. Not DAGs, not queues, not distributed systems. Just `concurrent.futures` and `asyncio` with the common policies and result handling already built in.
 
-`concurrent.futures` with better ergonomics: structured error handling, rate limiting, retry, batching, streaming, and async support.
+**Zero dependencies. Python 3.12+.**
+
+## Before / After
+
+Fetch 10,000 URLs with rate limiting and error handling.
+
+**concurrent.futures:**
+
+```python
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+results = [None] * len(urls)
+errors = []
+
+with ThreadPoolExecutor(max_workers=10) as pool:
+    futures = {pool.submit(fetch, url): i for i, url in enumerate(urls)}
+    for f in as_completed(futures):
+        i = futures[f]
+        try:
+            results[i] = f.result()
+        except Exception as e:
+            errors.append((i, e))
+
+# No rate limiting. No retry. No batching. And you still
+# need to wire those yourself every time.
+```
+
+**pyarallel:**
 
 ```python
 from pyarallel import parallel_map, RateLimit, Retry
 
-results = parallel_map(
-    fetch_url, urls,
+result = parallel_map(
+    fetch, urls,
     workers=10,
     rate_limit=RateLimit(100, "minute"),
     retry=Retry(attempts=3, on=(ConnectionError, TimeoutError)),
 )
+
+for idx, val in result.successes():
+    save(val)
+for idx, exc in result.failures():
+    log_error(idx, exc)
+```
+
+Same thing, async:
+
+```python
+from pyarallel import async_parallel_map, RateLimit, Retry
+
+result = await async_parallel_map(
+    fetch_async, urls,
+    concurrency=10,
+    rate_limit=RateLimit(100, "minute"),
+    retry=Retry(attempts=3, on=(ConnectionError, TimeoutError)),
+)
+# Same result model — result.ok, result.successes(), result.failures()
 ```
 
 ## Install
@@ -25,121 +71,100 @@ results = parallel_map(
 pip install pyarallel
 ```
 
+## What You Get
+
+- **Rate limiting** — token bucket, per-second/minute/hour: `rate_limit=RateLimit(100, "minute")`
+- **Retry with backoff** — per-item, exponential, jitter, exception filtering: `retry=Retry(attempts=3, on=(ConnectionError,))`
+- **Batched execution** — lazy input consumption for generators, memory control: `batch_size=500`
+- **Streaming** — constant-memory processing via `parallel_iter` / `async_parallel_iter`
+- **Structured errors** — `ParallelResult` with `.ok`, `.successes()`, `.failures()`, `.raise_on_failure()`
+- **Timeouts** — wall-clock for the whole operation (`timeout=30.0`) or per-task in async (`task_timeout=5.0`)
+- **Progress callbacks** — `on_progress=lambda done, total: print(f"{done}/{total}")`
+- **Process executor** — CPU-bound work: `executor="process"`
+- **Decorator API** — `@parallel` / `@async_parallel` with `.map()`, `.starmap()`, `.stream()`
+
 ## Quick Start
 
-### The Function — `parallel_map`
+### Sync
 
 ```python
 from pyarallel import parallel_map, RateLimit, Retry
 
-# Basic — fan out over a list, get ordered results
-results = parallel_map(fetch_url, urls, workers=10)
+# Fan out over a list, get ordered results
+result = parallel_map(fetch, urls, workers=10)
 
-# With rate limiting
-results = parallel_map(call_api, ids, rate_limit=RateLimit(100, "minute"))
+# Rate-limited API calls with retry
+result = parallel_map(
+    call_api, user_ids,
+    workers=10,
+    rate_limit=RateLimit(100, "minute"),
+    retry=Retry(attempts=3, backoff=1.0, on=(ConnectionError, TimeoutError)),
+)
 
-# With per-item retry for flaky calls
-results = parallel_map(fetch, urls, retry=Retry(attempts=3, backoff=1.0))
-
-# Batched — controls memory for large datasets (no K8s OOM kills)
-results = parallel_map(process, million_items, batch_size=500)
-
-# CPU-bound work with processes
-results = parallel_map(crunch, data, executor="process")
-
-# Progress tracking
-results = parallel_map(process, items,
-                       on_progress=lambda done, total: print(f"{done}/{total}"))
+# CPU-bound with processes
+result = parallel_map(resize_image, paths, executor="process")
 ```
 
-### The Decorator — `@parallel`
-
-For functions you call repeatedly. Adds `.map()` without changing the function:
-
-```python
-from pyarallel import parallel
-
-@parallel(workers=4, rate_limit=RateLimit(100, "minute"))
-def fetch(url):
-    return requests.get(url).json()
-
-# Normal call — returns dict, not [dict]
-data = fetch("http://example.com")
-
-# Parallel — explicit .map()
-results = fetch.map(["http://a.com", "http://b.com", "http://c.com"])
-```
-
-### Multi-Argument Functions — `starmap`
-
-```python
-from pyarallel import parallel_starmap
-
-def fetch_with_auth(url, token):
-    return requests.get(url, headers={"Authorization": token}).json()
-
-results = parallel_starmap(fetch_with_auth, [(url, token) for url in urls])
-```
-
-### Streaming — Constant Memory
-
-For large-scale processing where results shouldn't accumulate:
-
-```python
-from pyarallel import parallel_iter
-
-for item in parallel_iter(process, ten_million_items, batch_size=1000):
-    if item.ok:
-        db.save(item.value)  # yielded and discarded — no accumulation
-    else:
-        log_error(item.index, item.error)
-```
-
-### Async Support
-
-Mirror API using `asyncio.TaskGroup` for structured concurrency:
+### Async
 
 ```python
 from pyarallel import async_parallel_map
 
-results = await async_parallel_map(fetch_async, urls, concurrency=10, task_timeout=5.0)
+result = await async_parallel_map(
+    fetch_async, urls, concurrency=20, task_timeout=5.0,
+)
 ```
 
-## Error Handling
+### Decorator
 
-No more lost exceptions. All errors collected, never silently swallowed:
+Adds `.map()`, `.starmap()`, `.stream()` without changing the function:
 
 ```python
-result = parallel_map(process, items)
+from pyarallel import parallel, async_parallel, RateLimit
+
+@parallel(workers=8, rate_limit=RateLimit(100, "minute"))
+def fetch(url):
+    return requests.get(url).json()
+
+fetch("http://example.com")          # normal call — returns dict
+fetch.map(urls)                      # parallel — returns ParallelResult
+fetch.stream(urls, batch_size=500)   # streaming — yields ItemResult
+
+@async_parallel(concurrency=10)
+async def fetch_async(url):
+    async with httpx.AsyncClient() as c:
+        return (await c.get(url)).json()
+
+await fetch_async.map(urls)          # async parallel
+```
+
+### Streaming — Constant Memory
+
+For ETL, pipelines, or datasets too large to hold in memory:
+
+```python
+from pyarallel import parallel_iter
+
+for item in parallel_iter(transform, ten_million_rows, batch_size=1000):
+    if item.ok:
+        db.save(item.value)
+    else:
+        log_error(item.index, item.error)
+```
+
+### Error Handling
+
+All errors collected, never silently swallowed:
+
+```python
+result = parallel_map(send_email, messages)
 
 if result.ok:
-    values = result.values()
+    values = result.values()           # list of all results, in order
 else:
-    for idx, val in result.successes():
-        print(f"Item {idx}: {val}")
     for idx, exc in result.failures():
-        print(f"Item {idx} failed: {exc}")
-
-    result.raise_on_failure()  # ExceptionGroup with all errors
-```
-
-## Methods
-
-Works with instance methods and static methods:
-
-```python
-class Scraper:
-    def __init__(self, session):
-        self.session = session
-
-    @parallel(workers=4)
-    def fetch(self, url):
-        return self.session.get(url).text
-
-s = Scraper(requests.Session())
-s.fetch("http://example.com")        # normal call
-s.fetch.map(urls)                    # parallel over urls
-s.fetch.stream(urls, batch_size=100) # streaming
+        log_error(idx, exc)
+    result.raise_on_failure()          # or raise ExceptionGroup with all errors
 ```
 
 ## API Summary
@@ -148,18 +173,20 @@ s.fetch.stream(urls, batch_size=100) # streaming
 |---|---|---|---|
 | `parallel_map(fn, items)` | `.map(items)` | `ParallelResult` | Results fit in memory |
 | `parallel_starmap(fn, items)` | `.starmap(items)` | `ParallelResult` | Multi-arg, fits in memory |
-| `parallel_iter(fn, items)` | `.stream(items)` | `Iterator[ItemResult[T]]` | Streaming, constant memory |
+| `parallel_iter(fn, items)` | `.stream(items)` | `Iterator[ItemResult]` | Streaming, constant memory |
 
-Async variants: `async_parallel_map`, `async_parallel_starmap`, `async_parallel_iter`
+Async mirrors: `async_parallel_map`, `async_parallel_starmap`, `async_parallel_iter`
 
-| Config | Description |
+| Config | Example |
 |---|---|
-| `RateLimit(count, per)` | Rate limit: `RateLimit(100, "minute")` |
-| `Retry(attempts, backoff)` | Per-item retry: `Retry(attempts=3, on=(ConnectionError,))` |
+| `RateLimit(count, per)` | `RateLimit(100, "minute")` |
+| `Retry(attempts, backoff, on)` | `Retry(attempts=3, on=(ConnectionError,))` |
+
+Works with instance methods and static methods via `@parallel` decorator — see [full docs](https://oneryalcin.github.io/pyarallel/).
 
 ## Documentation
 
-[Full documentation](https://oneryalcin.github.io/pyarallel/) with API reference, advanced features, and best practices.
+[Full docs](https://oneryalcin.github.io/pyarallel/) — API reference, advanced features, best practices.
 
 ## License
 
