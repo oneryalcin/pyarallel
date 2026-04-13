@@ -17,7 +17,7 @@ results = await async_parallel_map(
     rate_limit=None,                 # RateLimit or ops/second
     task_timeout=None,                    # Per-task timeout in seconds
     on_progress=None,                # callback(completed, total)
-    batch_size=None,                 # Process in chunks to control memory
+    batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
 )
 ```
@@ -33,8 +33,8 @@ results = await async_parallel_map(
 | `concurrency` | `int` | `4` | Maximum concurrent tasks |
 | `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting |
 | `task_timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
-| `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback |
-| `batch_size` | `int \| None` | `None` | Process items in chunks (controls memory) |
+| `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback. For unsized iterables with batching, `total` is items seen so far |
+| `batch_size` | `int \| None` | `None` | Process items in chunks. With unsized iterables, input is consumed lazily one batch at a time |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 
 ### Why `concurrency` instead of `workers`?
@@ -68,6 +68,16 @@ results = await async_parallel_map(
     task_timeout=5.0,
 )
 ```
+
+### Notes on Progress and Unsized Iterables
+
+When `items` has a known length, `on_progress(done, total)` reports the final
+total.
+
+When `items` is unsized (for example a generator) and `batch_size` is set,
+Pyarallel keeps input consumption lazy instead of materializing the full input
+up front. In that mode, `total` is the number of items discovered so far, not a
+guaranteed final total.
 
 ---
 

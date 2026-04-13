@@ -81,7 +81,10 @@ For large datasets, use `batch_size` to limit how many futures exist at once:
 results = parallel_map(process, huge_list, workers=8, batch_size=1000)
 ```
 
-Without `batch_size`, all items are submitted at once. On memory-constrained environments (K8s pods, Lambda), this prevents OOM kills.
+Without `batch_size`, all items are submitted at once. With `batch_size` set,
+unsized iterables are consumed lazily one batch at a time. On
+memory-constrained environments (K8s pods, Lambda), this helps prevent OOM
+kills.
 
 ## Error Handling Patterns
 
@@ -172,4 +175,5 @@ def test_decorated_function():
 2. **Use rate limiting for external APIs** — protects you and the service
 3. **Prefer threads for I/O** — processes have serialization overhead
 4. **Check `result.ok` before iterating** — avoids surprise `ExceptionGroup` raises
-5. **Use `on_progress` for long jobs** — visibility into what's happening
+5. **Use `on_progress` for long jobs** — for unsized iterables with batching,
+   `total` is items seen so far, not the final size

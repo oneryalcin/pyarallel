@@ -345,8 +345,13 @@ def parallel_map[R](
         rate_limit: ``RateLimit`` object, or a plain number (ops per second).
         timeout: Total wall-clock timeout in seconds for the whole operation.
         on_progress: ``callback(completed, total)`` fired after each task.
-        batch_size: Process items in chunks of this size to control memory.
-            Without batching, all items are submitted at once.
+            When ``items`` has no known length and ``batch_size`` is set,
+            ``total`` is the number of items seen so far rather than the
+            final input size.
+        batch_size: Process items in chunks of this size. With ``batch_size``
+            set, unsized iterables (for example generators) are consumed
+            lazily one batch at a time. Without batching, all items are
+            submitted at once.
         retry: ``Retry`` object for per-item retry with backoff.
 
     Returns:

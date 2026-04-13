@@ -16,7 +16,7 @@ results = parallel_map(
     rate_limit=None,                 # RateLimit object or ops/second (float)
     timeout=None,                    # Total timeout in seconds
     on_progress=None,                # callback(completed, total)
-    batch_size=None,                 # Process in chunks to control memory
+    batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
 )
 ```
@@ -33,8 +33,8 @@ results = parallel_map(
 | `executor` | `"thread" \| "process"` | `"thread"` | Thread pool or process pool |
 | `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting (float = ops/second) |
 | `timeout` | `float \| None` | `None` | Total wall-clock timeout in seconds |
-| `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback `(completed, total)` |
-| `batch_size` | `int \| None` | `None` | Process items in chunks of this size (controls memory) |
+| `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback `(completed, total)`. For unsized iterables with batching, `total` is items seen so far |
+| `batch_size` | `int \| None` | `None` | Process items in chunks of this size. With unsized iterables, input is consumed lazily one batch at a time |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 
 ### Examples
@@ -53,12 +53,22 @@ results = parallel_map(fetch, urls, rate_limit=10)  # 10 per second
 results = parallel_map(fetch, urls, timeout=60.0,
                        on_progress=lambda d, t: print(f"{d}/{t}"))
 
-# Batched — controls memory for large datasets
+# Batched — keeps unsized iterables lazy one batch at a time
 results = parallel_map(process, million_items, workers=8, batch_size=500)
 
 # With retry — flaky network calls
 results = parallel_map(fetch, urls, workers=10, retry=Retry(attempts=3, backoff=1.0))
 ```
+
+### Notes on Progress and Unsized Iterables
+
+When `items` has a known length, `on_progress(done, total)` reports the final
+total.
+
+When `items` is unsized (for example a generator) and `batch_size` is set,
+Pyarallel keeps input consumption lazy instead of materializing the full input
+up front. In that mode, `total` is the number of items discovered so far, not a
+guaranteed final total.
 
 ---
 

@@ -13,6 +13,11 @@ def my_progress(done, total):
 results = parallel_map(process, items, workers=8, on_progress=my_progress)
 ```
 
+If `items` has a known length, `total` is the final input size. If `items` is
+an unsized iterable (for example a generator) and you also set `batch_size`,
+Pyarallel keeps input consumption lazy; in that mode `total` is the number of
+items discovered so far.
+
 Works with both `parallel_map` and `.map()`:
 
 ```python
@@ -154,6 +159,9 @@ Control memory for large datasets by processing in chunks:
 # Submit 500 items at a time instead of 500,000 at once
 results = parallel_map(process, huge_list, workers=8, batch_size=500)
 ```
+
+With `batch_size` set, unsized iterables are consumed lazily one batch at a
+time instead of being materialized up front.
 
 Errors in one batch don't prevent subsequent batches from running.
 

@@ -103,7 +103,12 @@ async def async_parallel_map[R](
         rate_limit: ``RateLimit`` object, or ops-per-second as a number.
         task_timeout: Per-task timeout in seconds (each individual task).
         on_progress: ``callback(completed, total)`` after each task.
-        batch_size: Process items in chunks to control memory.
+            When ``items`` has no known length and ``batch_size`` is set,
+            ``total`` is the number of items seen so far rather than the
+            final input size.
+        batch_size: Process items in chunks. With ``batch_size`` set,
+            unsized iterables (for example generators) are consumed lazily
+            one batch at a time.
         retry: ``Retry`` object for per-item retry with backoff.
         workers: Alias for ``concurrency`` (for convenience when switching
             from sync API). Emits a warning; prefer ``concurrency``.
