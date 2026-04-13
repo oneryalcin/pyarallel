@@ -101,9 +101,7 @@ class TestAsyncTimeout:
             await asyncio.sleep(2.0)
             return x
 
-        result = await async_parallel_map(
-            slow, [1, 2], concurrency=2, task_timeout=0.1
-        )
+        result = await async_parallel_map(slow, [1, 2], concurrency=2, task_timeout=0.1)
         assert not result.ok
         assert len(result.failures()) == 2
         for _, exc in result.failures():
@@ -118,7 +116,9 @@ class TestAsyncRateLimit:
 
         start = time.monotonic()
         await async_parallel_map(
-            noop, range(5), concurrency=5,
+            noop,
+            range(5),
+            concurrency=5,
             rate_limit=RateLimit(10, "second"),
         )
         elapsed = time.monotonic() - start
@@ -144,7 +144,9 @@ class TestAsyncProgress:
             return x
 
         await async_parallel_map(
-            noop, [1, 2, 3], concurrency=2,
+            noop,
+            [1, 2, 3],
+            concurrency=2,
             on_progress=lambda done, total: progress.append((done, total)),
         )
         assert len(progress) == 3
@@ -199,6 +201,7 @@ class TestAsyncWorkersAlias:
             return x * 2
 
         import warnings
+
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             result = await async_parallel_map(double, [1, 2, 3], workers=2)

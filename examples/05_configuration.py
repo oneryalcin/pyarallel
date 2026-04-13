@@ -9,9 +9,9 @@ and override settings at the decorator level.
 Run with: python examples/05_configuration.py
 """
 
-from pyarallel import parallel, config
 import time
 
+from pyarallel import config, parallel
 
 print("Example 1: Default configuration")
 print("=" * 50)
@@ -30,13 +30,12 @@ print("Example 2: Updating global configuration")
 print("=" * 50)
 
 # Update global defaults
-config.update_config({
-    "max_workers": 8,
-    "execution": {
-        "default_executor_type": "thread",
-        "default_batch_size": 50
+config.update_config(
+    {
+        "max_workers": 8,
+        "execution": {"default_executor_type": "thread", "default_batch_size": 50},
     }
-})
+)
 
 print("Updated configuration:")
 print(f"  Max workers: {config.get_config().max_workers}")
@@ -116,9 +115,11 @@ print()
 # Demonstrate hierarchy
 config.update_config({"max_workers": 8})  # Global config
 
+
 @parallel(max_workers=4)  # Decorator override
 def demo_hierarchy(item):
     return item
+
 
 print("Global config sets max_workers=8")
 print("Decorator sets max_workers=4")

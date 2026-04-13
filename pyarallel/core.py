@@ -10,12 +10,8 @@ import functools
 import random
 import threading
 import time
-from concurrent.futures import (
-    Future,
-    ProcessPoolExecutor,
-    ThreadPoolExecutor,
-    as_completed,
-)
+from concurrent.futures import (Future, ProcessPoolExecutor,
+                                ThreadPoolExecutor, as_completed)
 from dataclasses import dataclass
 from typing import Any, Callable, Generic, Iterable, Iterator, Literal, TypeVar
 
@@ -88,7 +84,7 @@ class Retry:
 
     def _delay(self, attempt: int) -> float:
         """Compute delay before retry *attempt* (0-indexed)."""
-        delay = min(self.backoff * (2 ** attempt), self.max_delay)
+        delay = min(self.backoff * (2**attempt), self.max_delay)
         if self.jitter:
             delay *= random.uniform(0.5, 1.5)
         return delay
@@ -191,9 +187,7 @@ class ParallelResult(Generic[R]):
     def successes(self) -> list[tuple[int, R]]:
         """``(index, value)`` for each task that succeeded."""
         return [
-            (i, v)
-            for i, v in enumerate(self._entries)
-            if not isinstance(v, _Failure)
+            (i, v) for i, v in enumerate(self._entries) if not isinstance(v, _Failure)
         ]
 
     def failures(self) -> list[tuple[int, Exception]]:
@@ -332,7 +326,9 @@ def parallel_map(
                     for i in chunk:
                         if results[i] is _PENDING:
                             results[i] = _Failure(
-                                TimeoutError(f"Task {i} did not complete within {timeout}s")
+                                TimeoutError(
+                                    f"Task {i} did not complete within {timeout}s"
+                                )
                             )
                     timed_out = True
                     continue
@@ -360,7 +356,9 @@ def parallel_map(
                         f.cancel()
                         if results[idx] is _PENDING:
                             results[idx] = _Failure(
-                                TimeoutError(f"Task {idx} did not complete within {timeout}s")
+                                TimeoutError(
+                                    f"Task {idx} did not complete within {timeout}s"
+                                )
                             )
     finally:
         pool.shutdown(wait=not timed_out, cancel_futures=timed_out)
@@ -395,9 +393,14 @@ def parallel_starmap(
     """
     packed = [(fn, args) for args in items]
     return parallel_map(
-        _unpack_call, packed,
-        workers=workers, executor=executor, rate_limit=rate_limit,
-        timeout=timeout, on_progress=on_progress, batch_size=batch_size,
+        _unpack_call,
+        packed,
+        workers=workers,
+        executor=executor,
+        rate_limit=rate_limit,
+        timeout=timeout,
+        on_progress=on_progress,
+        batch_size=batch_size,
         retry=retry,
     )
 
@@ -504,11 +507,20 @@ class _BoundParallel:
         retry: Retry | None = None,
     ) -> ParallelResult[Any]:
         """Run this function over *items* in parallel."""
-        return parallel_map(self._fn, items, **_merge_opts(
-            self._defaults, workers=workers, executor=executor,
-            rate_limit=rate_limit, timeout=timeout, on_progress=on_progress,
-            batch_size=batch_size, retry=retry,
-        ))
+        return parallel_map(
+            self._fn,
+            items,
+            **_merge_opts(
+                self._defaults,
+                workers=workers,
+                executor=executor,
+                rate_limit=rate_limit,
+                timeout=timeout,
+                on_progress=on_progress,
+                batch_size=batch_size,
+                retry=retry,
+            ),
+        )
 
     def starmap(
         self,
@@ -516,7 +528,9 @@ class _BoundParallel:
         **kwargs: Any,
     ) -> ParallelResult[Any]:
         """Like ``.map()`` but unpacks each item as ``fn(*args)``."""
-        return parallel_starmap(self._fn, items, **_merge_opts(self._defaults, **kwargs))
+        return parallel_starmap(
+            self._fn, items, **_merge_opts(self._defaults, **kwargs)
+        )
 
     def stream(
         self,
@@ -572,11 +586,20 @@ class _ParallelFunc:
         retry: Retry | None = None,
     ) -> ParallelResult[Any]:
         """Run this function over *items* in parallel."""
-        return parallel_map(self.__wrapped__, items, **_merge_opts(
-            self._defaults, workers=workers, executor=executor,
-            rate_limit=rate_limit, timeout=timeout, on_progress=on_progress,
-            batch_size=batch_size, retry=retry,
-        ))
+        return parallel_map(
+            self.__wrapped__,
+            items,
+            **_merge_opts(
+                self._defaults,
+                workers=workers,
+                executor=executor,
+                rate_limit=rate_limit,
+                timeout=timeout,
+                on_progress=on_progress,
+                batch_size=batch_size,
+                retry=retry,
+            ),
+        )
 
     def starmap(
         self,
@@ -584,7 +607,9 @@ class _ParallelFunc:
         **kwargs: Any,
     ) -> ParallelResult[Any]:
         """Like ``.map()`` but unpacks each item as ``fn(*args)``."""
-        return parallel_starmap(self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs))
+        return parallel_starmap(
+            self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs)
+        )
 
     def stream(
         self,
@@ -592,7 +617,9 @@ class _ParallelFunc:
         **kwargs: Any,
     ) -> Iterator[tuple[int, Any]]:
         """Yield ``(index, result)`` in completion order — constant memory."""
-        return parallel_iter(self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs))
+        return parallel_iter(
+            self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs)
+        )
 
 
 def parallel(

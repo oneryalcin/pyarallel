@@ -11,8 +11,9 @@ This example demonstrates the fundamental concepts of pyarallel:
 Run with: python examples/01_basic_usage.py
 """
 
-from pyarallel import parallel
 import time
+
+from pyarallel import parallel
 
 
 # Example 1: Simple multiplication

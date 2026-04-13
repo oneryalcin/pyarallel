@@ -12,9 +12,10 @@ Replace with actual API calls for real usage.
 Run with: python examples/02_api_calls_with_rate_limiting.py
 """
 
-from pyarallel import parallel, RateLimit
-import time
 import json
+import time
+
+from pyarallel import RateLimit, parallel
 
 
 # Mock API function (simulates HTTP request)
@@ -25,7 +26,7 @@ def mock_api_get(url):
         "url": url,
         "status": "success",
         "timestamp": time.time(),
-        "data": f"Data from {url}"
+        "data": f"Data from {url}",
     }
 
 
@@ -53,10 +54,7 @@ print()
 
 # Example 2: Rate limited API calls (10 requests per second)
 # -----------------------------------------------------------
-@parallel(
-    max_workers=5,
-    rate_limit=10  # 10 operations per second
-)
+@parallel(max_workers=5, rate_limit=10)  # 10 operations per second
 def fetch_with_rate_limit(endpoint_id):
     """Fetch with rate limiting - respects API quotas."""
     url = f"https://api.example.com/limited/{endpoint_id}"
@@ -79,10 +77,7 @@ print()
 
 # Example 3: Per-minute rate limiting
 # ------------------------------------
-@parallel(
-    max_workers=10,
-    rate_limit=(100, "minute")  # 100 operations per minute
-)
+@parallel(max_workers=10, rate_limit=(100, "minute"))  # 100 operations per minute
 def fetch_premium_api(resource_id):
     """Fetch from API with per-minute quota."""
     url = f"https://api.premium.com/v1/resource/{resource_id}"
@@ -107,10 +102,8 @@ print()
 # ----------------------------------------------
 api_rate = RateLimit(count=5, interval="second")
 
-@parallel(
-    max_workers=3,
-    rate_limit=api_rate
-)
+
+@parallel(max_workers=3, rate_limit=api_rate)
 def fetch_with_rate_object(item_id):
     """Fetch using RateLimit object for better readability."""
     url = f"https://api.example.com/items/{item_id}"
@@ -135,9 +128,7 @@ print()
 # Example 5: Batch processing with rate limiting
 # -----------------------------------------------
 @parallel(
-    max_workers=4,
-    batch_size=5,  # Process in batches of 5
-    rate_limit=(10, "second")
+    max_workers=4, batch_size=5, rate_limit=(10, "second")  # Process in batches of 5
 )
 def fetch_large_dataset(page_id):
     """Fetch pages from a large dataset."""

@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from pyarallel import parallel_map, RateLimit
+from pyarallel import RateLimit, parallel_map
 
 
 class TestBatchBasic:
@@ -68,6 +68,7 @@ class TestBatchMemoryControl:
 class TestBatchErrorHandling:
     def test_error_in_one_batch_still_processes_others(self):
         """Failures in batch N shouldn't prevent batch N+1 from running."""
+
         def fail_on_5(x):
             if x == 5:
                 raise ValueError("five")
@@ -85,7 +86,7 @@ class TestBatchErrorHandling:
             return x
 
         result = parallel_map(fail_even, range(10), workers=3, batch_size=3)
-        assert len(result.failures()) == 5   # 0, 2, 4, 6, 8
+        assert len(result.failures()) == 5  # 0, 2, 4, 6, 8
         assert len(result.successes()) == 5  # 1, 3, 5, 7, 9
 
 
@@ -93,7 +94,10 @@ class TestBatchWithOtherFeatures:
     def test_batch_with_progress(self):
         progress = []
         parallel_map(
-            lambda x: x, range(12), workers=2, batch_size=4,
+            lambda x: x,
+            range(12),
+            workers=2,
+            batch_size=4,
             on_progress=lambda d, t: progress.append((d, t)),
         )
         assert len(progress) == 12
@@ -102,7 +106,10 @@ class TestBatchWithOtherFeatures:
     def test_batch_with_rate_limit(self):
         start = time.monotonic()
         parallel_map(
-            lambda x: x, range(6), workers=4, batch_size=3,
+            lambda x: x,
+            range(6),
+            workers=4,
+            batch_size=3,
             rate_limit=RateLimit(10, "second"),
         )
         elapsed = time.monotonic() - start
@@ -116,11 +123,14 @@ class TestAsyncBatch:
         async def double(x):
             return x * 2
 
-        result = await async_parallel_map(double, range(15), concurrency=3, batch_size=5)
+        result = await async_parallel_map(
+            double, range(15), concurrency=3, batch_size=5
+        )
         assert list(result) == [x * 2 for x in range(15)]
 
     async def test_async_batch_limits_concurrency(self):
         import asyncio
+
         from pyarallel import async_parallel_map
 
         max_concurrent = 0

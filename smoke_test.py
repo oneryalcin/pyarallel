@@ -14,15 +14,8 @@ import time
 # Ensure we're importing the local version
 sys.path.insert(0, os.path.dirname(__file__))
 
-from pyarallel import (
-    ParallelResult,
-    RateLimit,
-    Retry,
-    async_parallel,
-    async_parallel_map,
-    parallel,
-    parallel_map,
-)
+from pyarallel import (ParallelResult, RateLimit, Retry, async_parallel,
+                       async_parallel_map, parallel, parallel_map)
 
 PASS = 0
 FAIL = 0
@@ -86,8 +79,11 @@ def tracked_work(x):
 
 result = parallel_map(tracked_work, range(50), workers=4, batch_size=10)
 check("batch correctness", list(result) == [x * 2 for x in range(50)])
-check(f"batch memory control (peak={peak_concurrent})", peak_concurrent <= 10,
-      f"expected <=10, got {peak_concurrent}")
+check(
+    f"batch memory control (peak={peak_concurrent})",
+    peak_concurrent <= 10,
+    f"expected <=10, got {peak_concurrent}",
+)
 
 # ---------------------------------------------------------------------------
 # 3. Retry with flaky function
@@ -104,11 +100,16 @@ def flaky_compute(x):
     return x * 100
 
 
-result = parallel_map(flaky_compute, [1, 2, 3, 4, 5], workers=3, retry=Retry(attempts=3))
+result = parallel_map(
+    flaky_compute, [1, 2, 3, 4, 5], workers=3, retry=Retry(attempts=3)
+)
 check("retry all succeed", result.ok)
 check("retry correct values", list(result) == [100, 200, 300, 400, 500])
-check("retry attempt counts", all(v == 3 for v in attempt_counts.values()),
-      f"counts: {attempt_counts}")
+check(
+    "retry attempt counts",
+    all(v == 3 for v in attempt_counts.values()),
+    f"counts: {attempt_counts}",
+)
 
 # ---------------------------------------------------------------------------
 # 4. Rate limiting — timing check
@@ -118,8 +119,11 @@ print("\n--- Sync: Rate limiting ---")
 start = time.monotonic()
 parallel_map(lambda x: x, range(10), workers=10, rate_limit=RateLimit(20, "second"))
 elapsed = time.monotonic() - start
-check(f"rate limit timing ({elapsed:.2f}s)", elapsed >= 0.35,
-      f"expected >= 0.35s for 10 items at 20/sec")
+check(
+    f"rate limit timing ({elapsed:.2f}s)",
+    elapsed >= 0.35,
+    f"expected >= 0.35s for 10 items at 20/sec",
+)
 
 # ---------------------------------------------------------------------------
 # 5. Error handling — partial results
@@ -136,8 +140,11 @@ def maybe_fail(x):
 result = parallel_map(maybe_fail, range(12), workers=4)
 check("partial: not ok", not result.ok)
 check("partial: 8 successes", len(result.successes()) == 8)
-check("partial: 4 failures", len(result.failures()) == 4,
-      f"got {len(result.failures())} failures")
+check(
+    "partial: 4 failures",
+    len(result.failures()) == 4,
+    f"got {len(result.failures())} failures",
+)
 
 try:
     result.raise_on_failure()
@@ -153,7 +160,7 @@ print("\n--- Sync: Decorator ---")
 
 @parallel(workers=3)
 def square(x):
-    return x ** 2
+    return x**2
 
 
 check("decorator single call", square(7) == 49)
@@ -185,8 +192,12 @@ check("method .map()", list(m.multiply.map([1, 2, 3])) == [7, 14, 21])
 print("\n--- Sync: Progress ---")
 
 progress_log = []
-parallel_map(lambda x: x, range(10), workers=3,
-             on_progress=lambda d, t: progress_log.append((d, t)))
+parallel_map(
+    lambda x: x,
+    range(10),
+    workers=3,
+    on_progress=lambda d, t: progress_log.append((d, t)),
+)
 check("progress called 10 times", len(progress_log) == 10)
 check("progress total correct", all(t == 10 for _, t in progress_log))
 

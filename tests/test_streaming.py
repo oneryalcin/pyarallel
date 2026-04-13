@@ -43,7 +43,10 @@ class TestParallelIterStreaming:
 
         yielded_count = 0
         for index, value in parallel_iter(
-            lambda x: x * 2, range(20), workers=2, batch_size=5,
+            lambda x: x * 2,
+            range(20),
+            workers=2,
+            batch_size=5,
         ):
             yielded_count += 1
 
@@ -92,10 +95,14 @@ class TestParallelIterErrors:
                 raise ValueError("not yet")
             return x * 10
 
-        results = list(parallel_iter(
-            flaky, [1, 2], workers=2,
-            retry=Retry(attempts=3, backoff=0, jitter=False),
-        ))
+        results = list(
+            parallel_iter(
+                flaky,
+                [1, 2],
+                workers=2,
+                retry=Retry(attempts=3, backoff=0, jitter=False),
+            )
+        )
         results.sort()
         assert results == [(0, 10), (1, 20)]
 
@@ -105,18 +112,27 @@ class TestParallelIterWithOptions:
         from pyarallel import parallel_iter
 
         start = time.monotonic()
-        list(parallel_iter(
-            lambda x: x, range(5), workers=5,
-            rate_limit=RateLimit(10, "second"),
-        ))
+        list(
+            parallel_iter(
+                lambda x: x,
+                range(5),
+                workers=5,
+                rate_limit=RateLimit(10, "second"),
+            )
+        )
         assert time.monotonic() - start >= 0.3
 
     def test_with_batch_size(self):
         from pyarallel import parallel_iter
 
-        results = list(parallel_iter(
-            lambda x: x * 2, range(15), workers=3, batch_size=5,
-        ))
+        results = list(
+            parallel_iter(
+                lambda x: x * 2,
+                range(15),
+                workers=3,
+                batch_size=5,
+            )
+        )
         results.sort()
         assert results == [(i, i * 2) for i in range(15)]
 

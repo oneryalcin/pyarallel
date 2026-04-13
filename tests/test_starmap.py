@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from pyarallel import parallel_map, RateLimit
+from pyarallel import RateLimit, parallel_map
 from pyarallel.core import Retry
 
 
@@ -91,7 +91,9 @@ class TestStarmapErrorHandling:
             return a + b
 
         result = parallel_starmap(
-            flaky_add, [(1, 2), (3, 4)], workers=2,
+            flaky_add,
+            [(1, 2), (3, 4)],
+            workers=2,
             retry=Retry(attempts=3, backoff=0, jitter=False),
         )
         assert result.ok
@@ -104,7 +106,9 @@ class TestStarmapWithOptions:
 
         start = time.monotonic()
         parallel_starmap(
-            _add, [(1, 2)] * 5, workers=5,
+            _add,
+            [(1, 2)] * 5,
+            workers=5,
             rate_limit=RateLimit(10, "second"),
         )
         assert time.monotonic() - start >= 0.3
@@ -113,7 +117,10 @@ class TestStarmapWithOptions:
         from pyarallel import parallel_starmap
 
         result = parallel_starmap(
-            _add, [(i, i) for i in range(20)], workers=4, batch_size=5,
+            _add,
+            [(i, i) for i in range(20)],
+            workers=4,
+            batch_size=5,
         )
         assert list(result) == [i * 2 for i in range(20)]
 
@@ -154,7 +161,9 @@ class TestAsyncStarmap:
             return a + b
 
         result = await async_parallel_starmap(
-            flaky_add, [(1, 2), (3, 4)], concurrency=2,
+            flaky_add,
+            [(1, 2), (3, 4)],
+            concurrency=2,
             retry=Retry(attempts=3, backoff=0, jitter=False),
         )
         assert result.ok

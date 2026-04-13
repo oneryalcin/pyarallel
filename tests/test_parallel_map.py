@@ -140,7 +140,9 @@ class TestRateLimiting:
     def test_rate_limit_object(self):
         start = time.monotonic()
         parallel_map(
-            lambda x: x, range(5), workers=5,
+            lambda x: x,
+            range(5),
+            workers=5,
             rate_limit=RateLimit(10, "second"),
         )
         elapsed = time.monotonic() - start
@@ -171,7 +173,9 @@ class TestProgress:
     def test_progress_callback_called(self):
         progress = []
         parallel_map(
-            lambda x: x, [1, 2, 3], workers=2,
+            lambda x: x,
+            [1, 2, 3],
+            workers=2,
             on_progress=lambda done, total: progress.append((done, total)),
         )
         assert len(progress) == 3

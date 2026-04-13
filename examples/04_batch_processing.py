@@ -12,8 +12,9 @@ Note: Example 5 uses process-based parallelism, so all execution code
 must be wrapped in if __name__ == "__main__" for proper pickling.
 """
 
-from pyarallel import parallel
 import time
+
+from pyarallel import parallel
 
 
 # Example 1: Memory-efficient batch processing
@@ -24,6 +25,7 @@ def process_record(record_id):
     # Simulate processing
     time.sleep(0.01)
     return f"Record {record_id} processed"
+
 
 # Process 100 records in batches of 10
 start = time.time()
@@ -78,7 +80,7 @@ class DataLoader:
         return {
             "chunk_id": chunk_id,
             "data": [i for i in range(1000)],  # Simulate large data
-            "size_kb": 100
+            "size_kb": 100,
         }
 
 
@@ -90,11 +92,7 @@ def process_large_chunk(chunk_id):
     # Process the data
     processed_data = sum(chunk["data"])
 
-    return {
-        "chunk_id": chunk_id,
-        "result": processed_data,
-        "size_kb": chunk["size_kb"]
-    }
+    return {"chunk_id": chunk_id, "result": processed_data, "size_kb": chunk["size_kb"]}
 
 
 print("Example 3: Memory-constrained processing")
@@ -125,14 +123,14 @@ class DatabaseSimulator:
         return {
             "id": user_id,
             "name": f"User {user_id}",
-            "email": f"user{user_id}@example.com"
+            "email": f"user{user_id}@example.com",
         }
 
 
 @parallel(
     max_workers=10,
     batch_size=20,  # Process 20 users at a time
-    prewarm=True     # Start workers immediately
+    prewarm=True,  # Start workers immediately
 )
 def fetch_and_enrich_user(user_id):
     """Fetch user and add enrichment data."""
@@ -164,9 +162,7 @@ print()
 # Example 5: File processing in batches
 # --------------------------------------
 @parallel(
-    max_workers=4,
-    batch_size=50,  # Process 50 files per batch
-    executor_type="process"
+    max_workers=4, batch_size=50, executor_type="process"  # Process 50 files per batch
 )
 def process_file(file_id):
     """Simulate processing a file (e.g., CSV, log file)."""
@@ -176,10 +172,7 @@ def process_file(file_id):
     # Process lines
     processed_lines = [line.upper() for line in lines]
 
-    return {
-        "file_id": file_id,
-        "lines_processed": len(processed_lines)
-    }
+    return {"file_id": file_id, "lines_processed": len(processed_lines)}
 
 
 print("Example 5: Batch file processing")

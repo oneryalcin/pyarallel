@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from pyarallel import parallel_map, RateLimit
+from pyarallel import RateLimit, parallel_map
 from pyarallel.core import Retry
 
 
@@ -39,7 +39,9 @@ class TestRetryBehavior:
             return x * 10
 
         result = parallel_map(
-            flaky, [1, 2, 3], workers=2,
+            flaky,
+            [1, 2, 3],
+            workers=2,
             retry=Retry(attempts=3, backoff=0, jitter=False),
         )
         assert result.ok
@@ -48,11 +50,14 @@ class TestRetryBehavior:
 
     def test_retries_exhausted_reports_failure(self):
         """Function always fails — should exhaust retries and report the last error."""
+
         def always_fail(x):
             raise RuntimeError(f"permanent failure for {x}")
 
         result = parallel_map(
-            always_fail, [1, 2], workers=2,
+            always_fail,
+            [1, 2],
+            workers=2,
             retry=Retry(attempts=3, backoff=0, jitter=False),
         )
         assert not result.ok
@@ -69,7 +74,9 @@ class TestRetryBehavior:
             raise ValueError("fail")
 
         parallel_map(
-            counter, [42], workers=1,
+            counter,
+            [42],
+            workers=1,
             retry=Retry(attempts=5, backoff=0, jitter=False),
         )
         assert call_count[42] == 5
@@ -90,12 +97,15 @@ class TestRetryBehavior:
 class TestExponentialBackoff:
     def test_backoff_takes_time(self):
         """With backoff, retries should take measurably longer."""
+
         def always_fail(x):
             raise ValueError("fail")
 
         start = time.monotonic()
         parallel_map(
-            always_fail, [1], workers=1,
+            always_fail,
+            [1],
+            workers=1,
             retry=Retry(attempts=3, backoff=0.1, jitter=False),
         )
         elapsed = time.monotonic() - start
@@ -114,7 +124,9 @@ class TestExponentialBackoff:
             raise ValueError("fail")
 
         parallel_map(
-            always_fail, [1], workers=1,
+            always_fail,
+            [1],
+            workers=1,
             retry=Retry(attempts=4, backoff=0.05, jitter=False),
         )
         # Compute gaps between attempts
@@ -125,12 +137,15 @@ class TestExponentialBackoff:
 
     def test_max_delay_caps_backoff(self):
         """max_delay should cap the exponential growth."""
+
         def always_fail(x):
             raise ValueError("fail")
 
         start = time.monotonic()
         parallel_map(
-            always_fail, [1], workers=1,
+            always_fail,
+            [1],
+            workers=1,
             # backoff=1.0 * 2^10 = 1024, but max_delay=0.1 caps it
             retry=Retry(attempts=4, backoff=1.0, max_delay=0.05, jitter=False),
         )
@@ -152,10 +167,14 @@ class TestJitter:
                 raise ValueError("fail")
 
             parallel_map(
-                always_fail, [1], workers=1,
+                always_fail,
+                [1],
+                workers=1,
                 retry=Retry(attempts=3, backoff=0.05, jitter=True),
             )
-            gaps = [timestamps[i + 1] - timestamps[i] for i in range(len(timestamps) - 1)]
+            gaps = [
+                timestamps[i + 1] - timestamps[i] for i in range(len(timestamps) - 1)
+            ]
             delays_per_run.append(gaps)
 
         # Jitter should make the two runs different
@@ -175,7 +194,9 @@ class TestJitter:
             raise ValueError("fail")
 
         parallel_map(
-            always_fail, [1], workers=1,
+            always_fail,
+            [1],
+            workers=1,
             retry=Retry(attempts=4, backoff=0.05, jitter=False),
         )
         gaps = [timestamps[i + 1] - timestamps[i] for i in range(len(timestamps) - 1)]
@@ -196,7 +217,9 @@ class TestRetryOnFilter:
             return x
 
         result = parallel_map(
-            flaky, [1, 2], workers=2,
+            flaky,
+            [1, 2],
+            workers=2,
             retry=Retry(attempts=3, backoff=0, jitter=False, on=(ConnectionError,)),
         )
         assert result.ok
@@ -212,8 +235,12 @@ class TestRetryOnFilter:
             raise ValueError("bad input — don't retry this")
 
         result = parallel_map(
-            bad_input, [1], workers=1,
-            retry=Retry(attempts=5, backoff=0, jitter=False, on=(ConnectionError, TimeoutError)),
+            bad_input,
+            [1],
+            workers=1,
+            retry=Retry(
+                attempts=5, backoff=0, jitter=False, on=(ConnectionError, TimeoutError)
+            ),
         )
         assert not result.ok
         assert call_count == 1  # Called once, not retried
@@ -231,13 +258,15 @@ class TestRetryOnFilter:
             return x
 
         result = parallel_map(
-            mixed, [1, 2, 3], workers=3,
+            mixed,
+            [1, 2, 3],
+            workers=3,
             retry=Retry(attempts=3, backoff=0, jitter=False, on=(ConnectionError,)),
         )
         assert len(result.failures()) == 2  # both 1 and 2 fail
-        assert call_count[1] == 3   # retried 3 times
-        assert call_count[2] == 1   # failed immediately
-        assert call_count[3] == 1   # succeeded first try
+        assert call_count[1] == 3  # retried 3 times
+        assert call_count[2] == 1  # failed immediately
+        assert call_count[3] == 1  # succeeded first try
 
     def test_on_none_retries_everything(self):
         """on=None (default) retries all exceptions."""
@@ -250,7 +279,9 @@ class TestRetryOnFilter:
             return x
 
         result = parallel_map(
-            flaky, [1], workers=1,
+            flaky,
+            [1],
+            workers=1,
             retry=Retry(attempts=3, backoff=0, jitter=False, on=None),
         )
         assert result.ok
@@ -265,7 +296,9 @@ class TestRetryPartialFailure:
             return x
 
         result = parallel_map(
-            half_fail, range(6), workers=3,
+            half_fail,
+            range(6),
+            workers=3,
             retry=Retry(attempts=2, backoff=0, jitter=False),
         )
         assert len(result.successes()) == 3
@@ -279,7 +312,9 @@ class TestRetryPartialFailure:
             raise ValueError("fail")
 
         parallel_map(
-            flaky, [1, 2, 3], workers=2,
+            flaky,
+            [1, 2, 3],
+            workers=2,
             retry=Retry(attempts=2, backoff=0, jitter=False),
             on_progress=lambda d, t: progress.append((d, t)),
         )
@@ -300,7 +335,9 @@ class TestAsyncRetry:
             return x * 10
 
         result = await async_parallel_map(
-            flaky, [1, 2, 3], concurrency=2,
+            flaky,
+            [1, 2, 3],
+            concurrency=2,
             retry=Retry(attempts=3, backoff=0, jitter=False),
         )
         assert result.ok
@@ -313,7 +350,9 @@ class TestAsyncRetry:
             raise RuntimeError("nope")
 
         result = await async_parallel_map(
-            always_fail, [1], concurrency=1,
+            always_fail,
+            [1],
+            concurrency=1,
             retry=Retry(attempts=3, backoff=0, jitter=False),
         )
         assert not result.ok
@@ -330,7 +369,9 @@ class TestAsyncRetry:
             raise ValueError("don't retry")
 
         result = await async_parallel_map(
-            bad, [1], concurrency=1,
+            bad,
+            [1],
+            concurrency=1,
             retry=Retry(attempts=5, backoff=0, jitter=False, on=(ConnectionError,)),
         )
         assert not result.ok

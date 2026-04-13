@@ -12,9 +12,10 @@ Note: Process-based functions must be defined at module level (not inside if __n
 to be picklable. All execution code is wrapped in if __name__ == "__main__".
 """
 
-from pyarallel import parallel
-import time
 import hashlib
+import time
+
+from pyarallel import parallel
 
 
 # Example 1: Comparison - Threads vs Processes
@@ -101,13 +102,13 @@ def analyze_dataset(dataset_id):
     total = sum(data)
     mean = total / len(data)
     variance = sum((x - mean) ** 2 for x in data) / len(data)
-    std_dev = variance ** 0.5
+    std_dev = variance**0.5
 
     return {
         "dataset_id": dataset_id,
         "count": len(data),
         "mean": round(mean, 2),
-        "std_dev": round(std_dev, 2)
+        "std_dev": round(std_dev, 2),
     }
 
 
@@ -176,7 +177,16 @@ if __name__ == "__main__":
 
     # Check primality of large numbers
     start = time.time()
-    large_numbers = [1000003, 1000033, 1000037, 1000039, 1000081, 1000099, 1000117, 1000121]
+    large_numbers = [
+        1000003,
+        1000033,
+        1000037,
+        1000039,
+        1000081,
+        1000099,
+        1000117,
+        1000121,
+    ]
     results = check_prime(large_numbers)
     duration = time.time() - start
 
