@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/user-guide/advanced-features/">
       
       
-        <link rel="prev" href="../../getting-started/quickstart/">
+        <link rel="prev" href="../real-world-patterns/">
       
       
         <link rel="next" href="../best-practices/">
@@ -379,6 +379,27 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../real-world-patterns/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Real-World Patterns
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -433,6 +454,21 @@
       Progress Tracking
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Progress Tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tqdm-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      tqdm Integration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -868,6 +904,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Progress Tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tqdm-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      tqdm Integration
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1046,6 +1097,26 @@ items discovered so far.</p>
 
 <span class="n">results</span> <span class="o">=</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">on_progress</span><span class="o">=</span><span class="k">lambda</span> <span class="n">d</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">))</span>
 </code></pre></div>
+<h3 id="tqdm-integration">tqdm Integration<a class="headerlink" href="#tqdm-integration" title="Permanent link">&para;</a></h3>
+<p>Wire <code>on_progress</code> to a tqdm progress bar:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+
+<span class="k">with</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">urls</span><span class="p">))</span> <span class="k">as</span> <span class="n">pbar</span><span class="p">:</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+        <span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+        <span class="n">on_progress</span><span class="o">=</span><span class="k">lambda</span> <span class="n">done</span><span class="p">,</span> <span class="n">total</span><span class="p">:</span> <span class="p">(</span><span class="nb">setattr</span><span class="p">(</span><span class="n">pbar</span><span class="p">,</span> <span class="s1">&#39;n&#39;</span><span class="p">,</span> <span class="n">done</span><span class="p">),</span> <span class="n">pbar</span><span class="o">.</span><span class="n">refresh</span><span class="p">()),</span>
+    <span class="p">)</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>tqdm works best with known-size inputs (lists, ranges). For generators
+with <code>batch_size</code>, the total changes as batches are consumed, which
+makes the progress bar jump — use a plain <code>on_progress</code> callback instead.</p>
+</div>
 <h2 id="timeouts">Timeouts<a class="headerlink" href="#timeouts" title="Permanent link">&para;</a></h2>
 <h3 id="total-timeout-sync">Total Timeout (sync)<a class="headerlink" href="#total-timeout-sync" title="Permanent link">&para;</a></h3>
 <p>Set a wall-clock limit for the entire operation:</p>

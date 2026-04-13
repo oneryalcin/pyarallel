@@ -380,6 +380,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../user-guide/real-world-patterns/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Real-World Patterns
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../user-guide/advanced-features/" class="md-nav__link">
         
   
@@ -854,19 +875,19 @@
 <ul>
 <li><strong><code>max_errors</code></strong> — stop early after N failures instead of processing all items. When hitting a dead API, don't waste 10,000 calls when the first 10 all failed. Returns partial results.</li>
 <li><strong>Ordered streaming</strong> — <code>parallel_iter(..., ordered=True)</code> yields results in input order instead of completion order. Essential for ETL, CSV writing, and pipelines where output order must match input.</li>
+<li><strong><code>async_parallel_map</code> with <code>timeout=</code></strong> — sync <code>parallel_map</code> has total wall-clock timeout, async doesn't. Add parity so async workloads can enforce an overall deadline.</li>
+<li><strong>Context variable propagation</strong> — copy <code>contextvars.Context</code> into worker threads so structured logging (correlation IDs) and request tracing work correctly. Without this, correlation IDs and request traces silently disappear in worker threads.</li>
 <li><strong><code>max_tasks_per_worker</code></strong> — restart process workers after N tasks to prevent memory leaks in long-running pools. Passes through to <code>ProcessPoolExecutor(max_tasks_per_child=)</code>.</li>
 <li><strong>Sequential/testing mode</strong> — <code>workers=0</code> or <code>sequential=True</code> runs everything in the calling thread. Makes debugging deterministic, breakpoints work, stack traces are readable.</li>
 <li><strong>Worker initializer</strong> — <code>worker_init=</code> callback run once per worker thread/process (e.g., open a DB connection, load a model). Passes through to executor <code>initializer=</code>.</li>
-<li><strong>Shared kwargs</strong> — <code>kwargs={"timeout": 5}</code> passed to every <code>fn</code> call alongside the item. Removes the need for <code>functools.partial</code> in common cases.</li>
 <li><strong><code>on_progress</code> for streaming</strong> — <code>parallel_iter</code> currently has no progress callback. Add it for parity with <code>parallel_map</code>.</li>
 </ul>
 <h3 id="exploring">Exploring<a class="headerlink" href="#exploring" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>.then()</code> chaining</strong> — <code>parallel_map(fn, items).then(fn2)</code> for lightweight pipelines without building a DAG engine. Chain a second parallel operation on results without extracting values manually.</li>
 <li><strong>Circuit breaker</strong> — composable with <code>Retry</code> for API-heavy workloads. When a downstream service is failing, stop hammering it and fail fast for a cooldown period.</li>
-<li><strong>Context variable propagation</strong> — copy <code>contextvars.Context</code> into worker threads so structured logging (correlation IDs) and request tracing work correctly.</li>
+<li><strong>Shared kwargs</strong> — <code>kwargs={"timeout": 5}</code> passed to every <code>fn</code> call alongside the item. Convenience over <code>functools.partial</code>, but partial is one line and well-known.</li>
 <li><strong>Free-threading support</strong> — leverage Python 3.13+ no-GIL for true thread parallelism.</li>
-<li><strong>Resource-aware scheduling</strong> — adaptive worker counts based on system load.</li>
 <li><strong>Per-task timeout (sync)</strong> — Python threads can't be cancelled mid-execution, so this is a hard problem. For now, use <code>timeout=</code> for total wall-clock or put timeouts inside your function.</li>
 </ul>
 <h2 id="not-planned">Not Planned<a class="headerlink" href="#not-planned" title="Permanent link">&para;</a></h2>
@@ -878,6 +899,7 @@
 <li><strong>Smart scheduling</strong> (priority queues, deadlines, DAGs) — use Celery, Airflow, or Prefect.</li>
 <li><strong>Dead letter queues</strong> — message queue concept, not a parallelization concern.</li>
 <li><strong>Resource monitoring</strong> (memory, CPU, disk, network) — OS-level. <code>batch_size</code> is the right abstraction for memory control.</li>
+<li><strong>Resource-aware scheduling</strong> — adaptive worker counts based on system load. This is autoscaling, a different problem domain. Set <code>workers</code> explicitly based on your environment.</li>
 <li><strong>Plugin / hook system</strong> — slippery slope. <code>on_progress</code> callback covers the real use case.</li>
 </ul>
 <hr />
