@@ -3,10 +3,10 @@
 Basic Usage Example
 ===================
 
-This example demonstrates the fundamental concepts of pyarallel:
-1. Write a function that processes ONE item
-2. Decorate it with @parallel
-3. Pass MANY items to process them in parallel
+This example demonstrates the current pyarallel API:
+1. Write a function that handles ONE item
+2. Decorate it with @parallel for reusable defaults
+3. Use .map(...) for parallel execution over MANY items
 
 Run with: python examples/01_basic_usage.py
 """
@@ -16,58 +16,45 @@ import time
 from pyarallel import parallel
 
 
-# Example 1: Simple multiplication
-# ---------------------------------
-# Notice: The function takes a SINGLE number, not a list
-@parallel(max_workers=4)
+@parallel(workers=4)
 def multiply_by_two(number):
     """Process a single number."""
     return number * 2
 
 
-print("Example 1: Simple multiplication")
+print("Example 1: Direct call vs .map()")
 print("=" * 50)
 
-# Single item - returns a list with one result
-result = multiply_by_two(5)
-print(f"multiply_by_two(5) = {result}")  # Output: [10]
+single = multiply_by_two(5)
+print(f"multiply_by_two(5) = {single}")  # Scalar return value
 
-# Multiple items - processes in parallel
-numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-results = multiply_by_two(numbers)
-print(f"multiply_by_two({numbers}) = {results}")
+numbers = [1, 2, 3, 4, 5]
+parallel_result = multiply_by_two.map(numbers)
+print(f"multiply_by_two.map({numbers}) = {list(parallel_result)}")
 print()
 
 
-# Example 2: I/O simulation with timing
-# --------------------------------------
-@parallel(max_workers=4)
+@parallel(workers=4)
 def simulate_io_task(task_id):
-    """Simulate an I/O-bound task (like API call or file read)."""
-    time.sleep(0.5)  # Simulate network delay
+    """Simulate an I/O-bound task such as an HTTP request."""
+    time.sleep(0.2)
     return f"Task {task_id} completed"
 
 
-print("Example 2: I/O simulation")
+print("Example 2: Parallel I/O")
 print("=" * 50)
 
-# Sequential execution would take 5 seconds (10 tasks × 0.5s)
-# Parallel execution with 4 workers takes ~1.5 seconds
 start = time.time()
-tasks = list(range(10))
-results = simulate_io_task(tasks)
+tasks = list(range(8))
+results = simulate_io_task.map(tasks)
 duration = time.time() - start
 
 print(f"Processed {len(results)} tasks in {duration:.2f} seconds")
-print(f"Results: {results[:3]}...")  # Show first 3 results
-print(f"Expected time (sequential): ~5 seconds")
-print(f"Actual time (parallel): {duration:.2f} seconds")
+print(f"First 3 results: {list(results)[:3]}")
 print()
 
 
-# Example 3: Data transformation
-# -------------------------------
-@parallel(max_workers=4)
+@parallel(workers=4)
 def format_name(name):
     """Format a single name to title case."""
     return name.strip().title()
@@ -77,21 +64,18 @@ print("Example 3: Data transformation")
 print("=" * 50)
 
 names = ["john doe", "JANE SMITH", "  bob jones  ", "alice wonder"]
-formatted = format_name(names)
+formatted = format_name.map(names)
 print(f"Original: {names}")
-print(f"Formatted: {formatted}")
+print(f"Formatted: {list(formatted)}")
 print()
 
 
-# Example 4: Working with instance methods
-# -----------------------------------------
 class TextProcessor:
     def __init__(self, prefix):
         self.prefix = prefix
 
-    @parallel(max_workers=4)
+    @parallel(workers=4)
     def add_prefix(self, text):
-        """Process a single text item."""
         return f"{self.prefix}: {text}"
 
 
@@ -100,16 +84,15 @@ print("=" * 50)
 
 processor = TextProcessor("LOG")
 messages = ["Starting", "Processing", "Finished"]
-prefixed = processor.add_prefix(messages)
+prefixed = processor.add_prefix.map(messages)
 print(f"Original: {messages}")
-print(f"Prefixed: {prefixed}")
+print(f"Prefixed: {list(prefixed)}")
 print()
 
 
 print("Summary")
 print("=" * 50)
-print("Key takeaways:")
-print("1. Write functions for ONE item (singular)")
-print("2. Pass MANY items (list/tuple) to process in parallel")
-print("3. Always get a list back, even for single items")
-print("4. Works with regular functions, instance methods, class methods")
+print("1. Decorated functions keep normal single-item behavior.")
+print("2. Use .map(...) to parallelize over many items.")
+print("3. .map(...) returns ParallelResult, which behaves like a list on success.")
+print("4. Methods work the same way as regular functions.")

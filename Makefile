@@ -5,8 +5,8 @@ help:
 	@echo "  make test         Run pytest suite"
 	@echo "  make docs-serve   Start mkdocs development server"
 	@echo "  make docs-deploy  Deploy documentation to GitHub Pages"
-	@echo "  make format      Format code with black and isort"
-	@echo "  make lint        Run mypy for type checking"
+	@echo "  make format      Format code with ruff"
+	@echo "  make lint        Run ruff check + mypy"
 	@echo "  make clean       Remove build artifacts"
 	@echo "  make build       Build package"
 	@echo "  make publish     Publish package to PyPI"
@@ -22,10 +22,11 @@ docs-deploy:
 	uv run mkdocs gh-deploy
 
 format:
-	uv run black .
-	uv run isort .
+	uv run ruff format .
+	uv run ruff check --fix .
 
 lint:
+	uv run ruff check .
 	uv run mypy pyarallel/
 
 clean:

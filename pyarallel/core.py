@@ -7,16 +7,19 @@ no global config singletons, no enterprise astronautics.
 from __future__ import annotations
 
 import functools
+import importlib
 import random
 import threading
 import time
-from concurrent.futures import (Future, ProcessPoolExecutor,
-                                ThreadPoolExecutor, as_completed)
+from collections.abc import Callable, Iterable, Iterator
+from concurrent.futures import (
+    Future,
+    ProcessPoolExecutor,
+    ThreadPoolExecutor,
+    as_completed,
+)
 from dataclasses import dataclass
-from typing import Any, Callable, Generic, Iterable, Iterator, Literal, TypeVar
-
-T = TypeVar("T")
-R = TypeVar("R")
+from typing import Any, Literal
 
 ExecutorType = Literal["thread", "process"]
 
@@ -151,12 +154,53 @@ def _make_chunks(n: int, batch_size: int | None) -> list[range]:
     return [range(n)]
 
 
+def _resolve_process_target(
+    fn: Callable[..., Any],
+) -> tuple[str, str] | None:
+    """Return a module/qualname pair when *fn* can be re-imported in a worker.
+
+    This keeps process execution working for decorated top-level functions,
+    whose original function object is no longer the module-global binding.
+    """
+    if getattr(fn, "__self__", None) is not None:
+        return None
+
+    module_name = getattr(fn, "__module__", None)
+    qualname = getattr(fn, "__qualname__", None)
+    if not module_name or not qualname or "<locals>" in qualname:
+        return None
+    return (module_name, qualname)
+
+
+@functools.cache
+def _load_process_target(module_name: str, qualname: str) -> Callable[..., Any]:
+    """Import and resolve a callable by module and qualname."""
+    target: Any = importlib.import_module(module_name)
+    for part in qualname.split("."):
+        target = getattr(target, part)
+    if not callable(target):
+        raise TypeError(f"{module_name}.{qualname} is not callable")
+    return target
+
+
+def _call_resolved(item: Any, *, module_name: str, qualname: str) -> Any:
+    """Resolve a callable inside the worker process and call it with one item."""
+    return _load_process_target(module_name, qualname)(item)
+
+
+def _call_resolved_args(
+    args: tuple[Any, ...], *, module_name: str, qualname: str
+) -> Any:
+    """Resolve a callable inside the worker process and call it with *args."""
+    return _load_process_target(module_name, qualname)(*args)
+
+
 # ---------------------------------------------------------------------------
 # ParallelResult
 # ---------------------------------------------------------------------------
 
 
-class ParallelResult(Generic[R]):
+class ParallelResult[R]:
     """Results from parallel execution.
 
     Behaves like a ``list[R]`` when every task succeeded.
@@ -252,7 +296,7 @@ def _run_with_retry(fn: Callable[..., Any], item: Any, retry: Retry) -> Any:
     raise last_exc  # type: ignore[misc]
 
 
-def parallel_map(
+def parallel_map[R](
     fn: Callable[..., R],
     items: Iterable[Any],
     *,
@@ -294,9 +338,10 @@ def parallel_map(
         raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
     if task_timeout is not None:
         raise NotImplementedError(
-            "task_timeout is not supported in sync parallel_map — Python threads "
-            "cannot be cancelled mid-execution. Use timeout= for a total wall-clock "
-            "limit, or put timeouts inside your function (e.g. requests.get(url, timeout=5)). "
+            "task_timeout is not supported in sync parallel_map — Python "
+            "threads cannot be cancelled mid-execution. Use timeout= for a "
+            "total wall-clock limit, or put timeouts inside your function "
+            "(e.g. requests.get(url, timeout=5)). "
             "For per-task timeouts, use async_parallel_map with task_timeout=."
         )
 
@@ -306,8 +351,30 @@ def parallel_map(
         return ParallelResult([])
 
     task_fn = fn
+    if executor == "process":
+        resolved = _resolve_process_target(fn)
+        if resolved is not None:
+            module_name, qualname = resolved
+            task_fn = functools.partial(
+                _call_resolved,
+                module_name=module_name,
+                qualname=qualname,
+            )
     if retry is not None:
         task_fn = functools.partial(_run_with_retry, fn, retry=retry)
+        if executor == "process":
+            resolved = _resolve_process_target(fn)
+            if resolved is not None:
+                module_name, qualname = resolved
+                task_fn = functools.partial(
+                    _run_with_retry,
+                    functools.partial(
+                        _call_resolved,
+                        module_name=module_name,
+                        qualname=qualname,
+                    ),
+                    retry=retry,
+                )
 
     pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
     bucket = _TokenBucket(rate_limit) if rate_limit else None
@@ -372,7 +439,7 @@ def _unpack_call(fn_and_args: tuple[Callable[..., Any], tuple[Any, ...]]) -> Any
     return fn(*args)
 
 
-def parallel_starmap(
+def parallel_starmap[R](
     fn: Callable[..., R],
     items: Iterable[tuple[Any, ...]],
     *,
@@ -391,6 +458,26 @@ def parallel_starmap(
         def add(a, b): return a + b
         parallel_starmap(add, [(1, 2), (3, 4)])  # [3, 7]
     """
+    if executor == "process":
+        resolved = _resolve_process_target(fn)
+        if resolved is not None:
+            module_name, qualname = resolved
+            return parallel_map(
+                functools.partial(
+                    _call_resolved_args,
+                    module_name=module_name,
+                    qualname=qualname,
+                ),
+                items,
+                workers=workers,
+                executor=executor,
+                rate_limit=rate_limit,
+                timeout=timeout,
+                on_progress=on_progress,
+                batch_size=batch_size,
+                retry=retry,
+            )
+
     packed = [(fn, args) for args in items]
     return parallel_map(
         _unpack_call,
@@ -405,7 +492,7 @@ def parallel_starmap(
     )
 
 
-def parallel_iter(
+def parallel_iter[R](
     fn: Callable[..., R],
     items: Iterable[Any],
     *,
@@ -440,8 +527,30 @@ def parallel_iter(
         raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
 
     task_fn = fn
+    if executor == "process":
+        resolved = _resolve_process_target(fn)
+        if resolved is not None:
+            module_name, qualname = resolved
+            task_fn = functools.partial(
+                _call_resolved,
+                module_name=module_name,
+                qualname=qualname,
+            )
     if retry is not None:
         task_fn = functools.partial(_run_with_retry, fn, retry=retry)
+        if executor == "process":
+            resolved = _resolve_process_target(fn)
+            if resolved is not None:
+                module_name, qualname = resolved
+                task_fn = functools.partial(
+                    _run_with_retry,
+                    functools.partial(
+                        _call_resolved,
+                        module_name=module_name,
+                        qualname=qualname,
+                    ),
+                    retry=retry,
+                )
 
     pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
     bucket = _TokenBucket(rate_limit) if rate_limit else None
@@ -622,7 +731,7 @@ class _ParallelFunc:
         )
 
 
-def parallel(
+def parallel[R](
     fn: Callable[..., R] | None = None,
     *,
     workers: int | None = None,

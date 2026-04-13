@@ -2,9 +2,7 @@
 
 import time
 
-import pytest
-
-from pyarallel import RateLimit, parallel_map
+from pyarallel import parallel_map
 from pyarallel.core import Retry
 
 
@@ -66,7 +64,7 @@ class TestRetryBehavior:
             assert isinstance(exc, RuntimeError)
 
     def test_retry_count_matches_attempts(self):
-        """Verify the function is called exactly `attempts` times on persistent failure."""
+        """Verify function is called exactly `attempts` times on failure."""
         call_count = {}
 
         def counter(x):
@@ -162,8 +160,8 @@ class TestJitter:
         for _ in range(2):
             timestamps = []
 
-            def always_fail(x):
-                timestamps.append(time.monotonic())
+            def always_fail(x, _ts=timestamps):
+                _ts.append(time.monotonic())
                 raise ValueError("fail")
 
             parallel_map(

@@ -3,13 +3,9 @@
 Batch Processing
 ================
 
-This example demonstrates how to efficiently process large datasets
-using batch processing to control memory usage.
+This example demonstrates memory control with batch_size on .map(...).
 
 Run with: python examples/04_batch_processing.py
-
-Note: Example 5 uses process-based parallelism, so all execution code
-must be wrapped in if __name__ == "__main__" for proper pickling.
 """
 
 import time
@@ -17,194 +13,122 @@ import time
 from pyarallel import parallel
 
 
-# Example 1: Memory-efficient batch processing
-# ---------------------------------------------
-@parallel(max_workers=4, batch_size=10)
+@parallel(workers=4)
 def process_record(record_id):
-    """Process a single record from a large dataset."""
-    # Simulate processing
     time.sleep(0.01)
     return f"Record {record_id} processed"
 
 
-# Process 100 records in batches of 10
-start = time.time()
-record_ids = list(range(100))
-results = process_record(record_ids)
-duration = time.time() - start
-
-print(f"Processed {len(results)} records in {duration:.2f} seconds")
-print(f"Batch size: 10 (processes 10 items at a time)")
-print(f"Total batches: {len(results) // 10}")
-print()
-
-
-# Example 2: Comparing batch sizes
-# ---------------------------------
-def benchmark_batch_size(batch_size, total_items=200):
-    """Benchmark different batch sizes."""
-
-    @parallel(max_workers=4, batch_size=batch_size)
-    def process_item(item_id):
-        time.sleep(0.005)  # Simulate processing
-        return item_id * 2
-
-    start = time.time()
-    items = list(range(total_items))
-    results = process_item(items)
-    duration = time.time() - start
-
-    return duration
-
-
-print("Example 2: Batch size comparison")
-print("=" * 50)
-
-batch_sizes = [1, 10, 25, 50, 100]
-for batch_size in batch_sizes:
-    duration = benchmark_batch_size(batch_size)
-    print(f"Batch size {batch_size:3d}: {duration:.2f} seconds")
-
-print()
-
-
-# Example 3: Large dataset processing with memory constraints
-# ------------------------------------------------------------
-class DataLoader:
-    """Simulate loading large data objects."""
-
-    @staticmethod
-    def load_chunk(chunk_id):
-        """Simulate loading a large data chunk (e.g., from database)."""
-        # In real scenario, this might load from database/file
-        return {
-            "chunk_id": chunk_id,
-            "data": [i for i in range(1000)],  # Simulate large data
-            "size_kb": 100,
-        }
-
-
-@parallel(max_workers=4, batch_size=5)  # Small batches for memory control
+@parallel(workers=4)
 def process_large_chunk(chunk_id):
-    """Process large data chunks in controlled batches."""
-    chunk = DataLoader.load_chunk(chunk_id)
-
-    # Process the data
-    processed_data = sum(chunk["data"])
-
-    return {"chunk_id": chunk_id, "result": processed_data, "size_kb": chunk["size_kb"]}
-
-
-print("Example 3: Memory-constrained processing")
-print("=" * 50)
-
-start = time.time()
-chunk_ids = list(range(50))  # 50 large chunks
-results = process_large_chunk(chunk_ids)
-duration = time.time() - start
-
-total_size = sum(r["size_kb"] for r in results)
-print(f"Processed {len(results)} chunks ({total_size} KB total)")
-print(f"Time: {duration:.2f} seconds")
-print(f"Batch size: 5 (max 5 chunks in memory at once)")
-print(f"Memory efficiency: Only 5 chunks loaded simultaneously")
-print()
+    chunk = {
+        "chunk_id": chunk_id,
+        "data": [i for i in range(1000)],
+        "size_kb": 100,
+    }
+    return {
+        "chunk_id": chunk_id,
+        "result": sum(chunk["data"]),
+        "size_kb": chunk["size_kb"],
+    }
 
 
-# Example 4: Database-style batch processing
-# -------------------------------------------
-class DatabaseSimulator:
-    """Simulate batch database operations."""
-
-    @staticmethod
-    def fetch_user(user_id):
-        """Simulate fetching user from database."""
-        time.sleep(0.01)  # Simulate DB latency
-        return {
-            "id": user_id,
-            "name": f"User {user_id}",
-            "email": f"user{user_id}@example.com",
-        }
-
-
-@parallel(
-    max_workers=10,
-    batch_size=20,  # Process 20 users at a time
-    prewarm=True,  # Start workers immediately
-)
+@parallel(workers=10)
 def fetch_and_enrich_user(user_id):
-    """Fetch user and add enrichment data."""
-    user = DatabaseSimulator.fetch_user(user_id)
-
-    # Add enrichment
-    user["status"] = "active"
-    user["processed_at"] = time.time()
-
-    return user
-
-
-print("Example 4: Batch database operations")
-print("=" * 50)
-
-start = time.time()
-user_ids = list(range(1000))
-users = fetch_and_enrich_user(user_ids)
-duration = time.time() - start
-
-print(f"Fetched and enriched {len(users)} users")
-print(f"Time: {duration:.2f} seconds")
-print(f"Throughput: {len(users) / duration:.0f} users/second")
-print(f"Batch size: 20, Workers: 10 (prewarmed)")
-print(f"Sample: {users[0]}")
-print()
+    time.sleep(0.01)
+    return {
+        "id": user_id,
+        "name": f"User {user_id}",
+        "email": f"user{user_id}@example.com",
+        "status": "active",
+        "processed_at": round(time.time(), 3),
+    }
 
 
-# Example 5: File processing in batches
-# --------------------------------------
-@parallel(
-    max_workers=4, batch_size=50, executor_type="process"  # Process 50 files per batch
-)
+@parallel(workers=4, executor="process")
 def process_file(file_id):
-    """Simulate processing a file (e.g., CSV, log file)."""
-    # Simulate file reading and processing
     lines = [f"line {i}" for i in range(100)]
-
-    # Process lines
     processed_lines = [line.upper() for line in lines]
-
     return {"file_id": file_id, "lines_processed": len(processed_lines)}
 
 
-print("Example 5: Batch file processing")
-print("=" * 50)
+def benchmark_batch_size(batch_size, total_items=80):
+    @parallel(workers=4)
+    def process_item(item_id):
+        time.sleep(0.005)
+        return item_id * 2
 
-start = time.time()
-file_ids = list(range(500))  # 500 files
-results = process_file(file_ids)
-duration = time.time() - start
-
-total_lines = sum(r["lines_processed"] for r in results)
-print(f"Processed {len(results)} files ({total_lines:,} lines total)")
-print(f"Time: {duration:.2f} seconds")
-print(f"Files/second: {len(results) / duration:.0f}")
-print(f"Batch size: 50 (processes 50 files at a time)")
-print()
+    start = time.time()
+    results = process_item.map(range(total_items), batch_size=batch_size)
+    assert len(results) == total_items
+    return time.time() - start
 
 
-print("Summary")
-print("=" * 50)
-print("Batch processing benefits:")
-print("  ✓ Controls memory usage (limits concurrent operations)")
-print("  ✓ Prevents resource exhaustion")
-print("  ✓ Improves predictability")
-print("  ✓ Enables processing of datasets larger than RAM")
-print()
-print("Choosing batch size:")
-print("  • Small batches (5-20): Large items, limited memory")
-print("  • Medium batches (20-100): Balanced approach")
-print("  • Large batches (100+): Small items, optimize throughput")
-print()
-print("Combine with:")
-print("  • max_workers: Control concurrency")
-print("  • executor_type: Choose thread/process based on task")
-print("  • rate_limit: Control external API/resource load")
+def main():
+    print("Example 1: Memory-efficient batch processing")
+    print("=" * 50)
+
+    start = time.time()
+    results = process_record.map(range(40), batch_size=10)
+    duration = time.time() - start
+
+    print(f"Processed {len(results)} records in {duration:.2f} seconds")
+    print("Batch size: 10")
+    print()
+
+    print("Example 2: Batch size comparison")
+    print("=" * 50)
+
+    for batch_size in [1, 5, 10, 20, 40]:
+        duration = benchmark_batch_size(batch_size)
+        print(f"Batch size {batch_size:2d}: {duration:.2f} seconds")
+    print()
+
+    print("Example 3: Large dataset processing")
+    print("=" * 50)
+
+    start = time.time()
+    chunk_results = process_large_chunk.map(range(20), batch_size=5)
+    duration = time.time() - start
+    total_size = sum(r["size_kb"] for r in chunk_results)
+
+    print(f"Processed {len(chunk_results)} chunks ({total_size} KB total)")
+    print(f"Time: {duration:.2f} seconds")
+    print("Batch size: 5")
+    print()
+
+    print("Example 4: Database-style operations")
+    print("=" * 50)
+
+    start = time.time()
+    users = fetch_and_enrich_user.map(range(100), batch_size=20)
+    duration = time.time() - start
+
+    print(f"Fetched and enriched {len(users)} users")
+    print(f"Time: {duration:.2f} seconds")
+    print(f"Sample: {list(users)[0]}")
+    print()
+
+    print("Example 5: Process-based batch work")
+    print("=" * 50)
+
+    start = time.time()
+    file_results = process_file.map(range(40), batch_size=10)
+    duration = time.time() - start
+    total_lines = sum(r["lines_processed"] for r in file_results)
+
+    print(f"Processed {len(file_results)} files ({total_lines:,} lines total)")
+    print(f"Time: {duration:.2f} seconds")
+    print("Batch size: 10, executor='process'")
+    print()
+
+    print("Summary")
+    print("=" * 50)
+    print("1. Pass batch_size to .map(...) to limit in-flight work.")
+    print("2. Smaller batches reduce peak memory.")
+    print("3. Larger batches can improve throughput for tiny tasks.")
+    print("4. Batching works with both thread and process executors.")
+
+
+if __name__ == "__main__":
+    main()
