@@ -41,7 +41,9 @@ results = await async_parallel_map(
 
 The sync API uses `workers` because it sizes a thread/process **pool** — you're creating real OS threads or processes. The async API uses `concurrency` because there's no pool — everything runs on one event loop, and `concurrency` controls how many tasks are allowed to run at the same time via a semaphore.
 
-Calling both `workers` would be misleading (async has no workers). Calling both `concurrency` would be wrong for sync (you're literally setting `ThreadPoolExecutor(max_workers=N)`). The names match what each actually controls.
+Calling both `workers` would be misleading because async execution has no worker pool. Calling both `concurrency` would be wrong for sync because the implementation really is sizing `ThreadPoolExecutor(max_workers=N)` or `ProcessPoolExecutor(max_workers=N)`. The names match what each API actually controls.
+
+Pre-v1, Pyarallel keeps these names intentionally different. If you're moving from sync to async, translate `workers=` to `concurrency=` rather than expecting them to be interchangeable.
 
 ### Other Differences from Sync
 

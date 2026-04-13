@@ -193,18 +193,3 @@ class TestAsyncDecorator:
         assert await f.fetch("a") == "data-a"
         results = await f.fetch.map(["a", "b", "c"])
         assert list(results) == ["data-a", "data-b", "data-c"]
-
-
-class TestAsyncWorkersAlias:
-    async def test_workers_warns_and_works(self):
-        async def double(x):
-            return x * 2
-
-        import warnings
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = await async_parallel_map(double, [1, 2, 3], workers=2)
-            assert len(w) == 1
-            assert "did you mean concurrency" in str(w[0].message)
-        assert list(result) == [2, 4, 6]
