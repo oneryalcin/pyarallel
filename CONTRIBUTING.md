@@ -40,15 +40,16 @@ We use GitHub issues to track public bugs. Report a bug by [opening a new issue]
 
 ## Use a Consistent Coding Style
 
-* Use [Black](https://github.com/psf/black) for Python code formatting
-* Keep line length to 88 characters (Black default)
+* Use `uv run ruff format .` for formatting
+* Use `uv run ruff check .` for linting and import ordering
+* Keep line length to 88 characters
 * Use type hints for function arguments and return values
 * Write docstrings for all public functions and classes
 
 ## Running Tests
 
 ```bash
-pytest tests/
+uv run python -m pytest tests/ -q
 ```
 
 ## License
