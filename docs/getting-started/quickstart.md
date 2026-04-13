@@ -99,6 +99,9 @@ Control memory for large datasets — process in chunks:
 results = parallel_map(process, huge_list, workers=8, batch_size=500)
 ```
 
+For unsized iterables such as generators, `batch_size` also keeps input
+consumption lazy one batch at a time.
+
 ## Error Handling
 
 Errors are never silently lost. `ParallelResult` gives you structured access:

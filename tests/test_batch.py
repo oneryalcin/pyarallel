@@ -62,6 +62,42 @@ class TestBatchMemoryControl:
         assert sorted(seen) == list(range(17))
         assert list(result) == list(range(17))
 
+    def test_batch_size_consumes_generator_lazily(self):
+        produced = []
+        started = threading.Event()
+        release = threading.Event()
+        current = 0
+        lock = threading.Lock()
+        holder = {}
+
+        def items():
+            for i in range(6):
+                produced.append(i)
+                yield i
+
+        def track(x):
+            nonlocal current
+            with lock:
+                current += 1
+                if current == 2:
+                    started.set()
+            release.wait(timeout=2)
+            with lock:
+                current -= 1
+            return x
+
+        def run():
+            holder["result"] = parallel_map(track, items(), workers=2, batch_size=2)
+
+        t = threading.Thread(target=run)
+        t.start()
+        assert started.wait(timeout=2)
+        assert produced == [0, 1]
+        release.set()
+        t.join(timeout=2)
+        assert not t.is_alive()
+        assert list(holder["result"]) == list(range(6))
+
 
 class TestBatchErrorHandling:
     def test_error_in_one_batch_still_processes_others(self):
@@ -113,6 +149,17 @@ class TestBatchWithOtherFeatures:
         elapsed = time.monotonic() - start
         assert elapsed >= 0.4  # 6 items at 10/sec
 
+    def test_timeout_with_list_does_not_double_count_remaining_items(self):
+        def slow(x):
+            time.sleep(0.2)
+            return x
+
+        result = parallel_map(
+            slow, list(range(10)), workers=2, batch_size=3, timeout=0.1
+        )
+        assert len(result) == 10
+        assert len(result.failures()) == 10
+
 
 class TestAsyncBatch:
     async def test_async_batch_produces_correct_results(self):
@@ -147,3 +194,45 @@ class TestAsyncBatch:
 
         await async_parallel_map(track, range(20), concurrency=3, batch_size=5)
         assert max_concurrent <= 5  # batch_size caps in-flight tasks
+
+    async def test_async_batch_consumes_generator_lazily(self):
+        import asyncio
+
+        from pyarallel import async_parallel_map
+
+        produced = []
+        started = threading.Event()
+        release = threading.Event()
+        current = 0
+        lock = threading.Lock()
+        holder = {}
+
+        def items():
+            for i in range(6):
+                produced.append(i)
+                yield i
+
+        async def track(x):
+            nonlocal current
+            with lock:
+                current += 1
+                if current == 2:
+                    started.set()
+            await asyncio.to_thread(release.wait, 2)
+            with lock:
+                current -= 1
+            return x
+
+        def run():
+            holder["result"] = asyncio.run(
+                async_parallel_map(track, items(), concurrency=2, batch_size=2)
+            )
+
+        t = threading.Thread(target=run)
+        t.start()
+        assert started.wait(timeout=2)
+        assert produced == [0, 1]
+        release.set()
+        t.join(timeout=2)
+        assert not t.is_alive()
+        assert list(holder["result"]) == list(range(6))

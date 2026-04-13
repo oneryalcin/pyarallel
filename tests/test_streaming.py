@@ -7,13 +7,17 @@ from pyarallel.core import Retry
 
 
 class TestParallelIterBasic:
-    def test_yields_index_and_value(self):
+    def test_yields_item_result(self):
         from pyarallel import parallel_iter
 
         results = list(parallel_iter(lambda x: x * 2, [1, 2, 3], workers=2))
-        # Results come in completion order, so sort by index
-        results.sort()
-        assert results == [(0, 2), (1, 4), (2, 6)]
+        results.sort(key=lambda item: item.index)
+        assert [(item.index, item.value) for item in results] == [
+            (0, 2),
+            (1, 4),
+            (2, 6),
+        ]
+        assert all(item.ok for item in results)
 
     def test_empty_input(self):
         from pyarallel import parallel_iter
@@ -24,13 +28,29 @@ class TestParallelIterBasic:
         from pyarallel import parallel_iter
 
         results = list(parallel_iter(lambda x: x * 10, [5], workers=1))
-        assert results == [(0, 50)]
+        assert len(results) == 1
+        assert results[0].index == 0
+        assert results[0].value == 50
 
     def test_accepts_any_iterable(self):
         from pyarallel import parallel_iter
 
         results = list(parallel_iter(lambda x: x, range(4), workers=2))
-        assert sorted(results) == [(0, 0), (1, 1), (2, 2), (3, 3)]
+        results.sort(key=lambda item: item.index)
+        assert [(item.index, item.value) for item in results] == [
+            (0, 0),
+            (1, 1),
+            (2, 2),
+            (3, 3),
+        ]
+
+    def test_none_values_are_valid_results(self):
+        from pyarallel import parallel_iter
+
+        results = list(parallel_iter(lambda x: None, [1, 2, 3], workers=2))
+        results.sort(key=lambda item: item.index)
+        assert all(item.ok for item in results)
+        assert [item.value for item in results] == [None, None, None]
 
 
 class TestParallelIterStreaming:
@@ -39,7 +59,7 @@ class TestParallelIterStreaming:
         from pyarallel import parallel_iter
 
         yielded_count = 0
-        for _index, _value in parallel_iter(
+        for _item in parallel_iter(
             lambda x: x * 2,
             range(20),
             workers=2,
@@ -59,13 +79,13 @@ class TestParallelIterStreaming:
             return x
 
         results = list(parallel_iter(speed_varies, [0, 1, 2], workers=3))
-        indices = [i for i, _ in results]
+        indices = [item.index for item in results]
         # Index 0 should come last (it sleeps)
         assert indices[-1] == 0
 
 
 class TestParallelIterErrors:
-    def test_errors_yielded_as_exceptions(self):
+    def test_errors_yielded_as_item_results(self):
         from pyarallel import parallel_iter
 
         def maybe_fail(x):
@@ -74,12 +94,12 @@ class TestParallelIterErrors:
             return x
 
         results = list(parallel_iter(maybe_fail, [1, 2, 3], workers=2))
-        successes = [(i, v) for i, v in results if not isinstance(v, Exception)]
-        failures = [(i, v) for i, v in results if isinstance(v, Exception)]
+        successes = [item for item in results if item.ok]
+        failures = [item for item in results if not item.ok]
 
         assert len(successes) == 2
         assert len(failures) == 1
-        assert isinstance(failures[0][1], ValueError)
+        assert isinstance(failures[0].error, ValueError)
 
     def test_errors_with_retry(self):
         from pyarallel import parallel_iter
@@ -100,8 +120,8 @@ class TestParallelIterErrors:
                 retry=Retry(attempts=3, backoff=0, jitter=False),
             )
         )
-        results.sort()
-        assert results == [(0, 10), (1, 20)]
+        results.sort(key=lambda item: item.index)
+        assert [(item.index, item.value) for item in results] == [(0, 10), (1, 20)]
 
 
 class TestParallelIterWithOptions:
@@ -130,8 +150,10 @@ class TestParallelIterWithOptions:
                 batch_size=5,
             )
         )
-        results.sort()
-        assert results == [(i, i * 2) for i in range(15)]
+        results.sort(key=lambda item: item.index)
+        assert [(item.index, item.value) for item in results] == [
+            (i, i * 2) for i in range(15)
+        ]
 
 
 class TestDecoratorStream:
@@ -143,8 +165,12 @@ class TestDecoratorStream:
             return x * 2
 
         results = list(double.stream([1, 2, 3]))
-        results.sort()
-        assert results == [(0, 2), (1, 4), (2, 6)]
+        results.sort(key=lambda item: item.index)
+        assert [(item.index, item.value) for item in results] == [
+            (0, 2),
+            (1, 4),
+            (2, 6),
+        ]
 
     def test_instance_method_stream(self):
         from pyarallel import parallel
@@ -159,8 +185,12 @@ class TestDecoratorStream:
 
         m = Mul(3)
         results = list(m.go.stream([1, 2, 3]))
-        results.sort()
-        assert results == [(0, 3), (1, 6), (2, 9)]
+        results.sort(key=lambda item: item.index)
+        assert [(item.index, item.value) for item in results] == [
+            (0, 3),
+            (1, 6),
+            (2, 9),
+        ]
 
 
 class TestAsyncParallelIter:
@@ -171,11 +201,15 @@ class TestAsyncParallelIter:
             return x * 2
 
         results = []
-        async for index, value in async_parallel_iter(double, [1, 2, 3], concurrency=2):
-            results.append((index, value))
+        async for item in async_parallel_iter(double, [1, 2, 3], concurrency=2):
+            results.append(item)
 
-        results.sort()
-        assert results == [(0, 2), (1, 4), (2, 6)]
+        results.sort(key=lambda item: item.index)
+        assert [(item.index, item.value) for item in results] == [
+            (0, 2),
+            (1, 4),
+            (2, 6),
+        ]
 
     async def test_async_decorator_stream(self):
         from pyarallel import async_parallel
@@ -185,8 +219,79 @@ class TestAsyncParallelIter:
             return x * 2
 
         results = []
-        async for index, value in double.stream([1, 2, 3]):
-            results.append((index, value))
+        async for item in double.stream([1, 2, 3]):
+            results.append(item)
 
-        results.sort()
-        assert results == [(0, 2), (1, 4), (2, 6)]
+        results.sort(key=lambda item: item.index)
+        assert [(item.index, item.value) for item in results] == [
+            (0, 2),
+            (1, 4),
+            (2, 6),
+        ]
+
+    async def test_none_values_are_valid_results(self):
+        from pyarallel import async_parallel_iter
+
+        results = []
+        async for item in async_parallel_iter(
+            _async_none, [1, 2, 3], concurrency=2
+        ):
+            results.append(item)
+
+        results.sort(key=lambda item: item.index)
+        assert all(item.ok for item in results)
+        assert [item.value for item in results] == [None, None, None]
+
+    async def test_batch_size_consumes_generator_lazily(self):
+        import asyncio
+        import threading
+
+        from pyarallel import async_parallel_iter
+
+        produced = []
+        started = threading.Event()
+        release = threading.Event()
+        current = 0
+        lock = threading.Lock()
+        holder = {}
+
+        def items():
+            for i in range(6):
+                produced.append(i)
+                yield i
+
+        async def track(x):
+            nonlocal current
+            with lock:
+                current += 1
+                if current == 2:
+                    started.set()
+            await asyncio.to_thread(release.wait, 2)
+            with lock:
+                current -= 1
+            return x
+
+        def run():
+            async def collect():
+                collected = []
+                async for item in async_parallel_iter(
+                    track, items(), concurrency=2, batch_size=2
+                ):
+                    collected.append(item)
+                holder["result"] = collected
+
+            asyncio.run(collect())
+
+        t = threading.Thread(target=run)
+        t.start()
+        assert started.wait(timeout=2)
+        assert produced == [0, 1]
+        release.set()
+        t.join(timeout=2)
+        assert not t.is_alive()
+        holder["result"].sort(key=lambda item: item.index)
+        assert [item.value for item in holder["result"]] == list(range(6))
+
+
+async def _async_none(_x):
+    return None

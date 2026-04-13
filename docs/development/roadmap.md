@@ -1,5 +1,7 @@
 # Roadmap
 
+This roadmap should be read together with the [DevX Principles](devx-principles.md).
+
 ## Current (v0.3.0)
 
 - `parallel_map()` / `.map()` — explicit parallel execution over iterables

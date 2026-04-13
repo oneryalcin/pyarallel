@@ -17,7 +17,7 @@ results = await async_parallel_map(
     rate_limit=None,                 # RateLimit or ops/second
     task_timeout=None,                    # Per-task timeout in seconds
     on_progress=None,                # callback(completed, total)
-    batch_size=None,                 # Process in chunks to control memory
+    batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
 )
 ```
@@ -33,15 +33,17 @@ results = await async_parallel_map(
 | `concurrency` | `int` | `4` | Maximum concurrent tasks |
 | `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting |
 | `task_timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
-| `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback |
-| `batch_size` | `int \| None` | `None` | Process items in chunks (controls memory) |
+| `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback. For unsized iterables with batching, `total` is items seen so far |
+| `batch_size` | `int \| None` | `None` | Process items in chunks. With unsized iterables, input is consumed lazily one batch at a time |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 
 ### Why `concurrency` instead of `workers`?
 
 The sync API uses `workers` because it sizes a thread/process **pool** — you're creating real OS threads or processes. The async API uses `concurrency` because there's no pool — everything runs on one event loop, and `concurrency` controls how many tasks are allowed to run at the same time via a semaphore.
 
-Calling both `workers` would be misleading (async has no workers). Calling both `concurrency` would be wrong for sync (you're literally setting `ThreadPoolExecutor(max_workers=N)`). The names match what each actually controls.
+Calling both `workers` would be misleading because async execution has no worker pool. Calling both `concurrency` would be wrong for sync because the implementation really is sizing `ThreadPoolExecutor(max_workers=N)` or `ProcessPoolExecutor(max_workers=N)`. The names match what each API actually controls.
+
+Pre-v1, Pyarallel keeps these names intentionally different. If you're moving from sync to async, translate `workers=` to `concurrency=` rather than expecting them to be interchangeable.
 
 ### Other Differences from Sync
 
@@ -69,6 +71,16 @@ results = await async_parallel_map(
 )
 ```
 
+### Notes on Progress and Unsized Iterables
+
+When `items` has a known length, `on_progress(done, total)` reports the final
+total.
+
+When `items` is unsized (for example a generator) and `batch_size` is set,
+Pyarallel keeps input consumption lazy instead of materializing the full input
+up front. In that mode, `total` is the number of items discovered so far, not a
+guaranteed final total.
+
 ---
 
 ## `async_parallel_starmap`
@@ -90,13 +102,16 @@ Takes the same options as `async_parallel_map`. Also available as `.starmap()` o
 
 ## `async_parallel_iter`
 
-Async streaming — yields `(index, result_or_exception)` in completion order. Constant memory.
+Async streaming — yields `ItemResult` in completion order. Constant memory.
 
 ```python
 from pyarallel import async_parallel_iter
 
-async for index, value in async_parallel_iter(fetch, urls, concurrency=10):
-    await db.save(value)
+async for item in async_parallel_iter(fetch, urls, concurrency=10):
+    if item.ok:
+        await db.save(item.value)
+    else:
+        log_error(item.index, item.error)
 ```
 
 Also available as `.stream()` on `@async_parallel` decorated functions:
@@ -105,8 +120,11 @@ Also available as `.stream()` on `@async_parallel` decorated functions:
 @async_parallel(concurrency=10)
 async def fetch(url): ...
 
-async for index, value in fetch.stream(urls, batch_size=1000):
-    await db.save(value)
+async for item in fetch.stream(urls, batch_size=1000):
+    if item.ok:
+        await db.save(item.value)
+    else:
+        log_error(item.index, item.error)
 ```
 
 ---

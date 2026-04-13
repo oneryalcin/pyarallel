@@ -4,17 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Pyarallel is a Python library for parallel execution, designed to make concurrent programming easy and efficient. It uses a decorator-based API and supports both thread-based (for I/O-bound tasks) and process-based (for CPU-bound tasks) parallelism. Key features include rate limiting, batch processing, and a flexible configuration system.
+Pyarallel is a Python library for explicit parallel execution. It provides
+sync and async map/stream helpers plus decorator-based APIs. It supports
+thread-based execution for I/O-bound work and process-based execution for
+CPU-bound work. Core features include rate limiting, batch processing, retry,
+and structured result handling.
 
 ## Code Architecture
 
-The core of Pyarallel revolves around the `@parallel` decorator (`pyarallel/core.py`) which wraps functions to enable parallel execution.
+The core sync API lives in `pyarallel/core.py` and the async API lives in
+`pyarallel/aio.py`.
 
-Configuration is managed by the `ConfigManager` (`pyarallel/config_manager.py`), a singleton class that handles global settings. It supports updates via Python code and environment variables. Configuration settings are structured into categories like `execution`, `rate_limiting`, `error_handling`, and `monitoring`. Environment variables use the `PYARALLEL_` prefix (e.g., `PYARALLEL_MAX_WORKERS`).
+Important public types and functions:
+- `parallel_map`, `parallel_starmap`, `parallel_iter`
+- `async_parallel_map`, `async_parallel_starmap`, `async_parallel_iter`
+- `@parallel` and `@async_parallel`
+- `ParallelResult`, `ItemResult`, `RateLimit`, and `Retry`
 
-Rate limiting logic is implemented in `pyarallel/core.py` and utilizes a `TokenBucket` class.
-
-The library supports various callable types, including regular functions, instance methods, class methods, and static methods.
+Rate limiting is implemented with local token-bucket helpers in the sync and
+async modules. The library supports regular functions plus instance methods via
+the descriptor protocol used by the decorator wrappers.
 
 ## Common Commands
 
@@ -25,7 +34,7 @@ git clone https://github.com/oneryalcin/pyarallel.git
 cd pyarallel
 
 # Install development dependencies
-pip install -e ".[dev]"
+uv sync --group dev
 ```
 
 ### Running Tests
@@ -37,11 +46,11 @@ pytest tests/ -v
 ```
 To run a single test file:
 ```bash
-pytest tests/test_pyarallel.py -v
+pytest tests/test_parallel_map.py -v
 ```
 To run a specific test case:
 ```bash
-pytest tests/test_pyarallel.py::test_basic_parallel_processing -v
+pytest tests/test_parallel_map.py::TestParallelMapBasic::test_basic_parallel_map -v
 ```
 
 ### Formatting Code
@@ -90,7 +99,7 @@ make docs-deploy
 
 ## Development Guidelines
 
-- Follow the coding style enforced by Black (line length 88 characters).
+- Follow the coding style enforced by Ruff formatting and linting (line length 88 characters).
 - Use type hints for function arguments and return values.
 - Write docstrings for all public functions and classes.
 - Add tests for new code and ensure the test suite passes (`make test`).

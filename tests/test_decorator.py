@@ -79,8 +79,12 @@ class TestDecoratorOverrides:
 
     def test_process_executor_stream(self):
         results = list(_process_double.stream([1, 2, 3]))
-        results.sort()
-        assert results == [(0, 2), (1, 4), (2, 6)]
+        results.sort(key=lambda item: item.index)
+        assert [(item.index, item.value) for item in results] == [
+            (0, 2),
+            (1, 4),
+            (2, 6),
+        ]
 
 
 class TestMethodSupport:

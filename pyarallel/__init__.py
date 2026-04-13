@@ -7,6 +7,7 @@ from .aio import (
     async_parallel_starmap,
 )
 from .core import (
+    ItemResult,
     ParallelResult,
     RateLimit,
     Retry,
@@ -19,6 +20,7 @@ from .core import (
 __version__ = "0.3.0"
 __all__ = [
     "ParallelResult",
+    "ItemResult",
     "RateLimit",
     "Retry",
     "parallel",
