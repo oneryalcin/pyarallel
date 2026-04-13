@@ -15,7 +15,13 @@ Fetch 10,000 URLs with rate limiting and error handling.
 **concurrent.futures:**
 
 ```python
+import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def fetch(url):
+    return requests.get(url, timeout=10).json()
+
+urls = ["https://api.example.com/users/1", "https://api.example.com/users/2", ...]
 
 results = [None] * len(urls)
 errors = []
@@ -54,7 +60,12 @@ for idx, exc in result.failures():
 Same thing, async:
 
 ```python
+import httpx
 from pyarallel import async_parallel_map, RateLimit, Retry
+
+async def fetch_async(url):
+    async with httpx.AsyncClient() as client:
+        return (await client.get(url, timeout=10)).json()
 
 result = await async_parallel_map(
     fetch_async, urls,
@@ -88,12 +99,19 @@ pip install pyarallel
 ### Sync
 
 ```python
+import requests
 from pyarallel import parallel_map, RateLimit, Retry
+
+def fetch(url):
+    return requests.get(url, timeout=10).json()
 
 # Fan out over a list, get ordered results
 result = parallel_map(fetch, urls, workers=10)
 
 # Rate-limited API calls with retry
+def call_api(user_id):
+    return requests.get(f"https://api.example.com/users/{user_id}").json()
+
 result = parallel_map(
     call_api, user_ids,
     workers=10,
@@ -102,13 +120,25 @@ result = parallel_map(
 )
 
 # CPU-bound with processes
+from PIL import Image
+
+def resize_image(path):
+    img = Image.open(path)
+    img.thumbnail((800, 600))
+    img.save(path.replace(".png", "_thumb.png"))
+
 result = parallel_map(resize_image, paths, executor="process")
 ```
 
 ### Async
 
 ```python
+import httpx
 from pyarallel import async_parallel_map
+
+async def fetch_async(url):
+    async with httpx.AsyncClient() as client:
+        return (await client.get(url, timeout=10)).json()
 
 result = await async_parallel_map(
     fetch_async, urls, concurrency=20, task_timeout=5.0,
@@ -145,6 +175,9 @@ For ETL, pipelines, or datasets too large to hold in memory:
 ```python
 from pyarallel import parallel_iter
 
+def transform(row):
+    return {"id": row["id"], "name": row["name"].strip().title()}
+
 for item in parallel_iter(transform, ten_million_rows, batch_size=1000):
     if item.ok:
         db.save(item.value)
@@ -157,6 +190,9 @@ for item in parallel_iter(transform, ten_million_rows, batch_size=1000):
 All errors collected, never silently swallowed:
 
 ```python
+def send_email(msg):
+    return smtp.send(msg["to"], msg["subject"], msg["body"])
+
 result = parallel_map(send_email, messages)
 
 if result.ok:
