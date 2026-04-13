@@ -580,7 +580,7 @@ def parallel_starmap[R](
     fn: Callable[..., R],
     items: Iterable[tuple[Any, ...]],
     *,
-    workers: int = 4,
+    workers: int | None = None,
     executor: ExecutorType = "thread",
     rate_limit: RateLimit | float | None = None,
     timeout: float | None = None,
@@ -633,7 +633,7 @@ def parallel_iter[R](
     fn: Callable[..., R],
     items: Iterable[Any],
     *,
-    workers: int = 4,
+    workers: int | None = None,
     executor: ExecutorType = "thread",
     rate_limit: RateLimit | float | None = None,
     batch_size: int | None = None,
@@ -657,7 +657,7 @@ def parallel_iter[R](
         rate_limit = RateLimit(rate_limit)
     if batch_size is not None and batch_size < 1:
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
-    if workers < 1:
+    if workers is not None and workers < 1:
         raise ValueError(f"workers must be >= 1, got {workers}")
     if executor not in ("thread", "process"):
         raise ValueError(f'executor must be "thread" or "process", got {executor!r}')

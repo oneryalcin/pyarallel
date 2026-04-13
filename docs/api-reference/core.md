@@ -141,7 +141,7 @@ Like `parallel_map` but unpacks each item as `fn(*args)` — for functions that 
 ```python
 from pyarallel import parallel_starmap
 
-results = parallel_starmap(fn, [(arg1, arg2), (arg3, arg4), ...], workers=4)
+results = parallel_starmap(fn, [(arg1, arg2), (arg3, arg4), ...])
 ```
 
 Takes the same options as `parallel_map` (workers, executor, rate_limit, timeout, batch_size, retry).
@@ -198,7 +198,7 @@ Same as `parallel_map` except no `timeout` or `on_progress` (results stream as t
 |---|---|---|---|
 | `fn` | `Callable` | required | Function to apply to each item |
 | `items` | `Iterable` | required | Any iterable |
-| `workers` | `int` | `4` | Number of parallel workers |
+| `workers` | `int \| None` | `None` | Number of parallel workers (stdlib default when `None`) |
 | `executor` | `"thread" \| "process"` | `"thread"` | Thread pool or process pool |
 | `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting |
 | `batch_size` | `int \| None` | `None` | Process in chunks (controls memory) |

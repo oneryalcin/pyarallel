@@ -32,8 +32,7 @@ results = parallel_map(compute, data, workers=4, executor="process")
 
 ### Worker Count
 
-`parallel_map()` and `@parallel(...).map()` default to `workers=None`, which lets
-the stdlib pick a sensible number automatically:
+By default, `workers=None` — the stdlib picks a sensible number automatically:
 
 - **Threads**: `min(32, cpu_count + 4)` — Python's `ThreadPoolExecutor` default
 - **Processes**: `cpu_count()` — Python's `ProcessPoolExecutor` default
@@ -50,10 +49,6 @@ results = parallel_map(fetch, urls, workers=100)       # high concurrency for fa
 results = parallel_map(crunch, data, executor="process",
                        workers=multiprocessing.cpu_count() - 1)  # leave a core free
 ```
-
-`parallel_starmap()` and `parallel_iter()` currently default to `workers=4`.
-If you want consistent worker counts across all sync APIs, pass `workers=...`
-explicitly instead of relying on defaults.
 
 ## Rate Limiting
 
