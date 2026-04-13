@@ -1,8 +1,8 @@
-"""Tests for ParallelResult."""
+"""Tests for ParallelResult and ItemResult."""
 
 import pytest
 
-from pyarallel import ParallelResult
+from pyarallel import ItemResult, ParallelResult
 from pyarallel.core import _Failure
 
 
@@ -170,3 +170,27 @@ class TestValidation:
         for per in ("second", "minute", "hour"):
             r = RateLimit(10, per)
             assert r.per_second > 0
+
+
+class TestItemResult:
+    def test_success(self):
+        item = ItemResult[int](index=2, value=42)
+        assert item.ok is True
+        assert item.index == 2
+        assert item.value == 42
+        assert item.error is None
+
+    def test_failure(self):
+        err = ValueError("bad")
+        item = ItemResult[int](index=3, error=err)
+        assert item.ok is False
+        assert item.index == 3
+        assert item.value is None
+        assert item.error is err
+
+    def test_requires_exactly_one_of_value_or_error(self):
+        with pytest.raises(ValueError):
+            ItemResult[int](index=0)
+
+        with pytest.raises(ValueError):
+            ItemResult[int](index=0, value=1, error=ValueError("bad"))

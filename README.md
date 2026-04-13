@@ -88,8 +88,11 @@ For large-scale processing where results shouldn't accumulate:
 ```python
 from pyarallel import parallel_iter
 
-for index, value in parallel_iter(process, ten_million_items, batch_size=1000):
-    db.save(value)  # yielded and discarded — no accumulation
+for item in parallel_iter(process, ten_million_items, batch_size=1000):
+    if item.ok:
+        db.save(item.value)  # yielded and discarded — no accumulation
+    else:
+        log_error(item.index, item.error)
 ```
 
 ### Async Support
@@ -145,7 +148,7 @@ s.fetch.stream(urls, batch_size=100) # streaming
 |---|---|---|---|
 | `parallel_map(fn, items)` | `.map(items)` | `ParallelResult` | Results fit in memory |
 | `parallel_starmap(fn, items)` | `.starmap(items)` | `ParallelResult` | Multi-arg, fits in memory |
-| `parallel_iter(fn, items)` | `.stream(items)` | `Iterator[(int, T)]` | Streaming, constant memory |
+| `parallel_iter(fn, items)` | `.stream(items)` | `Iterator[ItemResult[T]]` | Streaming, constant memory |
 
 Async variants: `async_parallel_map`, `async_parallel_starmap`, `async_parallel_iter`
 

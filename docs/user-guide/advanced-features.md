@@ -194,22 +194,26 @@ For large-scale processing where results shouldn't accumulate in memory, use `pa
 from pyarallel import parallel_iter
 
 # Process 10M items — only one batch of results in memory at a time
-for index, value in parallel_iter(process, ten_million_items,
-                                  workers=8, batch_size=1000):
-    if isinstance(value, Exception):
-        log_error(index, value)
+for item in parallel_iter(process, ten_million_items,
+                          workers=8, batch_size=1000):
+    if item.ok:
+        db.save(item.value)
     else:
-        db.save(value)
+        log_error(item.index, item.error)
 
 # Or with the decorator
 @parallel(workers=8)
 def process(item): ...
 
-for index, value in process.stream(huge_list, batch_size=1000):
-    db.save(value)
+for item in process.stream(huge_list, batch_size=1000):
+    if item.ok:
+        db.save(item.value)
+    else:
+        log_error(item.index, item.error)
 ```
 
-Results arrive in **completion order** (fastest tasks first), not input order. Each `(index, value)` tuple includes the original index so you can match results to inputs.
+Results arrive in **completion order** (fastest tasks first), not input order.
+Each `ItemResult` includes the original `.index` so you can match results to inputs.
 
 **When to use which:**
 

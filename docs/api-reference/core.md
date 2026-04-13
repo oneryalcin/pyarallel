@@ -172,16 +172,17 @@ add.starmap([(1, 2), (3, 4)])  # ParallelResult([3, 7])
 
 ## `parallel_iter`
 
-Streaming version of `parallel_map` — yields `(index, result_or_exception)` in completion order. Results are **not accumulated in memory**.
+Streaming version of `parallel_map` — yields `ItemResult` in completion order.
+Results are **not accumulated in memory**.
 
 ```python
 from pyarallel import parallel_iter
 
-for index, value in parallel_iter(fn, items, workers=4, batch_size=1000):
-    if isinstance(value, Exception):
-        log_error(index, value)
+for item in parallel_iter(fn, items, workers=4, batch_size=1000):
+    if item.ok:
+        db.save(item.value)
     else:
-        db.save(value)
+        log_error(item.index, item.error)
 ```
 
 ### When to Use
@@ -205,7 +206,8 @@ Same as `parallel_map` except no `timeout` or `on_progress` (results stream as t
 
 ### Yields
 
-`(int, T | Exception)` — index and result in **completion order** (not input order). Failed tasks yield the exception as the value.
+`ItemResult[T]` — each item includes `.index`, `.ok`, `.value`, and `.error`.
+Results arrive in **completion order** (not input order).
 
 Also available as `.stream()` on `@parallel` decorated functions:
 
@@ -213,8 +215,11 @@ Also available as `.stream()` on `@parallel` decorated functions:
 @parallel(workers=8)
 def process(item): ...
 
-for index, value in process.stream(huge_list, batch_size=1000):
-    db.save(value)
+for item in process.stream(huge_list, batch_size=1000):
+    if item.ok:
+        db.save(item.value)
+    else:
+        log_error(item.index, item.error)
 ```
 
 ---

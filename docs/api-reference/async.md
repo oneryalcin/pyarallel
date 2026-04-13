@@ -100,13 +100,16 @@ Takes the same options as `async_parallel_map`. Also available as `.starmap()` o
 
 ## `async_parallel_iter`
 
-Async streaming — yields `(index, result_or_exception)` in completion order. Constant memory.
+Async streaming — yields `ItemResult` in completion order. Constant memory.
 
 ```python
 from pyarallel import async_parallel_iter
 
-async for index, value in async_parallel_iter(fetch, urls, concurrency=10):
-    await db.save(value)
+async for item in async_parallel_iter(fetch, urls, concurrency=10):
+    if item.ok:
+        await db.save(item.value)
+    else:
+        log_error(item.index, item.error)
 ```
 
 Also available as `.stream()` on `@async_parallel` decorated functions:
@@ -115,8 +118,11 @@ Also available as `.stream()` on `@async_parallel` decorated functions:
 @async_parallel(concurrency=10)
 async def fetch(url): ...
 
-async for index, value in fetch.stream(urls, batch_size=1000):
-    await db.save(value)
+async for item in fetch.stream(urls, batch_size=1000):
+    if item.ok:
+        await db.save(item.value)
+    else:
+        log_error(item.index, item.error)
 ```
 
 ---

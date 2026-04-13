@@ -100,6 +100,27 @@ class Retry:
         return isinstance(exc, self.on)
 
 
+@dataclass(frozen=True, slots=True)
+class ItemResult[R]:
+    """Single streaming result item.
+
+    Exactly one of ``value`` or ``error`` is set.
+    """
+
+    index: int
+    value: R | None = None
+    error: Exception | None = None
+
+    def __post_init__(self) -> None:
+        if (self.value is None) == (self.error is None):
+            raise ValueError("Exactly one of value or error must be set")
+
+    @property
+    def ok(self) -> bool:
+        """True when this item succeeded."""
+        return self.error is None
+
+
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
@@ -610,21 +631,20 @@ def parallel_iter[R](
     rate_limit: RateLimit | float | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
-) -> Iterator[tuple[int, R | Exception]]:
-    """Execute *fn* over *items* in parallel, yielding ``(index, result)``
-    in completion order.
+) -> Iterator[ItemResult[R]]:
+    """Execute *fn* over *items* in parallel, yielding ``ItemResult`` in
+    completion order.
 
     Unlike ``parallel_map``, results are not accumulated in memory — they
-    are yielded as they complete. For failed tasks, the value is the
-    exception instance.
+    are yielded as they complete.
 
     Example::
 
-        for index, value in parallel_iter(process, huge_list, batch_size=1000):
-            if isinstance(value, Exception):
-                log_error(index, value)
+        for item in parallel_iter(process, huge_list, batch_size=1000):
+            if item.ok:
+                db.save(item.value)
             else:
-                db.save(value)
+                log_error(item.index, item.error)
     """
     if isinstance(rate_limit, (int, float)):
         rate_limit = RateLimit(rate_limit)
@@ -688,9 +708,9 @@ def parallel_iter[R](
             for future in as_completed(futures):
                 idx = futures[future]
                 try:
-                    yield (idx, future.result())
+                    yield ItemResult(idx, value=future.result())
                 except Exception as exc:
-                    yield (idx, exc)
+                    yield ItemResult(idx, error=exc)
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 
@@ -754,8 +774,8 @@ class _BoundParallel:
         self,
         items: Iterable[Any],
         **kwargs: Any,
-    ) -> Iterator[tuple[int, Any]]:
-        """Yield ``(index, result)`` in completion order — constant memory."""
+    ) -> Iterator[ItemResult[Any]]:
+        """Yield ``ItemResult`` in completion order — constant memory."""
         return parallel_iter(self._fn, items, **_merge_opts(self._defaults, **kwargs))
 
 
@@ -833,8 +853,8 @@ class _ParallelFunc:
         self,
         items: Iterable[Any],
         **kwargs: Any,
-    ) -> Iterator[tuple[int, Any]]:
-        """Yield ``(index, result)`` in completion order — constant memory."""
+    ) -> Iterator[ItemResult[Any]]:
+        """Yield ``ItemResult`` in completion order — constant memory."""
         return parallel_iter(
             self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs)
         )

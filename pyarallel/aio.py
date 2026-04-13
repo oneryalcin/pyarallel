@@ -14,6 +14,7 @@ from typing import Any
 
 from .core import (
     _PENDING,
+    ItemResult,
     ParallelResult,
     RateLimit,
     Retry,
@@ -244,9 +245,9 @@ async def async_parallel_iter(
     task_timeout: float | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
-) -> AsyncIterator[tuple[int, Any]]:
-    """Execute async *fn* over *items*, yielding ``(index, result)``
-    in completion order. Constant memory — results are not accumulated.
+) -> AsyncIterator[ItemResult[Any]]:
+    """Execute async *fn* over *items*, yielding ``ItemResult`` in
+    completion order. Constant memory — results are not accumulated.
     """
     if isinstance(rate_limit, (int, float)):
         rate_limit = RateLimit(rate_limit)
@@ -262,7 +263,7 @@ async def async_parallel_iter(
 
     semaphore = asyncio.Semaphore(concurrency)
     limiter = _AsyncTokenBucket(rate_limit) if rate_limit else None
-    queue: asyncio.Queue[tuple[int, Any] | None] = asyncio.Queue()
+    queue: asyncio.Queue[ItemResult[Any] | None] = asyncio.Queue()
 
     async def _run(i: int, item: Any) -> None:
         async with semaphore:
@@ -277,9 +278,9 @@ async def async_parallel_iter(
                     result = await asyncio.wait_for(fn(item), timeout=task_timeout)
                 else:
                     result = await fn(item)
-                await queue.put((i, result))
+                await queue.put(ItemResult(i, value=result))
             except Exception as exc:
-                await queue.put((i, exc))
+                await queue.put(ItemResult(i, error=exc))
 
     active_tasks: list[asyncio.Task[None]] = []
     try:
@@ -359,7 +360,7 @@ class _BoundAsyncParallel:
 
     async def stream(
         self, items: Iterable[Any], **kwargs: Any
-    ) -> AsyncIterator[tuple[int, Any]]:
+    ) -> AsyncIterator[ItemResult[Any]]:
         async for item in async_parallel_iter(
             self._fn, items, **_merge_opts(self._defaults, **kwargs)
         ):
@@ -425,7 +426,7 @@ class _AsyncParallelFunc:
 
     async def stream(
         self, items: Iterable[Any], **kwargs: Any
-    ) -> AsyncIterator[tuple[int, Any]]:
+    ) -> AsyncIterator[ItemResult[Any]]:
         async for item in async_parallel_iter(
             self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs)
         ):
