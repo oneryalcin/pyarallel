@@ -38,23 +38,17 @@ from pyarallel import parallel_map
 def fetch(url):
     return requests.get(url, timeout=10).json()
 
-# Known-size input — pass total upfront
 with tqdm(total=len(urls)) as pbar:
     result = parallel_map(
         fetch, urls, workers=10,
         on_progress=lambda done, total: (setattr(pbar, 'n', done), pbar.refresh()),
     )
-
-# Generators / unsized input — total updates as batches are consumed
-pbar = tqdm()
-def update(done, total):
-    pbar.total = total
-    pbar.n = done
-    pbar.refresh()
-
-result = parallel_map(fetch, url_generator(), workers=10, batch_size=100, on_progress=update)
-pbar.close()
 ```
+
+!!! note
+    tqdm works best with known-size inputs (lists, ranges). For generators
+    with `batch_size`, the total changes as batches are consumed, which
+    makes the progress bar jump — use a plain `on_progress` callback instead.
 
 ## Timeouts
 
