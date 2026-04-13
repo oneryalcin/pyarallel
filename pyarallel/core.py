@@ -529,6 +529,7 @@ def parallel_map[R](
 
             chunk_timeout: float | None = None
             if deadline is not None:
+                assert timeout is not None
                 chunk_timeout = max(0.0, deadline - time.monotonic())
                 if chunk_timeout <= 0:
                     _mark_timeout_indices(
@@ -557,6 +558,7 @@ def parallel_map[R](
                     if on_progress:
                         on_progress(completed, _progress_total(plan.total, results))
             except TimeoutError:
+                assert timeout is not None
                 timed_out = True
                 for f, _idx in futures.items():
                     if not f.done():
