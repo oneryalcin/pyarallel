@@ -650,9 +650,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#current-v020" class="md-nav__link">
+  <a href="#current-v030" class="md-nav__link">
     <span class="md-ellipsis">
-      Current (v0.2.0)
+      Current (v0.3.0)
     </span>
   </a>
   
@@ -688,6 +688,15 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#not-planned" class="md-nav__link">
+    <span class="md-ellipsis">
+      Not Planned
+    </span>
+  </a>
   
 </li>
       
@@ -734,9 +743,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#current-v020" class="md-nav__link">
+  <a href="#current-v030" class="md-nav__link">
     <span class="md-ellipsis">
-      Current (v0.2.0)
+      Current (v0.3.0)
     </span>
   </a>
   
@@ -775,6 +784,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#not-planned" class="md-nav__link">
+    <span class="md-ellipsis">
+      Not Planned
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -794,7 +812,7 @@
 
 
 <h1 id="roadmap">Roadmap<a class="headerlink" href="#roadmap" title="Permanent link">&para;</a></h1>
-<h2 id="current-v020">Current (v0.2.0)<a class="headerlink" href="#current-v020" title="Permanent link">&para;</a></h2>
+<h2 id="current-v030">Current (v0.3.0)<a class="headerlink" href="#current-v030" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>parallel_map()</code> / <code>.map()</code> — explicit parallel execution over iterables</li>
 <li><code>parallel_starmap()</code> / <code>.starmap()</code> — multi-argument parallel execution</li>
@@ -815,13 +833,30 @@
 <li><strong><code>max_errors</code></strong> — stop early after N failures instead of processing all items. When hitting a dead API, don't waste 10,000 calls when the first 10 all failed. Returns partial results.</li>
 <li><strong>Ordered streaming</strong> — <code>parallel_iter(..., ordered=True)</code> yields results in input order instead of completion order. Essential for ETL, CSV writing, and pipelines where output order must match input.</li>
 <li><strong><code>max_tasks_per_worker</code></strong> — restart process workers after N tasks to prevent memory leaks in long-running pools. Passes through to <code>ProcessPoolExecutor(max_tasks_per_child=)</code>.</li>
-<li><strong>tqdm/rich integration</strong> — built-in progress bar support</li>
+<li><strong>Sequential/testing mode</strong> — <code>workers=0</code> or <code>sequential=True</code> runs everything in the calling thread. Makes debugging deterministic, breakpoints work, stack traces are readable.</li>
+<li><strong>Worker initializer</strong> — <code>worker_init=</code> callback run once per worker thread/process (e.g., open a DB connection, load a model). Passes through to executor <code>initializer=</code>.</li>
+<li><strong>Shared kwargs</strong> — <code>kwargs={"timeout": 5}</code> passed to every <code>fn</code> call alongside the item. Removes the need for <code>functools.partial</code> in common cases.</li>
+<li><strong><code>on_progress</code> for streaming</strong> — <code>parallel_iter</code> currently has no progress callback. Add it for parity with <code>parallel_map</code>.</li>
 </ul>
 <h3 id="exploring">Exploring<a class="headerlink" href="#exploring" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Free-threading support</strong> — leverage Python 3.13+ no-GIL for true thread parallelism</li>
-<li><strong>Resource-aware scheduling</strong> — adaptive worker counts based on system load</li>
-<li><strong>Per-task timeout (sync)</strong> — Python threads cannot be cancelled mid-execution, so per-task timeout in sync is a hard problem with no clean solution. The async API supports <code>task_timeout</code> natively via <code>asyncio.wait_for</code>. For sync, use <code>timeout=</code> for total wall-clock limits and put timeouts inside your function (e.g., <code>requests.get(url, timeout=5)</code>).</li>
+<li><strong><code>.then()</code> chaining</strong> — <code>parallel_map(fn, items).then(fn2)</code> for lightweight pipelines without building a DAG engine. Chain a second parallel operation on results without extracting values manually.</li>
+<li><strong>Circuit breaker</strong> — composable with <code>Retry</code> for API-heavy workloads. When a downstream service is failing, stop hammering it and fail fast for a cooldown period.</li>
+<li><strong>Context variable propagation</strong> — copy <code>contextvars.Context</code> into worker threads so structured logging (correlation IDs) and request tracing work correctly.</li>
+<li><strong>Free-threading support</strong> — leverage Python 3.13+ no-GIL for true thread parallelism.</li>
+<li><strong>Resource-aware scheduling</strong> — adaptive worker counts based on system load.</li>
+<li><strong>Per-task timeout (sync)</strong> — Python threads can't be cancelled mid-execution, so this is a hard problem. For now, use <code>timeout=</code> for total wall-clock or put timeouts inside your function.</li>
+</ul>
+<h2 id="not-planned">Not Planned<a class="headerlink" href="#not-planned" title="Permanent link">&para;</a></h2>
+<p>Things we've considered and decided against. Pyarallel is a parallelization library, not a distributed computing framework.</p>
+<ul>
+<li><strong>Telemetry / metrics dashboards</strong> — use your existing observability stack (OpenTelemetry, Prometheus, Datadog). We give you <code>on_progress</code> and <code>ParallelResult</code>; instrument from there.</li>
+<li><strong>CLI tools</strong> — no dashboard, no profiler. Use <code>htop</code>, <code>py-spy</code>, or your IDE.</li>
+<li><strong>Logging framework</strong> — Python's <code>logging</code> module is fine. We don't add our own.</li>
+<li><strong>Smart scheduling</strong> (priority queues, deadlines, DAGs) — use Celery, Airflow, or Prefect.</li>
+<li><strong>Dead letter queues</strong> — message queue concept, not a parallelization concern.</li>
+<li><strong>Resource monitoring</strong> (memory, CPU, disk, network) — OS-level. <code>batch_size</code> is the right abstraction for memory control.</li>
+<li><strong>Plugin / hook system</strong> — slippery slope. <code>on_progress</code> callback covers the real use case.</li>
 </ul>
 <hr />
 <p>Want to contribute? Check out our <a href="../CONTRIBUTING/">Contributing Guide</a>!</p>
