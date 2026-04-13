@@ -220,22 +220,33 @@ async def async_parallel_iter(
             except Exception as exc:
                 await queue.put((i, exc))
 
-    tasks_remaining = 0
-    for chunk in _make_chunks(n, batch_size):
-        chunk_tasks = []
-        for i in chunk:
-            tasks_remaining += 1
-            chunk_tasks.append(asyncio.create_task(_run(i, items_list[i])))
+    active_tasks: list[asyncio.Task[None]] = []
+    try:
+        for chunk in _make_chunks(n, batch_size):
+            chunk_tasks = []
+            for i in chunk:
+                t = asyncio.create_task(_run(i, items_list[i]))
+                chunk_tasks.append(t)
+                active_tasks.append(t)
 
-        yielded_in_chunk = 0
-        while yielded_in_chunk < len(chunk_tasks):
-            item = await queue.get()
-            if item is not None:
-                yield item
-                yielded_in_chunk += 1
+            yielded_in_chunk = 0
+            while yielded_in_chunk < len(chunk_tasks):
+                item = await queue.get()
+                if item is not None:
+                    yield item
+                    yielded_in_chunk += 1
 
-        for t in chunk_tasks:
-            await t
+            for t in chunk_tasks:
+                await t
+            active_tasks.clear()
+    finally:
+        for t in active_tasks:
+            t.cancel()
+        for t in active_tasks:
+            try:
+                await t
+            except asyncio.CancelledError:
+                pass
 
 
 # ---------------------------------------------------------------------------

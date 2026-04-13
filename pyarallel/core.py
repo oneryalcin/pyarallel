@@ -368,6 +368,12 @@ def parallel_map(
     return ParallelResult(results)
 
 
+def _unpack_call(fn_and_args: tuple[Callable[..., Any], tuple[Any, ...]]) -> Any:
+    """Unpack and call fn(*args) — picklable for process executor."""
+    fn, args = fn_and_args
+    return fn(*args)
+
+
 def parallel_starmap(
     fn: Callable[..., R],
     items: Iterable[tuple[Any, ...]],
@@ -387,8 +393,9 @@ def parallel_starmap(
         def add(a, b): return a + b
         parallel_starmap(add, [(1, 2), (3, 4)])  # [3, 7]
     """
+    packed = [(fn, args) for args in items]
     return parallel_map(
-        lambda args: fn(*args), items,
+        _unpack_call, packed,
         workers=workers, executor=executor, rate_limit=rate_limit,
         timeout=timeout, on_progress=on_progress, batch_size=batch_size,
         retry=retry,
@@ -429,26 +436,33 @@ def parallel_iter(
     if executor not in ("thread", "process"):
         raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
 
-    items_list = list(items)
-    n = len(items_list)
-    if n == 0:
-        return
-
     task_fn = fn
     if retry is not None:
         task_fn = functools.partial(_run_with_retry, fn, retry=retry)
 
     pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
     bucket = _TokenBucket(rate_limit) if rate_limit else None
+    it = iter(items)
+    index = 0
 
     pool = pool_cls(max_workers=workers)
     try:
-        for chunk in _make_chunks(n, batch_size):
+        while True:
+            # Consume one chunk from the iterable lazily
+            chunk_items: list[tuple[int, Any]] = []
+            for item in it:
+                chunk_items.append((index, item))
+                index += 1
+                if batch_size is not None and len(chunk_items) >= batch_size:
+                    break
+            if not chunk_items:
+                break
+
             futures: dict[Future[R], int] = {}
-            for i in chunk:
+            for i, item in chunk_items:
                 if bucket:
                     bucket.wait()
-                futures[pool.submit(task_fn, items_list[i])] = i
+                futures[pool.submit(task_fn, item)] = i
 
             for future in as_completed(futures):
                 idx = futures[future]
