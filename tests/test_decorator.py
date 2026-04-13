@@ -3,6 +3,16 @@
 from pyarallel import parallel, parallel_map
 
 
+@parallel(workers=2, executor="process")
+def _process_double(x):
+    return x * 2
+
+
+@parallel(workers=2, executor="process")
+def _process_add(a, b):
+    return a + b
+
+
 class TestBasicDecorator:
     def test_single_call_returns_plain_value(self):
         @parallel(workers=2)
@@ -58,6 +68,19 @@ class TestDecoratorOverrides:
         identity.map(range(5), rate_limit=10)
         elapsed = time.monotonic() - start
         assert elapsed >= 0.3
+
+    def test_process_executor_map(self):
+        results = _process_double.map([1, 2, 3])
+        assert list(results) == [2, 4, 6]
+
+    def test_process_executor_starmap(self):
+        results = _process_add.starmap([(1, 2), (3, 4)])
+        assert list(results) == [3, 7]
+
+    def test_process_executor_stream(self):
+        results = list(_process_double.stream([1, 2, 3]))
+        results.sort()
+        assert results == [(0, 2), (1, 4), (2, 6)]
 
 
 class TestMethodSupport:
