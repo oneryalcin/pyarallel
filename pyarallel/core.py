@@ -26,6 +26,7 @@ ExecutorType = Literal["thread", "process"]
 
 # Sentinel for "slot not yet filled" — distinct from a legitimate None return.
 _PENDING = object()
+_MISSING = object()
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +101,7 @@ class Retry:
         return isinstance(exc, self.on)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(init=False, frozen=True, slots=True)
 class ItemResult[R]:
     """Single streaming result item.
 
@@ -108,12 +109,22 @@ class ItemResult[R]:
     """
 
     index: int
-    value: R | None = None
-    error: Exception | None = None
+    value: R | None
+    error: Exception | None
 
-    def __post_init__(self) -> None:
-        if (self.value is None) == (self.error is None):
+    def __init__(
+        self,
+        index: int,
+        value: R | None | object = _MISSING,
+        error: Exception | None | object = _MISSING,
+    ) -> None:
+        has_value = value is not _MISSING
+        has_error = error is not _MISSING
+        if has_value == has_error:
             raise ValueError("Exactly one of value or error must be set")
+        object.__setattr__(self, "index", index)
+        object.__setattr__(self, "value", value if has_value else None)
+        object.__setattr__(self, "error", error if has_error else None)
 
     @property
     def ok(self) -> bool:
@@ -142,6 +153,7 @@ class _CollectedMapPlan:
     results: list[Any]
     total: int | None
     batches: Iterable[list[tuple[int, Any]]]
+    remaining: Iterator[Any] | None = None
 
 
 class _TokenBucket:
@@ -201,7 +213,13 @@ def _iter_batches(
     items: Iterable[Any], batch_size: int
 ) -> Iterator[list[tuple[int, Any]]]:
     """Yield indexed item batches lazily from *items*."""
-    it = iter(items)
+    yield from _iter_batches_from_iterator(iter(items), batch_size)
+
+
+def _iter_batches_from_iterator(
+    it: Iterator[Any], batch_size: int
+) -> Iterator[list[tuple[int, Any]]]:
+    """Yield indexed item batches lazily from an existing iterator."""
     index = 0
     while True:
         batch = list(islice(it, batch_size))
@@ -234,8 +252,33 @@ def _plan_collected_map(
     return _CollectedMapPlan(
         results=[],
         total=_total_if_known(items),
-        batches=_iter_batches(items, batch_size),
+        batches=_iter_batches_from_iterator(source := iter(items), batch_size),
+        remaining=source,
     )
+
+
+def _timeout_failure(timeout: float, idx: int) -> _Failure:
+    """Create a consistent timeout failure wrapper."""
+    return _Failure(TimeoutError(f"Task {idx} did not complete within {timeout}s"))
+
+
+def _mark_timeout_indices(
+    results: list[Any], indices: Iterable[int], timeout: float
+) -> None:
+    """Fill any still-pending result slots at *indices* with timeout failures."""
+    for idx in indices:
+        if results[idx] is _PENDING:
+            results[idx] = _timeout_failure(timeout, idx)
+
+
+def _append_timeout_failures(
+    results: list[Any], remaining: Iterator[Any] | None, timeout: float
+) -> None:
+    """Drain remaining unseen input items and append timeout failures."""
+    if remaining is None:
+        return
+    for _item in remaining:
+        results.append(_timeout_failure(timeout, len(results)))
 
 
 def _total_if_known(items: Iterable[Any]) -> int | None:
@@ -481,41 +524,21 @@ def parallel_map[R](
     pool = pool_cls(max_workers=workers)
     try:
         for batch in plan.batches:
+            if batch_size is not None:
+                results.extend([_PENDING] * len(batch))
+
             chunk_timeout: float | None = None
             if deadline is not None:
                 chunk_timeout = max(0.0, deadline - time.monotonic())
                 if chunk_timeout <= 0:
-                    for idx, _item in batch:
-                        if results[idx] is _PENDING:
-                            results[idx] = _Failure(
-                                TimeoutError(
-                                    f"Task {idx} did not complete within {timeout}s"
-                                )
-                            )
-                    if batch_size is not None:
-                        for item in items:
-                            idx = len(results)
-                            _ = item
-                            results.append(
-                                _Failure(
-                                    TimeoutError(
-                                        f"Task {idx} did not complete within {timeout}s"
-                                    )
-                                )
-                            )
-                    else:
-                        for idx in range(len(results)):
-                            if results[idx] is _PENDING:
-                                results[idx] = _Failure(
-                                    TimeoutError(
-                                        f"Task {idx} did not complete within {timeout}s"
-                                    )
-                                )
+                    _mark_timeout_indices(
+                        results, (idx for idx, _item in batch), timeout
+                    )
+                    _append_timeout_failures(results, plan.remaining, timeout)
+                    if batch_size is None:
+                        _mark_timeout_indices(results, range(len(results)), timeout)
                     timed_out = True
                     break
-
-            if batch_size is not None:
-                results.extend([_PENDING] * len(batch))
 
             futures: dict[Future[R], int] = {}
             for idx, item in batch:
@@ -535,26 +558,11 @@ def parallel_map[R](
                         on_progress(completed, _progress_total(plan.total, results))
             except TimeoutError:
                 timed_out = True
-                for f, idx in futures.items():
+                for f, _idx in futures.items():
                     if not f.done():
                         f.cancel()
-                        if results[idx] is _PENDING:
-                            results[idx] = _Failure(
-                                TimeoutError(
-                                    f"Task {idx} did not complete within {timeout}s"
-                                )
-                            )
-                if batch_size is not None:
-                    for item in items:
-                        idx = len(results)
-                        _ = item
-                        results.append(
-                            _Failure(
-                                TimeoutError(
-                                    f"Task {idx} did not complete within {timeout}s"
-                                )
-                            )
-                        )
+                _mark_timeout_indices(results, futures.values(), timeout)
+                _append_timeout_failures(results, plan.remaining, timeout)
                 break
     finally:
         pool.shutdown(wait=not timed_out, cancel_futures=timed_out)

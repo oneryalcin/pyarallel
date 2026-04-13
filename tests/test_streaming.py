@@ -44,6 +44,14 @@ class TestParallelIterBasic:
             (3, 3),
         ]
 
+    def test_none_values_are_valid_results(self):
+        from pyarallel import parallel_iter
+
+        results = list(parallel_iter(lambda x: None, [1, 2, 3], workers=2))
+        results.sort(key=lambda item: item.index)
+        assert all(item.ok for item in results)
+        assert [item.value for item in results] == [None, None, None]
+
 
 class TestParallelIterStreaming:
     def test_constant_memory_with_batching(self):
@@ -220,3 +228,70 @@ class TestAsyncParallelIter:
             (1, 4),
             (2, 6),
         ]
+
+    async def test_none_values_are_valid_results(self):
+        from pyarallel import async_parallel_iter
+
+        results = []
+        async for item in async_parallel_iter(
+            _async_none, [1, 2, 3], concurrency=2
+        ):
+            results.append(item)
+
+        results.sort(key=lambda item: item.index)
+        assert all(item.ok for item in results)
+        assert [item.value for item in results] == [None, None, None]
+
+    async def test_batch_size_consumes_generator_lazily(self):
+        import asyncio
+        import threading
+
+        from pyarallel import async_parallel_iter
+
+        produced = []
+        started = threading.Event()
+        release = threading.Event()
+        current = 0
+        lock = threading.Lock()
+        holder = {}
+
+        def items():
+            for i in range(6):
+                produced.append(i)
+                yield i
+
+        async def track(x):
+            nonlocal current
+            with lock:
+                current += 1
+                if current == 2:
+                    started.set()
+            await asyncio.to_thread(release.wait, 2)
+            with lock:
+                current -= 1
+            return x
+
+        def run():
+            async def collect():
+                collected = []
+                async for item in async_parallel_iter(
+                    track, items(), concurrency=2, batch_size=2
+                ):
+                    collected.append(item)
+                holder["result"] = collected
+
+            asyncio.run(collect())
+
+        t = threading.Thread(target=run)
+        t.start()
+        assert started.wait(timeout=2)
+        assert produced == [0, 1]
+        release.set()
+        t.join(timeout=2)
+        assert not t.is_alive()
+        holder["result"].sort(key=lambda item: item.index)
+        assert [item.value for item in holder["result"]] == list(range(6))
+
+
+async def _async_none(_x):
+    return None

@@ -149,6 +149,17 @@ class TestBatchWithOtherFeatures:
         elapsed = time.monotonic() - start
         assert elapsed >= 0.4  # 6 items at 10/sec
 
+    def test_timeout_with_list_does_not_double_count_remaining_items(self):
+        def slow(x):
+            time.sleep(0.2)
+            return x
+
+        result = parallel_map(
+            slow, list(range(10)), workers=2, batch_size=3, timeout=0.1
+        )
+        assert len(result) == 10
+        assert len(result.failures()) == 10
+
 
 class TestAsyncBatch:
     async def test_async_batch_produces_correct_results(self):

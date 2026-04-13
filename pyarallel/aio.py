@@ -20,6 +20,7 @@ from .core import (
     Retry,
     _coerce_rate_limit,
     _Failure,
+    _iter_batches,
     _make_chunks,
     _merge_opts,
     _plan_collected_map,
@@ -207,10 +208,17 @@ async def async_parallel_iter(
     if concurrency < 1:
         raise ValueError(f"concurrency must be >= 1, got {concurrency}")
 
-    items_list = list(items)
-    n = len(items_list)
-    if n == 0:
-        return
+    if batch_size is None:
+        items_list = list(items)
+        n = len(items_list)
+        if n == 0:
+            return
+        batches: Iterable[list[tuple[int, Any]]] = (
+            [*enumerate(items_list[chunk.start : chunk.stop], chunk.start)]
+            for chunk in _make_chunks(n, batch_size)
+        )
+    else:
+        batches = _iter_batches(items, batch_size)
 
     semaphore = asyncio.Semaphore(concurrency)
     limiter = _AsyncTokenBucket(rate_limit) if rate_limit else None
@@ -235,10 +243,10 @@ async def async_parallel_iter(
 
     active_tasks: list[asyncio.Task[None]] = []
     try:
-        for chunk in _make_chunks(n, batch_size):
+        for batch in batches:
             chunk_tasks = []
-            for i in chunk:
-                t = asyncio.create_task(_run(i, items_list[i]))
+            for i, item in batch:
+                t = asyncio.create_task(_run(i, item))
                 chunk_tasks.append(t)
                 active_tasks.append(t)
 
