@@ -59,48 +59,6 @@ result = await async_parallel_map(
 )
 ```
 
-## Processing Parquet Files
-
-Transform multiple parquet files in parallel. Threads work well here since
-the bottleneck is I/O (disk read/write), not CPU.
-
-```python
-from pathlib import Path
-import pyarrow as pa
-import pyarrow.parquet as pq
-from pyarallel import parallel_map
-
-def process_file(path):
-    table = pq.read_table(path)
-    filtered = table.filter(pa.compute.equal(table["status"], "active"))
-    out_path = path.parent / "processed" / path.name
-    pq.write_table(filtered, out_path)
-    return {"file": path.name, "rows_in": len(table), "rows_out": len(filtered)}
-
-files = list(Path("data/raw").glob("*.parquet"))
-
-result = parallel_map(process_file, files)
-
-for stats in result:
-    print(f"{stats['file']}: {stats['rows_in']} → {stats['rows_out']} rows")
-```
-
-For very large file sets, use streaming to avoid holding all results in memory:
-
-```python
-from pyarallel import parallel_iter
-
-for item in parallel_iter(process_file, files, batch_size=20):
-    if item.ok:
-        print(f"Done: {item.value['file']}")
-    else:
-        print(f"Failed: {files[item.index].name} — {item.error}")
-```
-
-!!! note
-    For CPU-heavy transforms (not I/O-bound), use `executor="process"` for
-    true parallelism. Process executor requires the function to be defined
-    at module level and the script to use an `if __name__ == "__main__"` guard.
 
 ## Dataset Enrichment via API
 
