@@ -33,6 +33,7 @@ nav:
     - Rate Limiting: api-reference/rate-limiting.md
   - Development:
     - Contributing: development/CONTRIBUTING.md
+    - DevX Principles: development/devx-principles.md
     - Roadmap: development/roadmap.md
 
 markdown_extensions:
