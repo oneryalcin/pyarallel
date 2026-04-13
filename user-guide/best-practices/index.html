@@ -799,6 +799,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/devx-principles/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DevX Principles
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/roadmap/" class="md-nav__link">
         
   
@@ -1076,7 +1097,10 @@
 <div class="highlight"><pre><span></span><code><span class="c1"># 500K items — only 1000 futures in memory at a time</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">huge_list</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </code></pre></div>
-<p>Without <code>batch_size</code>, all items are submitted at once. On memory-constrained environments (K8s pods, Lambda), this prevents OOM kills.</p>
+<p>Without <code>batch_size</code>, all items are submitted at once. With <code>batch_size</code> set,
+unsized iterables are consumed lazily one batch at a time. On
+memory-constrained environments (K8s pods, Lambda), this helps prevent OOM
+kills.</p>
 <h2 id="error-handling-patterns">Error Handling Patterns<a class="headerlink" href="#error-handling-patterns" title="Permanent link">&para;</a></h2>
 <h3 id="fail-fast">Fail-Fast<a class="headerlink" href="#fail-fast" title="Permanent link">&para;</a></h3>
 <p>Iterate the result — first <code>ExceptionGroup</code> stops you:</p>
@@ -1142,7 +1166,8 @@
 <li><strong>Use rate limiting for external APIs</strong> — protects you and the service</li>
 <li><strong>Prefer threads for I/O</strong> — processes have serialization overhead</li>
 <li><strong>Check <code>result.ok</code> before iterating</strong> — avoids surprise <code>ExceptionGroup</code> raises</li>
-<li><strong>Use <code>on_progress</code> for long jobs</strong> — visibility into what's happening</li>
+<li><strong>Use <code>on_progress</code> for long jobs</strong> — for unsized iterables with batching,
+   <code>total</code> is items seen so far, not the final size</li>
 </ol>
 
 

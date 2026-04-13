@@ -727,6 +727,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/devx-principles/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DevX Principles
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/roadmap/" class="md-nav__link">
         
   
@@ -947,6 +968,8 @@
 <span class="c1"># With batching: only 500 at a time</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">huge_list</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
 </code></pre></div>
+<p>For unsized iterables such as generators, <code>batch_size</code> also keeps input
+consumption lazy one batch at a time.</p>
 <h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
 <p>Errors are never silently lost. <code>ParallelResult</code> gives you structured access:</p>
 <div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>

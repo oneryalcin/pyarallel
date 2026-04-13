@@ -793,6 +793,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/devx-principles/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DevX Principles
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/roadmap/" class="md-nav__link">
         
   
@@ -1015,6 +1036,10 @@
 
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">on_progress</span><span class="o">=</span><span class="n">my_progress</span><span class="p">)</span>
 </code></pre></div>
+<p>If <code>items</code> has a known length, <code>total</code> is the final input size. If <code>items</code> is
+an unsized iterable (for example a generator) and you also set <code>batch_size</code>,
+Pyarallel keeps input consumption lazy; in that mode <code>total</code> is the number of
+items discovered so far.</p>
 <p>Works with both <code>parallel_map</code> and <code>.map()</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span> <span class="o">...</span>
@@ -1114,6 +1139,8 @@
 <div class="highlight"><pre><span></span><code><span class="c1"># Submit 500 items at a time instead of 500,000 at once</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">huge_list</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
 </code></pre></div>
+<p>With <code>batch_size</code> set, unsized iterables are consumed lazily one batch at a
+time instead of being materialized up front.</p>
 <p>Errors in one batch don't prevent subsequent batches from running.</p>
 <h2 id="starmap-multi-argument-functions">Starmap — Multi-Argument Functions<a class="headerlink" href="#starmap-multi-argument-functions" title="Permanent link">&para;</a></h2>
 <p>For functions that take multiple arguments, use <code>parallel_starmap</code> or <code>.starmap()</code>:</p>
@@ -1137,21 +1164,25 @@
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_iter</span>
 
 <span class="c1"># Process 10M items — only one batch of results in memory at a time</span>
-<span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">parallel_iter</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">ten_million_items</span><span class="p">,</span>
-                                  <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
-        <span class="n">log_error</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">parallel_iter</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">ten_million_items</span><span class="p">,</span>
+                          <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+        <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">log_error</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
 
 <span class="c1"># Or with the decorator</span>
 <span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">item</span><span class="p">):</span> <span class="o">...</span>
 
-<span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">process</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="n">huge_list</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
-    <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">process</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="n">huge_list</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+        <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">log_error</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
 </code></pre></div>
-<p>Results arrive in <strong>completion order</strong> (fastest tasks first), not input order. Each <code>(index, value)</code> tuple includes the original index so you can match results to inputs.</p>
+<p>Results arrive in <strong>completion order</strong> (fastest tasks first), not input order.
+Each <code>ItemResult</code> includes the original <code>.index</code> so you can match results to inputs.</p>
 <p><strong>When to use which:</strong></p>
 <table>
 <thead>

@@ -546,6 +546,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#notes-on-progress-and-unsized-iterables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes on Progress and Unsized Iterables
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -660,6 +669,48 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#itemresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      ItemResult
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ItemResult">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      Properties
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invariant" class="md-nav__link">
+    <span class="md-ellipsis">
+      Invariant
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#parallelresult" class="md-nav__link">
     <span class="md-ellipsis">
       ParallelResult
@@ -679,7 +730,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#example_1" class="md-nav__link">
     <span class="md-ellipsis">
       Example
     </span>
@@ -886,6 +937,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/devx-principles/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DevX Principles
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/roadmap/" class="md-nav__link">
         
   
@@ -956,6 +1028,15 @@
   <a href="#examples" class="md-nav__link">
     <span class="md-ellipsis">
       Examples
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes-on-progress-and-unsized-iterables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes on Progress and Unsized Iterables
     </span>
   </a>
   
@@ -1075,6 +1156,48 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#itemresult" class="md-nav__link">
+    <span class="md-ellipsis">
+      ItemResult
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ItemResult">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#properties" class="md-nav__link">
+    <span class="md-ellipsis">
+      Properties
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#invariant" class="md-nav__link">
+    <span class="md-ellipsis">
+      Invariant
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#parallelresult" class="md-nav__link">
     <span class="md-ellipsis">
       ParallelResult
@@ -1094,7 +1217,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
+  <a href="#example_1" class="md-nav__link">
     <span class="md-ellipsis">
       Example
     </span>
@@ -1200,12 +1323,12 @@
     <span class="n">fn</span><span class="p">,</span>                              <span class="c1"># Function to apply to each item</span>
     <span class="n">items</span><span class="p">,</span>                           <span class="c1"># Any iterable</span>
     <span class="o">*</span><span class="p">,</span>
-    <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>                       <span class="c1"># Number of parallel workers</span>
+    <span class="n">workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                    <span class="c1"># Number of parallel workers</span>
     <span class="n">executor</span><span class="o">=</span><span class="s2">&quot;thread&quot;</span><span class="p">,</span>               <span class="c1"># &quot;thread&quot; or &quot;process&quot;</span>
     <span class="n">rate_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># RateLimit object or ops/second (float)</span>
     <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                    <span class="c1"># Total timeout in seconds</span>
     <span class="n">on_progress</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># callback(completed, total)</span>
-    <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Process in chunks to control memory</span>
+    <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Lazy batch consumption for unsized iterables</span>
     <span class="n">retry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                      <span class="c1"># Retry(attempts=3, backoff=1.0)</span>
 <span class="p">)</span>
 </code></pre></div>
@@ -1235,9 +1358,9 @@
 </tr>
 <tr>
 <td><code>workers</code></td>
-<td><code>int</code></td>
-<td><code>4</code></td>
-<td>Number of parallel workers</td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>Number of parallel workers. <code>None</code> lets the executor choose</td>
 </tr>
 <tr>
 <td><code>executor</code></td>
@@ -1261,13 +1384,13 @@
 <td><code>on_progress</code></td>
 <td><code>Callable[[int, int], None] \| None</code></td>
 <td><code>None</code></td>
-<td>Progress callback <code>(completed, total)</code></td>
+<td>Progress callback <code>(completed, total)</code>. For unsized iterables with batching, <code>total</code> is items seen so far</td>
 </tr>
 <tr>
 <td><code>batch_size</code></td>
 <td><code>int \| None</code></td>
 <td><code>None</code></td>
-<td>Process items in chunks of this size (controls memory)</td>
+<td>Process items in chunks of this size. With unsized iterables, input is consumed lazily one batch at a time</td>
 </tr>
 <tr>
 <td><code>retry</code></td>
@@ -1291,12 +1414,19 @@
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">60.0</span><span class="p">,</span>
                        <span class="n">on_progress</span><span class="o">=</span><span class="k">lambda</span> <span class="n">d</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">))</span>
 
-<span class="c1"># Batched — controls memory for large datasets</span>
+<span class="c1"># Batched — keeps unsized iterables lazy one batch at a time</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">million_items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
 
 <span class="c1"># With retry — flaky network calls</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">backoff</span><span class="o">=</span><span class="mf">1.0</span><span class="p">))</span>
 </code></pre></div>
+<h3 id="notes-on-progress-and-unsized-iterables">Notes on Progress and Unsized Iterables<a class="headerlink" href="#notes-on-progress-and-unsized-iterables" title="Permanent link">&para;</a></h3>
+<p>When <code>items</code> has a known length, <code>on_progress(done, total)</code> reports the final
+total.</p>
+<p>When <code>items</code> is unsized (for example a generator) and <code>batch_size</code> is set,
+Pyarallel keeps input consumption lazy instead of materializing the full input
+up front. In that mode, <code>total</code> is the number of items discovered so far, not a
+guaranteed final total.</p>
 <hr />
 <h2 id="parallel"><code>@parallel</code><a class="headerlink" href="#parallel" title="Permanent link">&para;</a></h2>
 <p>Decorator that adds <code>.map()</code> for parallel execution. The decorated function <strong>keeps its original signature and return type</strong>.</p>
@@ -1316,8 +1446,8 @@
 <tbody>
 <tr>
 <td><code>workers</code></td>
-<td><code>int</code></td>
-<td><code>4</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
 <td>Default worker count for <code>.map()</code></td>
 </tr>
 <tr>
@@ -1375,7 +1505,7 @@
 <p>Like <code>parallel_map</code> but unpacks each item as <code>fn(*args)</code> — for functions that take multiple arguments.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_starmap</span>
 
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_starmap</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="p">[(</span><span class="n">arg1</span><span class="p">,</span> <span class="n">arg2</span><span class="p">),</span> <span class="p">(</span><span class="n">arg3</span><span class="p">,</span> <span class="n">arg4</span><span class="p">),</span> <span class="o">...</span><span class="p">],</span> <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_starmap</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="p">[(</span><span class="n">arg1</span><span class="p">,</span> <span class="n">arg2</span><span class="p">),</span> <span class="p">(</span><span class="n">arg3</span><span class="p">,</span> <span class="n">arg4</span><span class="p">),</span> <span class="o">...</span><span class="p">])</span>
 </code></pre></div>
 <p>Takes the same options as <code>parallel_map</code> (workers, executor, rate_limit, timeout, batch_size, retry).</p>
 <h3 id="examples_1">Examples<a class="headerlink" href="#examples_1" title="Permanent link">&para;</a></h3>
@@ -1396,14 +1526,15 @@
 </code></pre></div>
 <hr />
 <h2 id="parallel_iter"><code>parallel_iter</code><a class="headerlink" href="#parallel_iter" title="Permanent link">&para;</a></h2>
-<p>Streaming version of <code>parallel_map</code> — yields <code>(index, result_or_exception)</code> in completion order. Results are <strong>not accumulated in memory</strong>.</p>
+<p>Streaming version of <code>parallel_map</code> — yields <code>ItemResult</code> in completion order.
+Results are <strong>not accumulated in memory</strong>.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_iter</span>
 
-<span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">parallel_iter</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
-        <span class="n">log_error</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">parallel_iter</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+        <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">log_error</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="when-to-use">When to Use<a class="headerlink" href="#when-to-use" title="Permanent link">&para;</a></h3>
 <ul>
@@ -1436,9 +1567,9 @@
 </tr>
 <tr>
 <td><code>workers</code></td>
-<td><code>int</code></td>
-<td><code>4</code></td>
-<td>Number of parallel workers</td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>Number of parallel workers (stdlib default when <code>None</code>)</td>
 </tr>
 <tr>
 <td><code>executor</code></td>
@@ -1467,13 +1598,62 @@
 </tbody>
 </table>
 <h3 id="yields">Yields<a class="headerlink" href="#yields" title="Permanent link">&para;</a></h3>
-<p><code>(int, T | Exception)</code> — index and result in <strong>completion order</strong> (not input order). Failed tasks yield the exception as the value.</p>
+<p><code>ItemResult[T]</code> — each item includes <code>.index</code>, <code>.ok</code>, <code>.value</code>, and <code>.error</code>.
+Results arrive in <strong>completion order</strong> (not input order).</p>
 <p>Also available as <code>.stream()</code> on <code>@parallel</code> decorated functions:</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">item</span><span class="p">):</span> <span class="o">...</span>
 
-<span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">process</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="n">huge_list</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
-    <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">process</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="n">huge_list</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+        <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">log_error</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="itemresult"><code>ItemResult</code><a class="headerlink" href="#itemresult" title="Permanent link">&para;</a></h2>
+<p>Single streaming result item returned by <code>parallel_iter</code>, <code>async_parallel_iter</code>,
+and <code>.stream()</code>.</p>
+<h3 id="properties">Properties<a class="headerlink" href="#properties" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Member</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.index</code></td>
+<td><code>int</code></td>
+<td>Original input index</td>
+</tr>
+<tr>
+<td><code>.ok</code></td>
+<td><code>bool</code></td>
+<td><code>True</code> when this item succeeded</td>
+</tr>
+<tr>
+<td><code>.value</code></td>
+<td><code>T \| None</code></td>
+<td>Result value for successful items. May legitimately be <code>None</code></td>
+</tr>
+<tr>
+<td><code>.error</code></td>
+<td><code>Exception \| None</code></td>
+<td>Exception for failed items</td>
+</tr>
+</tbody>
+</table>
+<h3 id="invariant">Invariant<a class="headerlink" href="#invariant" title="Permanent link">&para;</a></h3>
+<p>Exactly one of <code>.value</code> or <code>.error</code> is set. Success and failure are explicit.</p>
+<h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">parallel_iter</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+        <span class="n">handle</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">log</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
 </code></pre></div>
 <hr />
 <h2 id="parallelresult"><code>ParallelResult</code><a class="headerlink" href="#parallelresult" title="Permanent link">&para;</a></h2>
@@ -1535,7 +1715,7 @@
 </tr>
 </tbody>
 </table>
-<h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
+<h3 id="example_1">Example<a class="headerlink" href="#example_1" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
 
 <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
@@ -1616,24 +1796,55 @@
 <tr>
 <td><code>backoff</code></td>
 <td><code>float</code></td>
-<td><code>0.0</code></td>
-<td>Seconds between retries, multiplied by attempt number</td>
+<td><code>1.0</code></td>
+<td>Base delay for exponential backoff</td>
+</tr>
+<tr>
+<td><code>max_delay</code></td>
+<td><code>float</code></td>
+<td><code>60.0</code></td>
+<td>Maximum sleep between retries</td>
+</tr>
+<tr>
+<td><code>jitter</code></td>
+<td><code>bool</code></td>
+<td><code>True</code></td>
+<td>Randomize delays to avoid retry bursts</td>
+</tr>
+<tr>
+<td><code>on</code></td>
+<td><code>tuple[type[Exception], ...] \| None</code></td>
+<td><code>None</code></td>
+<td>Retry only these exception types. <code>None</code> means retry all exceptions</td>
 </tr>
 </tbody>
 </table>
 <h3 id="backoff-behavior">Backoff Behavior<a class="headerlink" href="#backoff-behavior" title="Permanent link">&para;</a></h3>
-<p>With <code>backoff=1.0</code> and <code>attempts=3</code>:</p>
+<p>With <code>backoff=1.0</code>, <code>attempts=3</code>, and the default exponential logic:</p>
 <ul>
 <li>Attempt 1: immediate</li>
 <li>Attempt 2: sleep 1.0s, then retry</li>
 <li>Attempt 3: sleep 2.0s, then retry</li>
 </ul>
+<p>The actual delay formula is <code>min(backoff * 2^attempt, max_delay)</code>, optionally
+multiplied by jitter.</p>
 <h3 id="examples_3">Examples<a class="headerlink" href="#examples_3" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c1"># Basic retry — 3 attempts, no wait</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Basic retry — 3 attempts, exponential backoff starting at 1s</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">())</span>
 
-<span class="c1"># Retry with exponential-ish backoff</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">attempts</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">backoff</span><span class="o">=</span><span class="mf">0.5</span><span class="p">))</span>
+<span class="c1"># Retry only transient network failures</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+    <span class="n">fetch</span><span class="p">,</span>
+    <span class="n">urls</span><span class="p">,</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="ne">ConnectionError</span><span class="p">,</span> <span class="ne">TimeoutError</span><span class="p">)),</span>
+<span class="p">)</span>
+
+<span class="c1"># Retry with custom caps and deterministic delays</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+    <span class="n">fetch</span><span class="p">,</span>
+    <span class="n">urls</span><span class="p">,</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">attempts</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">backoff</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">max_delay</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">jitter</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+<span class="p">)</span>
 
 <span class="c1"># Retry + rate limit + batch — the full production stack</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>

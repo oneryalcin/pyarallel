@@ -585,6 +585,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#notes-on-progress-and-unsized-iterables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes on Progress and Unsized Iterables
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -757,6 +766,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/devx-principles/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DevX Principles
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/roadmap/" class="md-nav__link">
         
   
@@ -845,6 +875,15 @@
   <a href="#examples" class="md-nav__link">
     <span class="md-ellipsis">
       Examples
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes-on-progress-and-unsized-iterables" class="md-nav__link">
+    <span class="md-ellipsis">
+      Notes on Progress and Unsized Iterables
     </span>
   </a>
   
@@ -947,7 +986,7 @@
     <span class="n">rate_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># RateLimit or ops/second</span>
     <span class="n">task_timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                    <span class="c1"># Per-task timeout in seconds</span>
     <span class="n">on_progress</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># callback(completed, total)</span>
-    <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Process in chunks to control memory</span>
+    <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Lazy batch consumption for unsized iterables</span>
     <span class="n">retry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                      <span class="c1"># Retry(attempts=3, backoff=1.0)</span>
 <span class="p">)</span>
 </code></pre></div>
@@ -997,13 +1036,13 @@
 <td><code>on_progress</code></td>
 <td><code>Callable[[int, int], None] \| None</code></td>
 <td><code>None</code></td>
-<td>Progress callback</td>
+<td>Progress callback. For unsized iterables with batching, <code>total</code> is items seen so far</td>
 </tr>
 <tr>
 <td><code>batch_size</code></td>
 <td><code>int \| None</code></td>
 <td><code>None</code></td>
-<td>Process items in chunks (controls memory)</td>
+<td>Process items in chunks. With unsized iterables, input is consumed lazily one batch at a time</td>
 </tr>
 <tr>
 <td><code>retry</code></td>
@@ -1015,7 +1054,8 @@
 </table>
 <h3 id="why-concurrency-instead-of-workers">Why <code>concurrency</code> instead of <code>workers</code>?<a class="headerlink" href="#why-concurrency-instead-of-workers" title="Permanent link">&para;</a></h3>
 <p>The sync API uses <code>workers</code> because it sizes a thread/process <strong>pool</strong> — you're creating real OS threads or processes. The async API uses <code>concurrency</code> because there's no pool — everything runs on one event loop, and <code>concurrency</code> controls how many tasks are allowed to run at the same time via a semaphore.</p>
-<p>Calling both <code>workers</code> would be misleading (async has no workers). Calling both <code>concurrency</code> would be wrong for sync (you're literally setting <code>ThreadPoolExecutor(max_workers=N)</code>). The names match what each actually controls.</p>
+<p>Calling both <code>workers</code> would be misleading because async execution has no worker pool. Calling both <code>concurrency</code> would be wrong for sync because the implementation really is sizing <code>ThreadPoolExecutor(max_workers=N)</code> or <code>ProcessPoolExecutor(max_workers=N)</code>. The names match what each API actually controls.</p>
+<p>Pre-v1, Pyarallel keeps these names intentionally different. If you're moving from sync to async, translate <code>workers=</code> to <code>concurrency=</code> rather than expecting them to be interchangeable.</p>
 <h3 id="other-differences-from-sync">Other Differences from Sync<a class="headerlink" href="#other-differences-from-sync" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>task_timeout</code> is <strong>per-task</strong> (via <code>asyncio.wait_for</code>), not total wall-clock like sync <code>timeout</code></li>
@@ -1039,6 +1079,13 @@
     <span class="n">task_timeout</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
+<h3 id="notes-on-progress-and-unsized-iterables">Notes on Progress and Unsized Iterables<a class="headerlink" href="#notes-on-progress-and-unsized-iterables" title="Permanent link">&para;</a></h3>
+<p>When <code>items</code> has a known length, <code>on_progress(done, total)</code> reports the final
+total.</p>
+<p>When <code>items</code> is unsized (for example a generator) and <code>batch_size</code> is set,
+Pyarallel keeps input consumption lazy instead of materializing the full input
+up front. In that mode, <code>total</code> is the number of items discovered so far, not a
+guaranteed final total.</p>
 <hr />
 <h2 id="async_parallel_starmap"><code>async_parallel_starmap</code><a class="headerlink" href="#async_parallel_starmap" title="Permanent link">&para;</a></h2>
 <p>Like <code>async_parallel_map</code> but unpacks each item as <code>fn(*args)</code>.</p>
@@ -1052,18 +1099,24 @@
 <p>Takes the same options as <code>async_parallel_map</code>. Also available as <code>.starmap()</code> on <code>@async_parallel</code> decorated functions.</p>
 <hr />
 <h2 id="async_parallel_iter"><code>async_parallel_iter</code><a class="headerlink" href="#async_parallel_iter" title="Permanent link">&para;</a></h2>
-<p>Async streaming — yields <code>(index, result_or_exception)</code> in completion order. Constant memory.</p>
+<p>Async streaming — yields <code>ItemResult</code> in completion order. Constant memory.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel_iter</span>
 
-<span class="k">async</span> <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">async_parallel_iter</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">concurrency</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
-    <span class="k">await</span> <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">async_parallel_iter</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">concurrency</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+        <span class="k">await</span> <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">log_error</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
 </code></pre></div>
 <p>Also available as <code>.stream()</code> on <code>@async_parallel</code> decorated functions:</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@async_parallel</span><span class="p">(</span><span class="n">concurrency</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span> <span class="o">...</span>
 
-<span class="k">async</span> <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">fetch</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
-    <span class="k">await</span> <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">fetch</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+        <span class="k">await</span> <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">log_error</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
 </code></pre></div>
 <hr />
 <h2 id="async_parallel"><code>@async_parallel</code><a class="headerlink" href="#async_parallel" title="Permanent link">&para;</a></h2>

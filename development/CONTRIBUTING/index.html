@@ -16,7 +16,7 @@
         <link rel="prev" href="../../api-reference/rate-limiting/">
       
       
-        <link rel="next" href="../roadmap/">
+        <link rel="next" href="../devx-principles/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -709,6 +709,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../devx-principles/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DevX Principles
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../roadmap/" class="md-nav__link">
         
   
@@ -873,13 +894,14 @@
 </ul>
 <h2 id="use-a-consistent-coding-style">Use a Consistent Coding Style<a class="headerlink" href="#use-a-consistent-coding-style" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Use <a href="https://github.com/psf/black">Black</a> for Python code formatting</li>
-<li>Keep line length to 88 characters (Black default)</li>
+<li>Use <code>uv run ruff format .</code> for formatting</li>
+<li>Use <code>uv run ruff check .</code> for linting and import ordering</li>
+<li>Keep line length to 88 characters</li>
 <li>Use type hints for function arguments and return values</li>
 <li>Write docstrings for all public functions and classes</li>
 </ul>
 <h2 id="running-tests">Running Tests<a class="headerlink" href="#running-tests" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>pytest<span class="w"> </span>tests/
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/<span class="w"> </span>-q
 </code></pre></div>
 <h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
 <p>By contributing, you agree that your contributions will be licensed under its MIT License.</p>
