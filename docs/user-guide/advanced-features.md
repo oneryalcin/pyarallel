@@ -27,6 +27,35 @@ def fetch(url): ...
 results = fetch.map(urls, on_progress=lambda d, t: print(f"{d}/{t}"))
 ```
 
+### tqdm Integration
+
+Wire `on_progress` to a tqdm progress bar:
+
+```python
+from tqdm import tqdm
+from pyarallel import parallel_map
+
+def fetch(url):
+    return requests.get(url, timeout=10).json()
+
+# Known-size input — pass total upfront
+with tqdm(total=len(urls)) as pbar:
+    result = parallel_map(
+        fetch, urls, workers=10,
+        on_progress=lambda done, total: (setattr(pbar, 'n', done), pbar.refresh()),
+    )
+
+# Generators / unsized input — total updates as batches are consumed
+pbar = tqdm()
+def update(done, total):
+    pbar.total = total
+    pbar.n = done
+    pbar.refresh()
+
+result = parallel_map(fetch, url_generator(), workers=10, batch_size=100, on_progress=update)
+pbar.close()
+```
+
 ## Timeouts
 
 ### Total Timeout (sync)
