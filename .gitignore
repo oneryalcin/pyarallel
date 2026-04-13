@@ -44,5 +44,12 @@ htmlcov/
 *.log
 
 
-# docs 
+# docs
 site
+
+# Claude Code / local dev
+CLAUDE.md
+AGENTS.md
+.omx/
+interim-feedback.md
+pain_points.md
