@@ -61,25 +61,25 @@ result = await async_parallel_map(
 
 ## Processing Parquet Files
 
-Transform multiple parquet files in parallel using the process executor
-for true CPU parallelism. Each worker gets its own process — no GIL contention.
+Transform multiple parquet files in parallel. Threads work well here since
+the bottleneck is I/O (disk read/write), not CPU.
 
 ```python
 from pathlib import Path
+import pyarrow as pa
 import pyarrow.parquet as pq
 from pyarallel import parallel_map
 
 def process_file(path):
     table = pq.read_table(path)
-    # filter, transform, aggregate — whatever you need
-    filtered = table.filter(table["status"] == "active")
+    filtered = table.filter(pa.compute.equal(table["status"], "active"))
     out_path = path.parent / "processed" / path.name
     pq.write_table(filtered, out_path)
     return {"file": path.name, "rows_in": len(table), "rows_out": len(filtered)}
 
 files = list(Path("data/raw").glob("*.parquet"))
 
-result = parallel_map(process_file, files, executor="process")
+result = parallel_map(process_file, files)
 
 for stats in result:
     print(f"{stats['file']}: {stats['rows_in']} → {stats['rows_out']} rows")
@@ -90,12 +90,17 @@ For very large file sets, use streaming to avoid holding all results in memory:
 ```python
 from pyarallel import parallel_iter
 
-for item in parallel_iter(process_file, files, executor="process", batch_size=20):
+for item in parallel_iter(process_file, files, batch_size=20):
     if item.ok:
         print(f"Done: {item.value['file']}")
     else:
         print(f"Failed: {files[item.index].name} — {item.error}")
 ```
+
+!!! note
+    For CPU-heavy transforms (not I/O-bound), use `executor="process"` for
+    true parallelism. Process executor requires the function to be defined
+    at module level and the script to use an `if __name__ == "__main__"` guard.
 
 ## Dataset Enrichment via API
 
@@ -134,13 +139,13 @@ df["lon"] = [r["lon"] if r else None for r in result]
 ### With HuggingFace Datasets
 
 ```python
+import requests
 from datasets import load_dataset
 from pyarallel import parallel_map, RateLimit
 
 dataset = load_dataset("imdb", split="train")
 
 def classify_sentiment(text):
-    # call your model endpoint, local model, or API
     r = requests.post("http://localhost:8000/predict", json={"text": text})
     return r.json()["label"]
 
@@ -190,6 +195,7 @@ if not result.ok:
 Process millions of database rows without loading everything into memory:
 
 ```python
+import json
 from pyarallel import parallel_iter
 
 def fetch_rows():
@@ -205,6 +211,7 @@ def transform(row):
         "payload": json.loads(row["raw_data"]),
     }
 
+output_buffer = []
 for item in parallel_iter(transform, fetch_rows(), workers=8, batch_size=500):
     if item.ok:
         output_buffer.append(item.value)
