@@ -19,6 +19,7 @@ from concurrent.futures import (
     as_completed,
 )
 from dataclasses import dataclass
+from itertools import islice
 from typing import Any, Literal
 
 ExecutorType = Literal["thread", "process"]
@@ -152,6 +153,29 @@ def _make_chunks(n: int, batch_size: int | None) -> list[range]:
             for start in range(0, n, batch_size)
         ]
     return [range(n)]
+
+
+def _iter_batches(
+    items: Iterable[Any], batch_size: int
+) -> Iterator[list[tuple[int, Any]]]:
+    """Yield indexed item batches lazily from *items*."""
+    it = iter(items)
+    index = 0
+    while True:
+        batch = list(islice(it, batch_size))
+        if not batch:
+            break
+        start = index
+        index += len(batch)
+        yield list(enumerate(batch, start))
+
+
+def _total_if_known(items: Iterable[Any]) -> int | None:
+    """Return len(items) when available without forcing materialization."""
+    try:
+        return len(items)  # type: ignore[arg-type]
+    except TypeError:
+        return None
 
 
 def _resolve_process_target(
@@ -345,11 +369,6 @@ def parallel_map[R](
             "For per-task timeouts, use async_parallel_map with task_timeout=."
         )
 
-    items_list = list(items)
-    n = len(items_list)
-    if n == 0:
-        return ParallelResult([])
-
     task_fn = fn
     if executor == "process":
         resolved = _resolve_process_target(fn)
@@ -378,33 +397,104 @@ def parallel_map[R](
 
     pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
     bucket = _TokenBucket(rate_limit) if rate_limit else None
-    results: list[Any] = [_PENDING] * n
     completed = 0
     deadline = (time.monotonic() + timeout) if timeout is not None else None
     timed_out = False
 
+    if batch_size is None:
+        items_list = list(items)
+        n = len(items_list)
+        if n == 0:
+            return ParallelResult([])
+        results: list[Any] = [_PENDING] * n
+
+        pool = pool_cls(max_workers=workers)
+        try:
+            for chunk in _make_chunks(n, batch_size):
+                chunk_timeout: float | None = None
+                if deadline is not None:
+                    chunk_timeout = max(0.0, deadline - time.monotonic())
+                    if chunk_timeout <= 0:
+                        for i in chunk:
+                            if results[i] is _PENDING:
+                                results[i] = _Failure(
+                                    TimeoutError(
+                                        f"Task {i} did not complete within {timeout}s"
+                                    )
+                                )
+                        timed_out = True
+                        continue
+
+                futures: dict[Future[R], int] = {}
+                for i in chunk:
+                    if bucket:
+                        bucket.wait()
+                    futures[pool.submit(task_fn, items_list[i])] = i
+
+                try:
+                    for future in as_completed(futures, timeout=chunk_timeout):
+                        idx = futures[future]
+                        try:
+                            results[idx] = future.result()
+                        except Exception as exc:
+                            results[idx] = _Failure(exc)
+                        completed += 1
+                        if on_progress:
+                            on_progress(completed, n)
+                except TimeoutError:
+                    timed_out = True
+                    for f, idx in futures.items():
+                        if not f.done():
+                            f.cancel()
+                            if results[idx] is _PENDING:
+                                results[idx] = _Failure(
+                                    TimeoutError(
+                                        f"Task {idx} did not complete within {timeout}s"
+                                    )
+                                )
+        finally:
+            pool.shutdown(wait=not timed_out, cancel_futures=timed_out)
+
+        return ParallelResult(results)
+
+    total = _total_if_known(items)
+    results: list[Any] = []
+
     pool = pool_cls(max_workers=workers)
     try:
-        for chunk in _make_chunks(n, batch_size):
+        for batch in _iter_batches(items, batch_size):
             chunk_timeout: float | None = None
             if deadline is not None:
                 chunk_timeout = max(0.0, deadline - time.monotonic())
                 if chunk_timeout <= 0:
-                    for i in chunk:
-                        if results[i] is _PENDING:
-                            results[i] = _Failure(
+                    for idx, _item in batch:
+                        results.append(
+                            _Failure(
                                 TimeoutError(
-                                    f"Task {i} did not complete within {timeout}s"
+                                    f"Task {idx} did not complete within {timeout}s"
                                 )
                             )
+                        )
+                    for item in items:
+                        idx = len(results)
+                        _ = item
+                        results.append(
+                            _Failure(
+                                TimeoutError(
+                                    f"Task {idx} did not complete within {timeout}s"
+                                )
+                            )
+                        )
                     timed_out = True
-                    continue
+                    break
+
+            results.extend([_PENDING] * len(batch))
 
             futures: dict[Future[R], int] = {}
-            for i in chunk:
+            for idx, item in batch:
                 if bucket:
                     bucket.wait()
-                futures[pool.submit(task_fn, items_list[i])] = i
+                futures[pool.submit(task_fn, item)] = idx
 
             try:
                 for future in as_completed(futures, timeout=chunk_timeout):
@@ -415,7 +505,10 @@ def parallel_map[R](
                         results[idx] = _Failure(exc)
                     completed += 1
                     if on_progress:
-                        on_progress(completed, n)
+                        on_progress(
+                            completed,
+                            total if total is not None else len(results),
+                        )
             except TimeoutError:
                 timed_out = True
                 for f, idx in futures.items():
@@ -427,6 +520,17 @@ def parallel_map[R](
                                     f"Task {idx} did not complete within {timeout}s"
                                 )
                             )
+                for item in items:
+                    idx = len(results)
+                    _ = item
+                    results.append(
+                        _Failure(
+                            TimeoutError(
+                                f"Task {idx} did not complete within {timeout}s"
+                            )
+                        )
+                    )
+                break
     finally:
         pool.shutdown(wait=not timed_out, cancel_futures=timed_out)
 

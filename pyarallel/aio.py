@@ -18,8 +18,10 @@ from .core import (
     RateLimit,
     Retry,
     _Failure,
+    _iter_batches,
     _make_chunks,
     _merge_opts,
+    _total_if_known,
 )
 
 # ---------------------------------------------------------------------------
@@ -125,12 +127,47 @@ async def async_parallel_map[R](
     if concurrency < 1:
         raise ValueError(f"concurrency must be >= 1, got {concurrency}")
 
-    items_list = list(items)
-    n = len(items_list)
-    if n == 0:
-        return ParallelResult([])
+    if batch_size is None:
+        items_list = list(items)
+        n = len(items_list)
+        if n == 0:
+            return ParallelResult([])
 
-    results: list[Any] = [_PENDING] * n
+        results: list[Any] = [_PENDING] * n
+        semaphore = asyncio.Semaphore(concurrency)
+        limiter = _AsyncTokenBucket(rate_limit) if rate_limit else None
+        completed = 0
+
+        async def _run(i: int, item: Any) -> None:
+            nonlocal completed
+            async with semaphore:
+                if limiter:
+                    await limiter.wait()
+                try:
+                    if retry is not None:
+                        result = await _async_run_with_retry(
+                            fn, item, retry, task_timeout=task_timeout
+                        )
+                    elif task_timeout is not None:
+                        result = await asyncio.wait_for(fn(item), timeout=task_timeout)
+                    else:
+                        result = await fn(item)
+                    results[i] = result
+                except Exception as exc:
+                    results[i] = _Failure(exc)
+                completed += 1
+                if on_progress:
+                    on_progress(completed, n)
+
+        for chunk in _make_chunks(n, batch_size):
+            async with asyncio.TaskGroup() as tg:
+                for i in chunk:
+                    tg.create_task(_run(i, items_list[i]))
+
+        return ParallelResult(results)
+
+    total = _total_if_known(items)
+    results: list[Any] = []
     semaphore = asyncio.Semaphore(concurrency)
     limiter = _AsyncTokenBucket(rate_limit) if rate_limit else None
     completed = 0
@@ -154,12 +191,13 @@ async def async_parallel_map[R](
                 results[i] = _Failure(exc)
             completed += 1
             if on_progress:
-                on_progress(completed, n)
+                on_progress(completed, total if total is not None else len(results))
 
-    for chunk in _make_chunks(n, batch_size):
+    for batch in _iter_batches(items, batch_size):
+        results.extend([_PENDING] * len(batch))
         async with asyncio.TaskGroup() as tg:
-            for i in chunk:
-                tg.create_task(_run(i, items_list[i]))
+            for i, item in batch:
+                tg.create_task(_run(i, item))
 
     return ParallelResult(results)
 
