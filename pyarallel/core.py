@@ -11,13 +11,15 @@ import importlib
 import random
 import threading
 import time
-from concurrent.futures import (Future, ProcessPoolExecutor,
-                                ThreadPoolExecutor, as_completed)
+from collections.abc import Callable, Iterable, Iterator
+from concurrent.futures import (
+    Future,
+    ProcessPoolExecutor,
+    ThreadPoolExecutor,
+    as_completed,
+)
 from dataclasses import dataclass
-from typing import Any, Callable, Generic, Iterable, Iterator, Literal, TypeVar
-
-T = TypeVar("T")
-R = TypeVar("R")
+from typing import Any, Literal
 
 ExecutorType = Literal["thread", "process"]
 
@@ -170,7 +172,7 @@ def _resolve_process_target(
     return (module_name, qualname)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _load_process_target(module_name: str, qualname: str) -> Callable[..., Any]:
     """Import and resolve a callable by module and qualname."""
     target: Any = importlib.import_module(module_name)
@@ -198,7 +200,7 @@ def _call_resolved_args(
 # ---------------------------------------------------------------------------
 
 
-class ParallelResult(Generic[R]):
+class ParallelResult[R]:
     """Results from parallel execution.
 
     Behaves like a ``list[R]`` when every task succeeded.
@@ -294,7 +296,7 @@ def _run_with_retry(fn: Callable[..., Any], item: Any, retry: Retry) -> Any:
     raise last_exc  # type: ignore[misc]
 
 
-def parallel_map(
+def parallel_map[R](
     fn: Callable[..., R],
     items: Iterable[Any],
     *,
@@ -336,9 +338,10 @@ def parallel_map(
         raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
     if task_timeout is not None:
         raise NotImplementedError(
-            "task_timeout is not supported in sync parallel_map — Python threads "
-            "cannot be cancelled mid-execution. Use timeout= for a total wall-clock "
-            "limit, or put timeouts inside your function (e.g. requests.get(url, timeout=5)). "
+            "task_timeout is not supported in sync parallel_map — Python "
+            "threads cannot be cancelled mid-execution. Use timeout= for a "
+            "total wall-clock limit, or put timeouts inside your function "
+            "(e.g. requests.get(url, timeout=5)). "
             "For per-task timeouts, use async_parallel_map with task_timeout=."
         )
 
@@ -436,7 +439,7 @@ def _unpack_call(fn_and_args: tuple[Callable[..., Any], tuple[Any, ...]]) -> Any
     return fn(*args)
 
 
-def parallel_starmap(
+def parallel_starmap[R](
     fn: Callable[..., R],
     items: Iterable[tuple[Any, ...]],
     *,
@@ -489,7 +492,7 @@ def parallel_starmap(
     )
 
 
-def parallel_iter(
+def parallel_iter[R](
     fn: Callable[..., R],
     items: Iterable[Any],
     *,
@@ -728,7 +731,7 @@ class _ParallelFunc:
         )
 
 
-def parallel(
+def parallel[R](
     fn: Callable[..., R] | None = None,
     *,
     workers: int | None = None,

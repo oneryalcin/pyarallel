@@ -7,15 +7,20 @@ Uses ``asyncio.TaskGroup`` for structured concurrency and
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import functools
-from collections.abc import AsyncIterator
-from typing import Any, Callable, Iterable, TypeVar
+from collections.abc import AsyncIterator, Callable, Iterable
+from typing import Any
 
-from .core import (_PENDING, ParallelResult, RateLimit, Retry, _Failure,
-                   _make_chunks, _merge_opts)
-
-R = TypeVar("R")
-
+from .core import (
+    _PENDING,
+    ParallelResult,
+    RateLimit,
+    Retry,
+    _Failure,
+    _make_chunks,
+    _merge_opts,
+)
 
 # ---------------------------------------------------------------------------
 # Async rate limiter
@@ -75,7 +80,7 @@ async def _async_run_with_retry(
     raise last_exc  # type: ignore[misc]
 
 
-async def async_parallel_map(
+async def async_parallel_map[R](
     fn: Callable[..., Any],
     items: Iterable[Any],
     *,
@@ -159,7 +164,7 @@ async def async_parallel_map(
     return ParallelResult(results)
 
 
-async def async_parallel_starmap(
+async def async_parallel_starmap[R](
     fn: Callable[..., Any],
     items: Iterable[tuple[Any, ...]],
     *,
@@ -256,10 +261,8 @@ async def async_parallel_iter(
         for t in active_tasks:
             t.cancel()
         for t in active_tasks:
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await t
-            except asyncio.CancelledError:
-                pass
 
 
 # ---------------------------------------------------------------------------

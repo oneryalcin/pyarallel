@@ -41,28 +41,19 @@ testpaths = [
     "tests",
 ]
 
-[tool.black]
+[tool.ruff]
 line-length = 88
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-)/
-'''
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+# E/W=pycodestyle, F=pyflakes, I=isort, UP=pyupgrade, B=bugbear, SIM=simplify
+
+[tool.ruff.lint.isort]
+known-first-party = ["pyarallel"]
 
 [dependency-groups]
 dev = [
-    "black>=24.10.0",
-    "isort>=5.13.2",
+    "ruff>=0.15.0",
     "mkdocs-git-revision-date-plugin>=0.3.2",
     "mkdocs-material[imaging]>=9.5.50",
     "mkdocs-minify-plugin>=0.8.0",

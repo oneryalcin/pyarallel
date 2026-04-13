@@ -5,17 +5,23 @@ Run with: uv run smoke_test.py
 """
 
 import asyncio
-import json
 import os
 import sys
 import tempfile
+import threading
 import time
 
 # Ensure we're importing the local version
 sys.path.insert(0, os.path.dirname(__file__))
 
-from pyarallel import (ParallelResult, RateLimit, Retry, async_parallel,
-                       async_parallel_map, parallel, parallel_map)
+from pyarallel import (
+    RateLimit,
+    Retry,
+    async_parallel,
+    async_parallel_map,
+    parallel,
+    parallel_map,
+)
 
 PASS = 0
 FAIL = 0
@@ -58,8 +64,6 @@ with tempfile.TemporaryDirectory() as tmpdir:
 # 2. Batch processing — verify memory control
 # ---------------------------------------------------------------------------
 print("\n--- Sync: Batch processing ---")
-
-import threading
 
 peak_concurrent = 0
 current_concurrent = 0
@@ -122,7 +126,7 @@ elapsed = time.monotonic() - start
 check(
     f"rate limit timing ({elapsed:.2f}s)",
     elapsed >= 0.35,
-    f"expected >= 0.35s for 10 items at 20/sec",
+    "expected >= 0.35s for 10 items at 20/sec",
 )
 
 # ---------------------------------------------------------------------------
@@ -251,7 +255,7 @@ asyncio.run(run_async_tests())
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-print(f"\n{'='*50}")
+print(f"\n{'=' * 50}")
 print(f"  {PASS} passed, {FAIL} failed")
-print(f"{'='*50}")
+print(f"{'=' * 50}")
 sys.exit(1 if FAIL > 0 else 0)

@@ -3,8 +3,6 @@
 import threading
 import time
 
-import pytest
-
 from pyarallel import RateLimit, parallel_map
 
 

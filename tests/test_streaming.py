@@ -1,9 +1,6 @@
 """Tests for parallel_iter / .stream() — streaming results, constant memory."""
 
-import threading
 import time
-
-import pytest
 
 from pyarallel import RateLimit
 from pyarallel.core import Retry
@@ -42,7 +39,7 @@ class TestParallelIterStreaming:
         from pyarallel import parallel_iter
 
         yielded_count = 0
-        for index, value in parallel_iter(
+        for _index, _value in parallel_iter(
             lambda x: x * 2,
             range(20),
             workers=2,

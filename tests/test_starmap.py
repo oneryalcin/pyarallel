@@ -2,9 +2,7 @@
 
 import time
 
-import pytest
-
-from pyarallel import RateLimit, parallel_map
+from pyarallel import RateLimit
 from pyarallel.core import Retry
 
 
