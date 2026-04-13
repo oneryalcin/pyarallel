@@ -16,7 +16,7 @@
         <link rel="prev" href="../../getting-started/quickstart/">
       
       
-        <link rel="next" href="../configuration/">
+        <link rel="next" href="../best-practices/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -428,85 +428,37 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#configuration-options" class="md-nav__link">
+  <a href="#progress-tracking" class="md-nav__link">
     <span class="md-ellipsis">
-      Configuration Options
+      Progress Tracking
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Configuration Options">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#executor-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      Executor Types
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#worker-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      Worker Management
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Worker Management">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#worker-prewarming" class="md-nav__link">
-    <span class="md-ellipsis">
-      Worker Prewarming
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dynamic-worker-pools" class="md-nav__link">
-    <span class="md-ellipsis">
-      Dynamic Worker Pools
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#rate-limiting" class="md-nav__link">
+  <a href="#timeouts" class="md-nav__link">
     <span class="md-ellipsis">
-      Rate Limiting
+      Timeouts
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Rate Limiting">
+    <nav class="md-nav" aria-label="Timeouts">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#time-based-rate-limits" class="md-nav__link">
+  <a href="#total-timeout-sync" class="md-nav__link">
     <span class="md-ellipsis">
-      Time-Based Rate Limits
+      Total Timeout (sync)
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#custom-rate-limiting" class="md-nav__link">
+  <a href="#per-task-timeout-async" class="md-nav__link">
     <span class="md-ellipsis">
-      Custom Rate Limiting
+      Per-Task Timeout (async)
     </span>
   </a>
   
@@ -518,28 +470,37 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#batch-processing" class="md-nav__link">
+  <a href="#method-support" class="md-nav__link">
     <span class="md-ellipsis">
-      Batch Processing
+      Method Support
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Batch Processing">
+    <nav class="md-nav" aria-label="Method Support">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#automatic-batching" class="md-nav__link">
+  <a href="#instance-methods" class="md-nav__link">
     <span class="md-ellipsis">
-      Automatic Batching
+      Instance Methods
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#memory-efficient-processing" class="md-nav__link">
+  <a href="#static-methods" class="md-nav__link">
     <span class="md-ellipsis">
-      Memory-Efficient Processing
+      Static Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-parallel_map-with-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using parallel_map with Methods
     </span>
   </a>
   
@@ -551,68 +512,65 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#advanced-error-handling" class="md-nav__link">
+  <a href="#overriding-decorator-defaults" class="md-nav__link">
     <span class="md-ellipsis">
-      Advanced Error Handling
+      Overriding Decorator Defaults
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Advanced Error Handling">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#batch-error-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      Batch Error Handling
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#custom-exception-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      Custom Exception Handling
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#performance-optimization" class="md-nav__link">
+  <a href="#async-decorator" class="md-nav__link">
     <span class="md-ellipsis">
-      Performance Optimization
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Performance Optimization">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#worker-pool-optimization" class="md-nav__link">
-    <span class="md-ellipsis">
-      Worker Pool Optimization
+      Async Decorator
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#batch-size-optimization" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#retry" class="md-nav__link">
     <span class="md-ellipsis">
-      Batch Size Optimization
+      Retry
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#batching" class="md-nav__link">
+    <span class="md-ellipsis">
+      Batching
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#starmap-multi-argument-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Starmap — Multi-Argument Functions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-constant-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      Streaming — Constant Memory
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#structured-error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Structured Error Handling
+    </span>
+  </a>
   
 </li>
       
@@ -620,27 +578,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../configuration/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Configuration
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -723,11 +660,32 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api-reference/decorators/" class="md-nav__link">
+      <a href="../../api-reference/core/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Decorators
+    Core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/async/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Async
   </span>
   
 
@@ -749,27 +707,6 @@
   
   <span class="md-ellipsis">
     Rate Limiting
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api-reference/configuration-api/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Configuration API
   </span>
   
 
@@ -904,85 +841,37 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#configuration-options" class="md-nav__link">
+  <a href="#progress-tracking" class="md-nav__link">
     <span class="md-ellipsis">
-      Configuration Options
+      Progress Tracking
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Configuration Options">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#executor-types" class="md-nav__link">
-    <span class="md-ellipsis">
-      Executor Types
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#worker-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      Worker Management
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Worker Management">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#worker-prewarming" class="md-nav__link">
-    <span class="md-ellipsis">
-      Worker Prewarming
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dynamic-worker-pools" class="md-nav__link">
-    <span class="md-ellipsis">
-      Dynamic Worker Pools
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#rate-limiting" class="md-nav__link">
+  <a href="#timeouts" class="md-nav__link">
     <span class="md-ellipsis">
-      Rate Limiting
+      Timeouts
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Rate Limiting">
+    <nav class="md-nav" aria-label="Timeouts">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#time-based-rate-limits" class="md-nav__link">
+  <a href="#total-timeout-sync" class="md-nav__link">
     <span class="md-ellipsis">
-      Time-Based Rate Limits
+      Total Timeout (sync)
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#custom-rate-limiting" class="md-nav__link">
+  <a href="#per-task-timeout-async" class="md-nav__link">
     <span class="md-ellipsis">
-      Custom Rate Limiting
+      Per-Task Timeout (async)
     </span>
   </a>
   
@@ -994,28 +883,37 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#batch-processing" class="md-nav__link">
+  <a href="#method-support" class="md-nav__link">
     <span class="md-ellipsis">
-      Batch Processing
+      Method Support
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Batch Processing">
+    <nav class="md-nav" aria-label="Method Support">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#automatic-batching" class="md-nav__link">
+  <a href="#instance-methods" class="md-nav__link">
     <span class="md-ellipsis">
-      Automatic Batching
+      Instance Methods
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#memory-efficient-processing" class="md-nav__link">
+  <a href="#static-methods" class="md-nav__link">
     <span class="md-ellipsis">
-      Memory-Efficient Processing
+      Static Methods
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#using-parallel_map-with-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using parallel_map with Methods
     </span>
   </a>
   
@@ -1027,68 +925,65 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#advanced-error-handling" class="md-nav__link">
+  <a href="#overriding-decorator-defaults" class="md-nav__link">
     <span class="md-ellipsis">
-      Advanced Error Handling
+      Overriding Decorator Defaults
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Advanced Error Handling">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#batch-error-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      Batch Error Handling
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#custom-exception-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      Custom Exception Handling
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#performance-optimization" class="md-nav__link">
+  <a href="#async-decorator" class="md-nav__link">
     <span class="md-ellipsis">
-      Performance Optimization
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Performance Optimization">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#worker-pool-optimization" class="md-nav__link">
-    <span class="md-ellipsis">
-      Worker Pool Optimization
+      Async Decorator
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#batch-size-optimization" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#retry" class="md-nav__link">
     <span class="md-ellipsis">
-      Batch Size Optimization
+      Retry
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#batching" class="md-nav__link">
+    <span class="md-ellipsis">
+      Batching
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#starmap-multi-argument-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Starmap — Multi-Argument Functions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-constant-memory" class="md-nav__link">
+    <span class="md-ellipsis">
+      Streaming — Constant Memory
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#structured-error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Structured Error Handling
+    </span>
+  </a>
   
 </li>
       
@@ -1111,136 +1006,196 @@
 
 
 <h1 id="advanced-features">Advanced Features<a class="headerlink" href="#advanced-features" title="Permanent link">&para;</a></h1>
-<h2 id="configuration-options">Configuration Options<a class="headerlink" href="#configuration-options" title="Permanent link">&para;</a></h2>
-<h3 id="executor-types">Executor Types<a class="headerlink" href="#executor-types" title="Permanent link">&para;</a></h3>
-<p>Pyarallel supports both thread and process-based executors:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Thread-based for I/O-bound tasks (default)</span>
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">executor_type</span><span class="o">=</span><span class="s2">&quot;thread&quot;</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">io_task</span><span class="p">():</span> <span class="o">...</span>
+<h2 id="progress-tracking">Progress Tracking<a class="headerlink" href="#progress-tracking" title="Permanent link">&para;</a></h2>
+<p>Track progress for long-running operations:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span>
 
-<span class="c1"># Process-based for CPU-bound tasks</span>
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">executor_type</span><span class="o">=</span><span class="s2">&quot;process&quot;</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">cpu_task</span><span class="p">():</span> <span class="o">...</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">my_progress</span><span class="p">(</span><span class="n">done</span><span class="p">,</span> <span class="n">total</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\r</span><span class="si">{</span><span class="n">done</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="mi">100</span><span class="o">*</span><span class="n">done</span><span class="o">//</span><span class="n">total</span><span class="si">}</span><span class="s2">%)&quot;</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">on_progress</span><span class="o">=</span><span class="n">my_progress</span><span class="p">)</span>
 </code></pre></div>
-<h3 id="worker-management">Worker Management<a class="headerlink" href="#worker-management" title="Permanent link">&para;</a></h3>
-<h4 id="worker-prewarming">Worker Prewarming<a class="headerlink" href="#worker-prewarming" title="Permanent link">&para;</a></h4>
-<p>Reduce initial latency by prewarming workers:</p>
-<div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span>
-    <span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
-    <span class="n">prewarm</span><span class="o">=</span><span class="kc">True</span>  <span class="c1"># Start workers immediately</span>
-<span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">latency_sensitive_task</span><span class="p">():</span> <span class="o">...</span>
+<p>Works with both <code>parallel_map</code> and <code>.map()</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span> <span class="o">...</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">on_progress</span><span class="o">=</span><span class="k">lambda</span> <span class="n">d</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">))</span>
 </code></pre></div>
-<h4 id="dynamic-worker-pools">Dynamic Worker Pools<a class="headerlink" href="#dynamic-worker-pools" title="Permanent link">&para;</a></h4>
-<p>Pyarallel automatically manages worker lifecycles:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Workers are reused across calls</span>
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">reused_pool_task</span><span class="p">():</span> <span class="o">...</span>
+<h2 id="timeouts">Timeouts<a class="headerlink" href="#timeouts" title="Permanent link">&para;</a></h2>
+<h3 id="total-timeout-sync">Total Timeout (sync)<a class="headerlink" href="#total-timeout-sync" title="Permanent link">&para;</a></h3>
+<p>Set a wall-clock limit for the entire operation:</p>
+<div class="highlight"><pre><span></span><code><span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">30.0</span><span class="p">)</span>
 
-<span class="c1"># Workers are cleaned up when no longer needed</span>
+<span class="c1"># Tasks that didn&#39;t complete are marked as failures</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">results</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">exc</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">failures</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="ne">TimeoutError</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Item </span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2"> timed out&quot;</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="rate-limiting">Rate Limiting<a class="headerlink" href="#rate-limiting" title="Permanent link">&para;</a></h2>
-<h3 id="time-based-rate-limits">Time-Based Rate Limits<a class="headerlink" href="#time-based-rate-limits" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c1"># Operations per second</span>
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">rate_limit</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>  <span class="c1"># 10 ops/second</span>
+<h3 id="per-task-timeout-async">Per-Task Timeout (async)<a class="headerlink" href="#per-task-timeout-async" title="Permanent link">&para;</a></h3>
+<p>The async API supports per-task timeouts via <code>asyncio.wait_for</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel_map</span>
 
-<span class="c1"># Operations per minute</span>
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">rate_limit</span><span class="o">=</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>  <span class="c1"># 100 ops/minute</span>
-
-<span class="c1"># Operations per hour</span>
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">rate_limit</span><span class="o">=</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="s2">&quot;hour&quot;</span><span class="p">))</span>  <span class="c1"># 1000 ops/hour</span>
+<span class="n">results</span> <span class="o">=</span> <span class="k">await</span> <span class="n">async_parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">concurrency</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">task_timeout</span><span class="o">=</span><span class="mf">5.0</span><span class="p">)</span>
+<span class="c1"># Each individual task gets 5 seconds before timing out</span>
 </code></pre></div>
-<h3 id="custom-rate-limiting">Custom Rate Limiting<a class="headerlink" href="#custom-rate-limiting" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimit</span>
+<h2 id="method-support">Method Support<a class="headerlink" href="#method-support" title="Permanent link">&para;</a></h2>
+<p>The <code>@parallel</code> decorator works with instance methods via the descriptor protocol:</p>
+<h3 id="instance-methods">Instance Methods<a class="headerlink" href="#instance-methods" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Scraper</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">session</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session</span> <span class="o">=</span> <span class="n">session</span>
 
-<span class="c1"># Create custom rate limit</span>
-<span class="n">rate</span> <span class="o">=</span> <span class="n">RateLimit</span><span class="p">(</span><span class="n">count</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="s2">&quot;minute&quot;</span><span class="p">)</span>
+    <span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">text</span>
 
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">rate_limit</span><span class="o">=</span><span class="n">rate</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">rate_limited_task</span><span class="p">():</span> <span class="o">...</span>
+<span class="n">s</span> <span class="o">=</span> <span class="n">Scraper</span><span class="p">(</span><span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">())</span>
+<span class="n">s</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;http://example.com&quot;</span><span class="p">)</span>       <span class="c1"># normal — returns str</span>
+<span class="n">s</span><span class="o">.</span><span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span>                   <span class="c1"># parallel — returns ParallelResult</span>
 </code></pre></div>
-<h2 id="batch-processing">Batch Processing<a class="headerlink" href="#batch-processing" title="Permanent link">&para;</a></h2>
-<h3 id="automatic-batching">Automatic Batching<a class="headerlink" href="#automatic-batching" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span>
-    <span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
-    <span class="n">batch_size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>  <span class="c1"># Process 10 items at a time</span>
-    <span class="n">executor_type</span><span class="o">=</span><span class="s2">&quot;process&quot;</span>
-<span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">process_batch</span><span class="p">(</span><span class="n">items</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
-    <span class="k">return</span> <span class="p">[</span><span class="n">process_item</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">]</span>
+<h3 id="static-methods">Static Methods<a class="headerlink" href="#static-methods" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MathUtils</span><span class="p">:</span>
+    <span class="nd">@staticmethod</span>
+    <span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">square</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">x</span> <span class="o">**</span> <span class="mi">2</span>
 
-<span class="c1"># Process large dataset</span>
-<span class="n">items</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1000</span><span class="p">))</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">process_batch</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>  <span class="c1"># Processed in batches of 10</span>
+<span class="n">MathUtils</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>                 <span class="c1"># 25</span>
+<span class="n">MathUtils</span><span class="o">.</span><span class="n">square</span><span class="o">.</span><span class="n">map</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>    <span class="c1"># ParallelResult([1, 4, 9])</span>
 </code></pre></div>
-<h3 id="memory-efficient-processing">Memory-Efficient Processing<a class="headerlink" href="#memory-efficient-processing" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span>
-    <span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
-    <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span>  <span class="c1"># Larger batches for better throughput</span>
-<span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">process_large_dataset</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
-    <span class="k">return</span> <span class="n">heavy_processing</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-
-<span class="c1"># Process millions of items efficiently</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">process_large_dataset</span><span class="p">(</span><span class="n">large_dataset</span><span class="p">)</span>
+<h3 id="using-parallel_map-with-methods">Using parallel_map with Methods<a class="headerlink" href="#using-parallel_map-with-methods" title="Permanent link">&para;</a></h3>
+<p>You can always use <code>parallel_map</code> directly with bound methods:</p>
+<div class="highlight"><pre><span></span><code><span class="n">scraper</span> <span class="o">=</span> <span class="n">Scraper</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">scraper</span><span class="o">.</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 </code></pre></div>
-<h2 id="advanced-error-handling">Advanced Error Handling<a class="headerlink" href="#advanced-error-handling" title="Permanent link">&para;</a></h2>
-<h3 id="batch-error-handling">Batch Error Handling<a class="headerlink" href="#batch-error-handling" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
+<h2 id="overriding-decorator-defaults">Overriding Decorator Defaults<a class="headerlink" href="#overriding-decorator-defaults" title="Permanent link">&para;</a></h2>
+<p>Per-call overrides on <code>.map()</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="s2">&quot;second&quot;</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">item</span><span class="p">):</span> <span class="o">...</span>
 
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">process_with_errors</span><span class="p">(</span><span class="n">items</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]]:</span>
-    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">:</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">process_item</span><span class="p">(</span><span class="n">item</span><span class="p">))</span>
-        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># Continue on error</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error processing </span><span class="si">{</span><span class="n">item</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">results</span>
+<span class="c1"># Override workers and rate limit for this specific call</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">big_list</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
 </code></pre></div>
-<h3 id="custom-exception-handling">Custom Exception Handling<a class="headerlink" href="#custom-exception-handling" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ProcessingError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
-    <span class="k">pass</span>
+<h2 id="async-decorator">Async Decorator<a class="headerlink" href="#async-decorator" title="Permanent link">&para;</a></h2>
+<p>Same pattern as sync, with <code>async</code>/<code>await</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel</span>
 
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">safe_process</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
-    <span class="k">try</span><span class="p">:</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="n">process_item</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">validate_result</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="n">ProcessingError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid result for </span><span class="si">{</span><span class="n">item</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">result</span>
-    <span class="k">except</span> <span class="n">ProcessingError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="c1"># Handle specific errors</span>
-        <span class="n">handle_processing_error</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
-    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-        <span class="c1"># Handle unexpected errors</span>
-        <span class="n">handle_unexpected_error</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+<span class="nd">@async_parallel</span><span class="p">(</span><span class="n">concurrency</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
+    <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">c</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span><span class="k">await</span> <span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">))</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+
+<span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;http://example.com&quot;</span><span class="p">)</span>       <span class="c1"># single call</span>
+<span class="n">results</span> <span class="o">=</span> <span class="k">await</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span>                 <span class="c1"># parallel</span>
+<span class="n">results</span> <span class="o">=</span> <span class="k">await</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">task_timeout</span><span class="o">=</span><span class="mf">5.0</span><span class="p">)</span>  <span class="c1"># with per-task timeout</span>
 </code></pre></div>
-<h2 id="performance-optimization">Performance Optimization<a class="headerlink" href="#performance-optimization" title="Permanent link">&para;</a></h2>
-<h3 id="worker-pool-optimization">Worker Pool Optimization<a class="headerlink" href="#worker-pool-optimization" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c1"># Optimize for CPU-bound tasks</span>
-<span class="nd">@parallel</span><span class="p">(</span>
-    <span class="n">max_workers</span><span class="o">=</span><span class="n">multiprocessing</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">(),</span>
-    <span class="n">executor_type</span><span class="o">=</span><span class="s2">&quot;process&quot;</span>
-<span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">cpu_optimized_task</span><span class="p">():</span> <span class="o">...</span>
+<h2 id="retry">Retry<a class="headerlink" href="#retry" title="Permanent link">&para;</a></h2>
+<p>Built-in per-item retry with exponential backoff and jitter:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">Retry</span>
 
-<span class="c1"># Optimize for I/O-bound tasks</span>
-<span class="nd">@parallel</span><span class="p">(</span>
-    <span class="n">max_workers</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>  <span class="c1"># Higher worker count for I/O</span>
-    <span class="n">executor_type</span><span class="o">=</span><span class="s2">&quot;thread&quot;</span>
-<span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">io_optimized_task</span><span class="p">():</span> <span class="o">...</span>
+<span class="c1"># Retry up to 3 times with 1s base exponential backoff</span>
+<span class="c1"># Jitter is ON by default — randomizes delay ±50% to prevent thundering herd</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">backoff</span><span class="o">=</span><span class="mf">1.0</span><span class="p">))</span>
+
+<span class="c1"># Only retry transient network errors — fail immediately on bad input</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+                       <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="ne">ConnectionError</span><span class="p">,</span> <span class="ne">TimeoutError</span><span class="p">)))</span>
+
+<span class="c1"># Cap max delay and disable jitter (useful for testing)</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+                       <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">attempts</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">backoff</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="n">max_delay</span><span class="o">=</span><span class="mf">30.0</span><span class="p">,</span> <span class="n">jitter</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
 </code></pre></div>
-<h3 id="batch-size-optimization">Batch Size Optimization<a class="headerlink" href="#batch-size-optimization" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c1"># Small batches for low latency</span>
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">low_latency_task</span><span class="p">():</span> <span class="o">...</span>
+<p><strong>How backoff works:</strong> delay = <code>backoff * 2^attempt</code>, capped at <code>max_delay</code>. With <code>jitter=True</code> (default), the delay is multiplied by a random factor between 0.5 and 1.5 — this prevents all workers from retrying at the exact same moment when a service recovers.</p>
+<p>Retries happen <em>inside the worker</em> — only the failing item is retried, not the entire batch. This composes cleanly with rate limiting and batching.</p>
+<p>For the full <code>Retry</code> API, see <a href="../../api-reference/core/#retry">API Reference</a>.</p>
+<h2 id="batching">Batching<a class="headerlink" href="#batching" title="Permanent link">&para;</a></h2>
+<p>Control memory for large datasets by processing in chunks:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Submit 500 items at a time instead of 500,000 at once</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">huge_list</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+</code></pre></div>
+<p>Errors in one batch don't prevent subsequent batches from running.</p>
+<h2 id="starmap-multi-argument-functions">Starmap — Multi-Argument Functions<a class="headerlink" href="#starmap-multi-argument-functions" title="Permanent link">&para;</a></h2>
+<p>For functions that take multiple arguments, use <code>parallel_starmap</code> or <code>.starmap()</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_starmap</span>
 
-<span class="c1"># Large batches for high throughput</span>
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">high_throughput_task</span><span class="p">():</span> <span class="o">...</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fetch_with_auth</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">token</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="n">token</span><span class="p">})</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_starmap</span><span class="p">(</span><span class="n">fetch_with_auth</span><span class="p">,</span>
+                           <span class="p">[(</span><span class="n">url</span><span class="p">,</span> <span class="n">token</span><span class="p">)</span> <span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">urls</span><span class="p">],</span>
+                           <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+
+<span class="c1"># Or with the decorator</span>
+<span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fetch_with_auth</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">token</span><span class="p">):</span> <span class="o">...</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="n">fetch_with_auth</span><span class="o">.</span><span class="n">starmap</span><span class="p">([(</span><span class="n">url1</span><span class="p">,</span> <span class="n">token</span><span class="p">),</span> <span class="p">(</span><span class="n">url2</span><span class="p">,</span> <span class="n">token</span><span class="p">)])</span>
+</code></pre></div>
+<h2 id="streaming-constant-memory">Streaming — Constant Memory<a class="headerlink" href="#streaming-constant-memory" title="Permanent link">&para;</a></h2>
+<p>For large-scale processing where results shouldn't accumulate in memory, use <code>parallel_iter</code> or <code>.stream()</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_iter</span>
+
+<span class="c1"># Process 10M items — only one batch of results in memory at a time</span>
+<span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">parallel_iter</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">ten_million_items</span><span class="p">,</span>
+                                  <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
+        <span class="n">log_error</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+<span class="c1"># Or with the decorator</span>
+<span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">item</span><span class="p">):</span> <span class="o">...</span>
+
+<span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">process</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="n">huge_list</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+</code></pre></div>
+<p>Results arrive in <strong>completion order</strong> (fastest tasks first), not input order. Each <code>(index, value)</code> tuple includes the original index so you can match results to inputs.</p>
+<p><strong>When to use which:</strong></p>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>Memory</th>
+<th>Use case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.map()</code> / <code>parallel_map</code></td>
+<td>All results in memory</td>
+<td>Results fit in memory, need <code>.ok</code>, <code>.failures()</code></td>
+</tr>
+<tr>
+<td><code>.stream()</code> / <code>parallel_iter</code></td>
+<td>Constant (one batch)</td>
+<td>ETL, streaming to DB, 10M+ items</td>
+</tr>
+</tbody>
+</table>
+<h2 id="structured-error-handling">Structured Error Handling<a class="headerlink" href="#structured-error-handling" title="Permanent link">&para;</a></h2>
+<p><code>ParallelResult</code> never silently drops errors:</p>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+
+<span class="c1"># Inspect successes and failures separately</span>
+<span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">successes</span><span class="p">():</span>
+    <span class="n">save</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">error</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">failures</span><span class="p">():</span>
+    <span class="n">log_error</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">error</span><span class="p">)</span>
+
+<span class="c1"># Retry just the failed items</span>
+<span class="n">failed_items</span> <span class="o">=</span> <span class="p">[</span><span class="n">items</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">failures</span><span class="p">()]</span>
+<span class="n">retry_result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">failed_items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</code></pre></div>
+<p>When you iterate or call <code>.values()</code>, failures raise an <code>ExceptionGroup</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="k">try</span><span class="p">:</span>
+    <span class="n">values</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+<span class="k">except</span> <span class="n">ExceptionGroup</span> <span class="k">as</span> <span class="n">eg</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">eg</span><span class="o">.</span><span class="n">exceptions</span><span class="p">)</span><span class="si">}</span><span class="s2"> tasks failed&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">exc</span> <span class="ow">in</span> <span class="n">eg</span><span class="o">.</span><span class="n">exceptions</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
 
 

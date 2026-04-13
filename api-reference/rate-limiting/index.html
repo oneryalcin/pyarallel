@@ -13,10 +13,10 @@
         <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/api-reference/rate-limiting/">
       
       
-        <link rel="prev" href="../decorators/">
+        <link rel="prev" href="../async/">
       
       
-        <link rel="next" href="../configuration-api/">
+        <link rel="next" href="../../development/CONTRIBUTING/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#api-reference" class="md-skip">
+        <a href="#rate-limiting" class="md-skip">
           Skip to content
         </a>
       
@@ -403,27 +403,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/configuration/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Configuration
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../user-guide/best-practices/" class="md-nav__link">
         
   
@@ -494,11 +473,32 @@
   
   
     <li class="md-nav__item">
-      <a href="../decorators/" class="md-nav__link">
+      <a href="../core/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Decorators
+    Core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../async/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Async
   </span>
   
 
@@ -561,47 +561,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#rate-limiting-api" class="md-nav__link">
+  <a href="#basic-usage" class="md-nav__link">
     <span class="md-ellipsis">
-      Rate Limiting API
+      Basic Usage
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Rate Limiting API">
+    <nav class="md-nav" aria-label="Basic Usage">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ratelimit" class="md-nav__link">
+  <a href="#with-ratelimit-object" class="md-nav__link">
     <span class="md-ellipsis">
-      RateLimit
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="RateLimit">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      Parameters
+      With RateLimit Object
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#properties" class="md-nav__link">
+  <a href="#shorthand-ops-per-second" class="md-nav__link">
     <span class="md-ellipsis">
-      Properties
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      Examples
+      Shorthand (ops per second)
     </span>
   </a>
   
@@ -611,42 +592,31 @@
     </nav>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#tokenbucket" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
     <span class="md-ellipsis">
-      TokenBucket
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TokenBucket">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#parameters_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      Parameters
+      How It Works
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#methods" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#with-the-decorator" class="md-nav__link">
     <span class="md-ellipsis">
-      Methods
+      With the Decorator
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tips
+    </span>
+  </a>
   
 </li>
       
@@ -654,27 +624,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../configuration-api/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Configuration API
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -805,47 +754,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#rate-limiting-api" class="md-nav__link">
+  <a href="#basic-usage" class="md-nav__link">
     <span class="md-ellipsis">
-      Rate Limiting API
+      Basic Usage
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Rate Limiting API">
+    <nav class="md-nav" aria-label="Basic Usage">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#ratelimit" class="md-nav__link">
+  <a href="#with-ratelimit-object" class="md-nav__link">
     <span class="md-ellipsis">
-      RateLimit
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="RateLimit">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#parameters" class="md-nav__link">
-    <span class="md-ellipsis">
-      Parameters
+      With RateLimit Object
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#properties" class="md-nav__link">
+  <a href="#shorthand-ops-per-second" class="md-nav__link">
     <span class="md-ellipsis">
-      Properties
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      Examples
+      Shorthand (ops per second)
     </span>
   </a>
   
@@ -855,42 +785,31 @@
     </nav>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#tokenbucket" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
     <span class="md-ellipsis">
-      TokenBucket
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TokenBucket">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#parameters_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      Parameters
+      How It Works
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#methods" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#with-the-decorator" class="md-nav__link">
     <span class="md-ellipsis">
-      Methods
+      With the Decorator
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#tips" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tips
+    </span>
+  </a>
   
 </li>
       
@@ -912,53 +831,50 @@
   
 
 
-<h1 id="api-reference">API Reference<a class="headerlink" href="#api-reference" title="Permanent link">&para;</a></h1>
-<h2 id="rate-limiting-api">Rate Limiting API<a class="headerlink" href="#rate-limiting-api" title="Permanent link">&para;</a></h2>
-<h3 id="ratelimit">RateLimit<a class="headerlink" href="#ratelimit" title="Permanent link">&para;</a></h3>
-<p>Configuration class for rate limiting parallel operations.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">RateLimit</span>
+<h1 id="rate-limiting">Rate Limiting<a class="headerlink" href="#rate-limiting" title="Permanent link">&para;</a></h1>
+<p>Pyarallel includes a token-bucket rate limiter for controlling execution rates.</p>
+<h2 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h2>
+<h3 id="with-ratelimit-object">With <code>RateLimit</code> Object<a class="headerlink" href="#with-ratelimit-object" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span>
 
-<span class="n">rate</span> <span class="o">=</span> <span class="n">RateLimit</span><span class="p">(</span>
-    <span class="n">count</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
-    <span class="n">interval</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;second&quot;</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">,</span> <span class="s2">&quot;hour&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;second&quot;</span>
-<span class="p">)</span>
-</code></pre></div>
-<h4 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h4>
-<ul>
-<li><code>count</code> (float): Number of operations allowed per interval</li>
-<li><code>interval</code> (str): Time interval for rate limiting ("second", "minute", "hour")</li>
-</ul>
-<h4 id="properties">Properties<a class="headerlink" href="#properties" title="Permanent link">&para;</a></h4>
-<ul>
-<li><code>per_second</code> (float): Converts the rate to operations per second</li>
-</ul>
-<h4 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h4>
-<div class="highlight"><pre><span></span><code><span class="c1"># Define rate limits</span>
-<span class="n">per_minute</span> <span class="o">=</span> <span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">)</span>  <span class="c1"># 100 ops/minute</span>
-<span class="n">per_hour</span> <span class="o">=</span> <span class="n">RateLimit</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="s2">&quot;hour&quot;</span><span class="p">)</span>    <span class="c1"># 1000 ops/hour</span>
+<span class="c1"># 100 operations per minute</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+                       <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
 
-<span class="c1"># Use with parallel decorator</span>
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">rate_limit</span><span class="o">=</span><span class="n">per_minute</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">rate_limited_function</span><span class="p">(</span><span class="n">item</span><span class="p">):</span> <span class="o">...</span>
+<span class="c1"># 1000 per hour</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span>
+                       <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="s2">&quot;hour&quot;</span><span class="p">))</span>
 </code></pre></div>
-<h3 id="tokenbucket">TokenBucket<a class="headerlink" href="#tokenbucket" title="Permanent link">&para;</a></h3>
-<p>Thread-safe implementation of the token bucket algorithm for rate limiting.</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">TokenBucket</span>
+<h3 id="shorthand-ops-per-second">Shorthand (ops per second)<a class="headerlink" href="#shorthand-ops-per-second" title="Permanent link">&para;</a></h3>
+<p>Pass a number for simple per-second limits:</p>
+<div class="highlight"><pre><span></span><code><span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>  <span class="c1"># 10 per second</span>
+</code></pre></div>
+<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
+<p>Rate limiting uses a <strong>token bucket</strong> algorithm:</p>
+<ol>
+<li>Each operation claims a time-slot</li>
+<li>Slots are spaced at <code>1 / rate_per_second</code> intervals</li>
+<li>If a slot is in the future, the caller sleeps until that slot</li>
+<li>Thread-safe — the lock is held only for bookkeeping, never during sleep</li>
+</ol>
+<p>For the async API, an equivalent <code>asyncio.Lock</code>-based bucket is used with <code>asyncio.sleep</code>.</p>
+<h2 id="with-the-decorator">With the Decorator<a class="headerlink" href="#with-the-decorator" title="Permanent link">&para;</a></h2>
+<p>Set a default rate limit, override per-call:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">call_api</span><span class="p">(</span><span class="n">item_id</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">api</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">item_id</span><span class="p">)</span>
 
-<span class="n">bucket</span> <span class="o">=</span> <span class="n">TokenBucket</span><span class="p">(</span>
-    <span class="n">rate_limit</span><span class="p">:</span> <span class="n">RateLimit</span><span class="p">,</span>
-    <span class="n">capacity</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span>
-<span class="p">)</span>
+<span class="c1"># Uses default rate limit</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">call_api</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
+
+<span class="c1"># Override for this call</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">call_api</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">ids</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
 </code></pre></div>
-<h4 id="parameters_1">Parameters<a class="headerlink" href="#parameters_1" title="Permanent link">&para;</a></h4>
+<h2 id="tips">Tips<a class="headerlink" href="#tips" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>rate_limit</code> (RateLimit): Rate limiting configuration</li>
-<li><code>capacity</code> (int, optional): Maximum number of tokens the bucket can hold</li>
-</ul>
-<h4 id="methods">Methods<a class="headerlink" href="#methods" title="Permanent link">&para;</a></h4>
-<ul>
-<li><code>get_token() -&gt; bool</code>: Try to get a token from the bucket</li>
-<li><code>wait_for_token()</code>: Block until a token is available</li>
+<li><strong>Leave buffer</strong> below actual API limits (use 90% of the limit)</li>
+<li><strong>Rate limiting is at submission time</strong> (sync) — items are submitted to the pool at the controlled rate</li>
+<li><strong>Rate limiting is at execution time</strong> (async) — tasks acquire the rate token inside the semaphore</li>
 </ul>
 
 

@@ -346,36 +346,27 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#basic-installation" class="md-nav__link">
+  <a href="#install" class="md-nav__link">
     <span class="md-ellipsis">
-      Basic Installation
+      Install
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#development-installation" class="md-nav__link">
+  <a href="#development-install" class="md-nav__link">
     <span class="md-ellipsis">
-      Development Installation
+      Development Install
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#verifying-installation" class="md-nav__link">
+  <a href="#verify" class="md-nav__link">
     <span class="md-ellipsis">
-      Verifying Installation
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      Troubleshooting
+      Verify
     </span>
   </a>
   
@@ -488,27 +479,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/configuration/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Configuration
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../user-guide/best-practices/" class="md-nav__link">
         
   
@@ -579,11 +549,32 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api-reference/decorators/" class="md-nav__link">
+      <a href="../../api-reference/core/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Decorators
+    Core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api-reference/async/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Async
   </span>
   
 
@@ -605,27 +596,6 @@
   
   <span class="md-ellipsis">
     Rate Limiting
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api-reference/configuration-api/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Configuration API
   </span>
   
 
@@ -769,36 +739,27 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#basic-installation" class="md-nav__link">
+  <a href="#install" class="md-nav__link">
     <span class="md-ellipsis">
-      Basic Installation
+      Install
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#development-installation" class="md-nav__link">
+  <a href="#development-install" class="md-nav__link">
     <span class="md-ellipsis">
-      Development Installation
+      Development Install
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#verifying-installation" class="md-nav__link">
+  <a href="#verify" class="md-nav__link">
     <span class="md-ellipsis">
-      Verifying Installation
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      Troubleshooting
+      Verify
     </span>
   </a>
   
@@ -825,57 +786,22 @@
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
 <h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Python 3.9 or higher</li>
-<li>pip package manager</li>
+<li>Python 3.12 or higher</li>
 </ul>
-<h2 id="basic-installation">Basic Installation<a class="headerlink" href="#basic-installation" title="Permanent link">&para;</a></h2>
-<p>Install Pyarallel using pip:</p>
+<h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>pyarallel
 </code></pre></div>
-<h2 id="development-installation">Development Installation<a class="headerlink" href="#development-installation" title="Permanent link">&para;</a></h2>
-<p>For development or contributing to Pyarallel:</p>
-<ol>
-<li>
-<p>Clone the repository:
+<h2 id="development-install">Development Install<a class="headerlink" href="#development-install" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/oneryalcin/pyarallel.git
 <span class="nb">cd</span><span class="w"> </span>pyarallel
-</code></pre></div></p>
-</li>
-<li>
-<p>Install development dependencies:
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
-</code></pre></div></p>
-</li>
-</ol>
-<h2 id="verifying-installation">Verifying Installation<a class="headerlink" href="#verifying-installation" title="Permanent link">&para;</a></h2>
-<p>Verify your installation by running Python and importing Pyarallel:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel</span>
-
-<span class="c1"># Test with a simple parallel function</span>
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">test_func</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">x</span> <span class="o">*</span> <span class="mi">2</span>
-
-<span class="n">result</span> <span class="o">=</span> <span class="n">test_func</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>  <span class="c1"># Should print: [2, 4, 6]</span>
+pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
 </code></pre></div>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
-<p>If you encounter any issues during installation:</p>
-<ol>
-<li>
-<p>Ensure you have the latest pip version:
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
-</code></pre></div></p>
-</li>
-<li>
-<p>Check Python version compatibility:
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>--version
-</code></pre></div></p>
-</li>
-<li>
-<p>For platform-specific issues or additional help, please refer to our <a href="https://github.com/oneryalcin/pyarallel/issues">GitHub Issues</a> page.</p>
-</li>
-</ol>
+<h2 id="verify">Verify<a class="headerlink" href="#verify" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">workers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">results</span><span class="p">))</span>  <span class="c1"># [2, 4, 6]</span>
+</code></pre></div>
 
 
 
