@@ -29,12 +29,13 @@ from ._plan import (
     _plan_collected_map,
     _progress_total,
     _total_if_known,
+    _validate_max_errors,
 )
 from ._procexec import _call_resolved, _call_resolved_args, _resolve_process_target
 from .checkpoint import _CheckpointStore, _task_signature
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
-from .result import ItemResult, ParallelResult, _Failure
+from .result import Aborted, ItemResult, ParallelResult, _Failure
 
 ExecutorType = Literal["thread", "process"]
 
@@ -158,6 +159,7 @@ def parallel_map[T, R](
     batch_size: int | None = None,
     retry: Retry | None = None,
     checkpoint: str | Path | None = None,
+    max_errors: int | None = None,
 ) -> ParallelResult[R]:
     """Execute *fn* over *items* in parallel, returning ordered results.
 
@@ -195,11 +197,32 @@ def parallel_map[T, R](
             result that cannot be checkpointed aborts the run with
             ``CheckpointError``. Rows are positional — reordering or
             inserting inputs forces shifted items to recompute.
+        max_errors: Abort after this many failures (counted after retries
+            are exhausted). Work is then admitted through a bounded window
+            rather than submitted upfront, so a dead API costs tens of
+            calls, not thousands. Items that never ran are marked with
+            ``Aborted`` — distinguishable from real failures.
 
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
     """
     _validate_common(workers, executor, batch_size)
+    _validate_max_errors(max_errors)
+
+    if max_errors is not None:
+        return _collected_map_windowed(
+            fn,
+            items,
+            workers=workers,
+            executor=executor,
+            rate_limit=rate_limit,
+            timeout=timeout,
+            on_progress=on_progress,
+            batch_size=batch_size,
+            retry=retry,
+            checkpoint=checkpoint,
+            max_errors=max_errors,
+        )
 
     bucket = _as_limiter(rate_limit)
     task_fn = _build_task_fn(fn, executor, retry, bucket)
@@ -288,6 +311,146 @@ def parallel_map[T, R](
     return ParallelResult(results)
 
 
+def _collected_map_windowed(
+    fn: Callable[..., Any],
+    items: Iterable[Any],
+    *,
+    workers: int | None,
+    executor: ExecutorType,
+    rate_limit: Limiter | RateLimit | float | None,
+    timeout: float | None,
+    on_progress: Callable[[int, int], None] | None,
+    batch_size: int | None,
+    retry: Retry | None,
+    checkpoint: str | Path | None,
+    max_errors: int,
+) -> ParallelResult[Any]:
+    """Collected map with bounded admission — the ``max_errors`` engine.
+
+    The plain collected path submits everything upfront; with
+    ``max_errors`` that would let a dead API burn thousands of calls
+    before the Nth failure is even observed. Admitting work through a
+    window caps the exposure: total submissions stay within the
+    abort-trigger point plus one window.
+    """
+    bucket = _as_limiter(rate_limit)
+    task_fn = _build_task_fn(fn, executor, retry, bucket)
+    pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
+    window = (
+        batch_size
+        if batch_size is not None
+        else 2 * _effective_workers(workers, executor)
+    )
+    total = _total_if_known(items)
+    source = iter(items)
+    results: list[Any] = []
+    in_flight: dict[Future[Any], int] = {}
+    fingerprints: dict[int, bytes] = {}
+    completed = 0
+    failures = 0
+    aborted = False
+    timed_out = False
+    deadline = (time.monotonic() + timeout) if timeout is not None else None
+
+    store = (
+        _CheckpointStore(checkpoint, _task_signature(fn))
+        if checkpoint is not None
+        else None
+    )
+    pool = pool_cls(max_workers=workers)
+
+    def _report() -> None:
+        if on_progress:
+            on_progress(completed, _progress_total(total, results))
+
+    def _submit_next() -> bool:
+        nonlocal completed
+        while True:
+            try:
+                item = next(source)
+            except StopIteration:
+                return False
+            idx = len(results)
+            results.append(_PENDING)
+            if store is not None:
+                fp = _CheckpointStore.fingerprint(item)
+                cached = store.get(idx, fp)
+                if cached is not None:
+                    results[idx] = cached[0]
+                    completed += 1
+                    _report()
+                    continue  # cached — keep looking for work to admit
+                fingerprints[idx] = fp
+            if bucket:
+                bucket.wait()
+            in_flight[pool.submit(task_fn, item)] = idx
+            return True
+
+    def _absorb(future: Future[Any], idx: int) -> None:
+        nonlocal completed, failures, aborted
+        try:
+            results[idx] = future.result()
+        except Exception as exc:
+            results[idx] = _Failure(exc)
+            failures += 1
+            if failures >= max_errors:
+                aborted = True
+        else:
+            # Outside the try: a checkpoint write failure raises
+            # CheckpointError instead of mislabeling a success as a failure.
+            if store is not None:
+                store.put(idx, fingerprints.pop(idx), results[idx])
+        completed += 1
+        _report()
+
+    try:
+        while True:
+            while not aborted and len(in_flight) < window and _submit_next():
+                pass
+            if not in_flight:
+                break
+            wait_timeout: float | None = None
+            if deadline is not None:
+                wait_timeout = max(0.0, deadline - time.monotonic())
+            done, _pending = wait(
+                in_flight, timeout=wait_timeout, return_when=FIRST_COMPLETED
+            )
+            if not done:
+                timed_out = True
+                break
+            for future in done:
+                _absorb(future, in_flight.pop(future))
+            if aborted:
+                break
+
+        if timed_out:
+            assert timeout is not None
+            for future in in_flight:
+                future.cancel()
+            _mark_timeout_indices(results, in_flight.values(), timeout)
+            _append_timeout_failures(results, source, timeout)
+        elif aborted:
+            # Salvage completions that raced the stop, drop the rest.
+            done, pending = wait(in_flight, timeout=0)
+            for future in done:
+                _absorb(future, in_flight.pop(future))
+            for future in pending:
+                future.cancel()
+            reason = f"aborted after {failures} failures (max_errors={max_errors})"
+            for idx in in_flight.values():
+                if results[idx] is _PENDING:
+                    results[idx] = _Failure(Aborted(reason))
+            for _item in source:
+                results.append(_Failure(Aborted(reason)))
+    finally:
+        stopped = timed_out or aborted
+        pool.shutdown(wait=not stopped, cancel_futures=stopped)
+        if store is not None:
+            store.close()
+
+    return ParallelResult(results)
+
+
 def _unpack_call(fn_and_args: tuple[Callable[..., Any], tuple[Any, ...]]) -> Any:
     """Unpack and call fn(*args) — picklable for process executor."""
     fn, args = fn_and_args
@@ -358,6 +521,7 @@ def parallel_iter[T, R](
     retry: Retry | None = None,
     ordered: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
+    max_errors: int | None = None,
 ) -> Iterator[ItemResult[R]]:
     """Execute *fn* over *items* in parallel, yielding ``ItemResult`` in
     completion order (or input order with ``ordered=True``).
@@ -382,6 +546,11 @@ def parallel_iter[T, R](
     unsized inputs ``total`` is the number of items consumed from the
     source so far, not the final count.
 
+    ``max_errors`` stops the stream early: once that many failures have
+    been yielded (counted after retries are exhausted), admission stops
+    and the stream ends — no placeholder items for unseen input. A
+    consumer detects the abort by counting error items.
+
     Breaking out of the loop closes the generator: submission stops and
     not-yet-started tasks are cancelled. Tasks already running in a
     worker thread or process cannot be interrupted and finish in the
@@ -396,6 +565,7 @@ def parallel_iter[T, R](
                 log_error(item.index, item.error)
     """
     _validate_common(workers, executor, batch_size)
+    _validate_max_errors(max_errors)
 
     bucket = _as_limiter(rate_limit)
     task_fn = _build_task_fn(fn, executor, retry, bucket)
@@ -409,6 +579,8 @@ def parallel_iter[T, R](
     source = enumerate(items)
     seen = 0
     completed = 0
+    failures = 0
+    yielded_failures = 0
     in_flight: dict[Future[R], int] = {}
     buffered: dict[int, ItemResult[R]] = {}
     next_yield = 0
@@ -431,8 +603,17 @@ def parallel_iter[T, R](
         # The engine invariant: in_flight + buffered never exceeds the
         # window. Gating admission on the sum (not on completions) is what
         # keeps ordered mode bounded when a straggler blocks the buffer.
+        if max_errors is not None and failures >= max_errors:
+            return  # aborting — no new work
         while len(in_flight) + len(buffered) < window and _submit_next():
             pass
+
+    def _yield_ends_stream(item_result: ItemResult[R]) -> bool:
+        nonlocal yielded_failures
+        if item_result.ok or max_errors is None:
+            return False
+        yielded_failures += 1
+        return yielded_failures >= max_errors
 
     try:
         _admit()
@@ -445,6 +626,7 @@ def parallel_iter[T, R](
                     result = ItemResult(idx, value=future.result())
                 except Exception as exc:
                     result = ItemResult(idx, error=exc)
+                    failures += 1
                 completed += 1
                 if on_progress:
                     on_progress(completed, total if total is not None else seen)
@@ -452,11 +634,16 @@ def parallel_iter[T, R](
                     buffered[idx] = result
                 else:
                     yield result
+                    if _yield_ends_stream(result):
+                        return
                     _admit()
             if ordered:
                 while next_yield in buffered:
-                    yield buffered.pop(next_yield)
+                    ordered_result = buffered.pop(next_yield)
                     next_yield += 1
+                    yield ordered_result
+                    if _yield_ends_stream(ordered_result):
+                        return
                 _admit()
     finally:
         # Runs on exhaustion, on caller break (generator close), and when

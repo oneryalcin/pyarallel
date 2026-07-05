@@ -13,6 +13,15 @@ from typing import Any
 _MISSING = object()
 
 
+class Aborted(RuntimeError):
+    """The run stopped early because ``max_errors`` failures accumulated.
+
+    Items that never ran (or never finished) are marked with this — they
+    are distinguishable from items that genuinely failed:
+    ``isinstance(exc, Aborted)``.
+    """
+
+
 class _Failure:
     """Sentinel wrapping a failed task result."""
 

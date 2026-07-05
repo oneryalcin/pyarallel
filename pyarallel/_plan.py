@@ -27,6 +27,12 @@ class _CollectedMapPlan:
     remaining: Iterator[Any] | None = None
 
 
+def _validate_max_errors(max_errors: int | None) -> None:
+    """Shared max_errors validation for sync and async entry points."""
+    if max_errors is not None and max_errors < 1:
+        raise ValueError(f"max_errors must be >= 1, got {max_errors}")
+
+
 def _total_if_known(items: Iterable[Any]) -> int | None:
     """Return len(items) when available without forcing materialization."""
     try:

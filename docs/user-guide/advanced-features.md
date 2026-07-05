@@ -253,6 +253,39 @@ Safety guards, stated honestly:
 
 Available on `parallel_map`, `async_parallel_map`, and `.map()`.
 
+## Early Abort — `max_errors`
+
+Stop paying for a dead API. With `max_errors=N` the run aborts once N
+items have failed (counted after retries are exhausted) and returns
+partial results:
+
+```python
+from pyarallel import Aborted
+
+result = parallel_map(fetch, urls, workers=10, max_errors=10)
+
+if not result.ok:
+    real  = [(i, e) for i, e in result.failures() if not isinstance(e, Aborted)]
+    unrun = [i for i, e in result.failures() if isinstance(e, Aborted)]
+```
+
+Work is admitted through a bounded window when `max_errors` is set, so
+the abort is genuinely cheap — a 10k-item job against a dead API costs
+tens of calls, not thousands. Finished items keep their real results;
+never-run items are marked `Aborted`.
+
+The overnight-job combo is `max_errors` + `checkpoint`: the job aborts
+cheaply when the API dies, successes are already persisted, and the
+morning rerun resumes exactly where it stopped:
+
+```python
+result = parallel_map(fetch, users, workers=10,
+                      max_errors=10, checkpoint="nightly.ckpt")
+```
+
+Streaming APIs accept `max_errors` too — the stream ends after the Nth
+failure is yielded, with no placeholder items for unseen input.
+
 ## Batching
 
 Control memory for large datasets by processing in chunks:

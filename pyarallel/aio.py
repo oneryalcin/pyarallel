@@ -17,11 +17,12 @@ from ._plan import (
     _plan_collected_map,
     _progress_total,
     _total_if_known,
+    _validate_max_errors,
 )
 from .checkpoint import CheckpointError, _CheckpointStore, _task_signature
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
-from .result import ItemResult, ParallelResult, _Failure
+from .result import Aborted, ItemResult, ParallelResult, _Failure
 
 
 async def _async_run_with_retry(
@@ -74,6 +75,7 @@ async def async_parallel_map[T, R](
     batch_size: int | None = None,
     retry: Retry | None = None,
     checkpoint: str | Path | None = None,
+    max_errors: int | None = None,
 ) -> ParallelResult[R]:
     """Execute an async *fn* over *items* concurrently.
 
@@ -102,6 +104,11 @@ async def async_parallel_map[T, R](
             result that cannot be checkpointed aborts the run with
             ``CheckpointError``. Rows are positional — reordering or
             inserting inputs forces shifted items to recompute.
+        max_errors: Abort after this many failures (counted after retries
+            are exhausted). Tasks are then created through a bounded
+            window rather than all upfront, so a dead API costs tens of
+            calls, not thousands. Items that never ran are marked with
+            ``Aborted`` — distinguishable from real failures.
 
     Returns:
         ``ParallelResult`` — same container as the sync API.
@@ -110,6 +117,21 @@ async def async_parallel_map[T, R](
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if concurrency < 1:
         raise ValueError(f"concurrency must be >= 1, got {concurrency}")
+    _validate_max_errors(max_errors)
+
+    if max_errors is not None:
+        return await _async_collected_map_windowed(
+            fn,
+            items,
+            concurrency=concurrency,
+            rate_limit=rate_limit,
+            task_timeout=task_timeout,
+            on_progress=on_progress,
+            batch_size=batch_size,
+            retry=retry,
+            checkpoint=checkpoint,
+            max_errors=max_errors,
+        )
 
     plan = _plan_collected_map(items, batch_size)
     if plan.total == 0:
@@ -185,6 +207,132 @@ async def async_parallel_map[T, R](
     return ParallelResult(results)
 
 
+async def _async_collected_map_windowed(
+    fn: Callable[..., Awaitable[Any]],
+    items: Iterable[Any],
+    *,
+    concurrency: int,
+    rate_limit: Limiter | RateLimit | float | None,
+    task_timeout: float | None,
+    on_progress: Callable[[int, int], None] | None,
+    batch_size: int | None,
+    retry: Retry | None,
+    checkpoint: str | Path | None,
+    max_errors: int,
+) -> ParallelResult[Any]:
+    """Async collected map with bounded admission — the ``max_errors`` engine.
+
+    Mirrors the sync version: creating every task upfront would let a
+    dead API burn thousands of calls before the Nth failure is observed.
+    """
+    window = batch_size if batch_size is not None else 2 * concurrency
+    semaphore = asyncio.Semaphore(concurrency)
+    limiter = _as_limiter(rate_limit)
+    total = _total_if_known(items)
+    source = iter(items)
+    results: list[Any] = []
+    in_flight: dict[asyncio.Task[Any], int] = {}
+    fingerprints: dict[int, bytes] = {}
+    completed = 0
+    failures = 0
+    aborted = False
+
+    store = (
+        _CheckpointStore(checkpoint, _task_signature(fn))
+        if checkpoint is not None
+        else None
+    )
+
+    async def _run(item: Any) -> Any:
+        async with semaphore:
+            if limiter:
+                await limiter.wait_async()
+            if retry is not None:
+                return await _async_run_with_retry(
+                    fn, item, retry, task_timeout=task_timeout, limiter=limiter
+                )
+            if task_timeout is not None:
+                return await asyncio.wait_for(fn(item), timeout=task_timeout)
+            return await fn(item)
+
+    def _report() -> None:
+        if on_progress:
+            on_progress(completed, _progress_total(total, results))
+
+    def _submit_next() -> bool:
+        nonlocal completed
+        while True:
+            try:
+                item = next(source)
+            except StopIteration:
+                return False
+            idx = len(results)
+            results.append(_PENDING)
+            if store is not None:
+                fp = _CheckpointStore.fingerprint(item)
+                cached = store.get(idx, fp)
+                if cached is not None:
+                    results[idx] = cached[0]
+                    completed += 1
+                    _report()
+                    continue  # cached — keep looking for work to admit
+                fingerprints[idx] = fp
+            in_flight[asyncio.create_task(_run(item))] = idx
+            return True
+
+    def _absorb(task: asyncio.Task[Any], idx: int) -> None:
+        nonlocal completed, failures, aborted
+        try:
+            results[idx] = task.result()
+        except Exception as exc:
+            results[idx] = _Failure(exc)
+            failures += 1
+            if failures >= max_errors:
+                aborted = True
+        else:
+            # Outside the try: a checkpoint write failure raises
+            # CheckpointError instead of mislabeling a success as a failure.
+            if store is not None:
+                store.put(idx, fingerprints.pop(idx), results[idx])
+        completed += 1
+        _report()
+
+    try:
+        while True:
+            while not aborted and len(in_flight) < window and _submit_next():
+                pass
+            if not in_flight:
+                break
+            done, _pending = await asyncio.wait(
+                in_flight, return_when=asyncio.FIRST_COMPLETED
+            )
+            for task in done:
+                _absorb(task, in_flight.pop(task))
+            if aborted:
+                break
+
+        if aborted:
+            # Salvage completions that raced the stop, cancel the rest.
+            for task in [t for t in in_flight if t.done()]:
+                _absorb(task, in_flight.pop(task))
+            reason = f"aborted after {failures} failures (max_errors={max_errors})"
+            for idx in in_flight.values():
+                if results[idx] is _PENDING:
+                    results[idx] = _Failure(Aborted(reason))
+            for _item in source:
+                results.append(_Failure(Aborted(reason)))
+    finally:
+        for task in in_flight:
+            task.cancel()
+        for task in in_flight:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+        if store is not None:
+            store.close()
+
+    return ParallelResult(results)
+
+
 async def async_parallel_starmap[R](
     fn: Callable[..., Awaitable[R]],
     items: Iterable[tuple[Any, ...]],
@@ -224,6 +372,7 @@ async def async_parallel_iter[T, R](
     retry: Retry | None = None,
     ordered: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
+    max_errors: int | None = None,
 ) -> AsyncIterator[ItemResult[R]]:
     """Execute async *fn* over *items*, yielding ``ItemResult`` in
     completion order (or input order with ``ordered=True``).
@@ -248,6 +397,11 @@ async def async_parallel_iter[T, R](
     unsized inputs ``total`` is the number of items consumed from the
     source so far, not the final count.
 
+    ``max_errors`` stops the stream early: once that many failures have
+    been yielded (counted after retries are exhausted), admission stops
+    and the stream ends — no placeholder items for unseen input. A
+    consumer detects the abort by counting error items.
+
     Breaking out of the loop closes the generator: submission stops and
     in-flight tasks are cancelled (async tasks, unlike threads, are
     genuinely cancellable).
@@ -256,6 +410,7 @@ async def async_parallel_iter[T, R](
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if concurrency < 1:
         raise ValueError(f"concurrency must be >= 1, got {concurrency}")
+    _validate_max_errors(max_errors)
 
     window = batch_size if batch_size is not None else 2 * concurrency
     semaphore = asyncio.Semaphore(concurrency)
@@ -278,6 +433,8 @@ async def async_parallel_iter[T, R](
     source = enumerate(items)
     seen = 0
     completed = 0
+    failures = 0
+    yielded_failures = 0
     in_flight: dict[asyncio.Task[R], int] = {}
     buffered: dict[int, ItemResult[R]] = {}
     next_yield = 0
@@ -296,8 +453,17 @@ async def async_parallel_iter[T, R](
         # The engine invariant: in_flight + buffered never exceeds the
         # window. Gating admission on the sum (not on completions) is what
         # keeps ordered mode bounded when a straggler blocks the buffer.
+        if max_errors is not None and failures >= max_errors:
+            return  # aborting — no new work
         while len(in_flight) + len(buffered) < window and _submit_next():
             pass
+
+    def _yield_ends_stream(item_result: ItemResult[R]) -> bool:
+        nonlocal yielded_failures
+        if item_result.ok or max_errors is None:
+            return False
+        yielded_failures += 1
+        return yielded_failures >= max_errors
 
     try:
         _admit()
@@ -312,6 +478,7 @@ async def async_parallel_iter[T, R](
                     result = ItemResult(idx, value=task.result())
                 except Exception as exc:
                     result = ItemResult(idx, error=exc)
+                    failures += 1
                 completed += 1
                 if on_progress:
                     on_progress(completed, total if total is not None else seen)
@@ -319,11 +486,16 @@ async def async_parallel_iter[T, R](
                     buffered[idx] = result
                 else:
                     yield result
+                    if _yield_ends_stream(result):
+                        return
                     _admit()
             if ordered:
                 while next_yield in buffered:
-                    yield buffered.pop(next_yield)
+                    ordered_result = buffered.pop(next_yield)
                     next_yield += 1
+                    yield ordered_result
+                    if _yield_ends_stream(ordered_result):
+                        return
                 _admit()
     finally:
         # Runs on exhaustion, on caller break (generator close), and when

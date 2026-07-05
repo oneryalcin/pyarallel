@@ -57,6 +57,7 @@ class _BoundParallel[R]:
         batch_size: int | None = None,
         retry: Retry | None = None,
         checkpoint: str | Path | None = None,
+        max_errors: int | None = None,
     ) -> ParallelResult[R]:
         """Run this function over *items* in parallel."""
         return parallel_map(
@@ -72,6 +73,7 @@ class _BoundParallel[R]:
                 batch_size=batch_size,
                 retry=retry,
                 checkpoint=checkpoint,
+                max_errors=max_errors,
             ),
         )
 
@@ -146,6 +148,7 @@ class _ParallelFunc[**P, R]:
         batch_size: int | None = None,
         retry: Retry | None = None,
         checkpoint: str | Path | None = None,
+        max_errors: int | None = None,
     ) -> ParallelResult[R]:
         """Run this function over *items* in parallel."""
         return parallel_map(
@@ -161,6 +164,7 @@ class _ParallelFunc[**P, R]:
                 batch_size=batch_size,
                 retry=retry,
                 checkpoint=checkpoint,
+                max_errors=max_errors,
             ),
         )
 
@@ -267,6 +271,7 @@ class _BoundAsyncParallel[R]:
         batch_size: int | None = None,
         retry: Retry | None = None,
         checkpoint: str | Path | None = None,
+        max_errors: int | None = None,
     ) -> ParallelResult[R]:
         return await async_parallel_map(
             self._fn,
@@ -280,6 +285,7 @@ class _BoundAsyncParallel[R]:
                 batch_size=batch_size,
                 retry=retry,
                 checkpoint=checkpoint,
+                max_errors=max_errors,
             ),
         )
 
@@ -345,6 +351,7 @@ class _AsyncParallelFunc[**P, R]:
         batch_size: int | None = None,
         retry: Retry | None = None,
         checkpoint: str | Path | None = None,
+        max_errors: int | None = None,
     ) -> ParallelResult[R]:
         return await async_parallel_map(
             cast("Callable[[Any], Awaitable[R]]", self.__wrapped__),
@@ -358,6 +365,7 @@ class _AsyncParallelFunc[**P, R]:
                 batch_size=batch_size,
                 retry=retry,
                 checkpoint=checkpoint,
+                max_errors=max_errors,
             ),
         )
 

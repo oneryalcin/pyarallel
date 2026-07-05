@@ -19,6 +19,7 @@ results = parallel_map(
     batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
     checkpoint=None,                 # Path to a resume file (SQLite)
+    max_errors=None,                 # Abort after N failures
 )
 ```
 
@@ -38,6 +39,7 @@ results = parallel_map(
 | `batch_size` | `int \| None` | `None` | Process items in chunks of this size. With unsized iterables, input is consumed lazily one batch at a time |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
+| `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Unrun items are marked `Aborted` |
 
 ### Examples
 
@@ -63,7 +65,37 @@ results = parallel_map(fetch, urls, workers=10, retry=Retry(attempts=3, backoff=
 
 # Resumable — crash at item 40k does not restart from zero
 results = parallel_map(embed, chunks, checkpoint="embeddings.ckpt")
+
+# Abort early — a dead API costs tens of calls, not thousands
+results = parallel_map(fetch, urls, workers=10, max_errors=10)
 ```
+
+### Early Abort with `max_errors`
+
+With `max_errors=N`, the run stops once N items have failed (counted
+**after** retries are exhausted — an item that fails then succeeds on
+retry is a success). To make the abort actually cheap, work is admitted
+through a bounded window (`batch_size` if set, else `2 × workers`)
+instead of being submitted all upfront: total submissions stay within
+the abort point plus one window.
+
+On abort you still get a complete `ParallelResult` — one entry per input
+item. Finished work keeps its real result; items that never ran are
+marked with an `Aborted` exception, distinguishable from real failures:
+
+```python
+from pyarallel import Aborted
+
+result = parallel_map(fetch, urls, workers=10, max_errors=10)
+real = [(i, e) for i, e in result.failures() if not isinstance(e, Aborted)]
+unrun = [i for i, e in result.failures() if isinstance(e, Aborted)]
+```
+
+Composes with `timeout=` (whichever fires first wins, each marking its
+own failure type) and with `checkpoint=` — completed successes are
+already persisted, so the aborted job resumes exactly where it stopped.
+Streaming APIs take `max_errors` too: the stream simply ends after the
+Nth failure is yielded, with no placeholder items.
 
 ### Checkpoint / Resume
 
