@@ -138,6 +138,8 @@ change and that's acceptable now.
 
 ## v0.5 — Structural quality
 
+Detailed implementation contract: [v0.5.0 Plan](plans/v0.5.0.md).
+
 ### Sliding-window streaming
 
 `parallel_iter` has a batch barrier: one straggler stalls the entire next
