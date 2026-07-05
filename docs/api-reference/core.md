@@ -244,6 +244,8 @@ Same as `parallel_map` except no `timeout` or `on_progress` (results stream as t
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting |
 | `batch_size` | `int \| None` | `None` | Maximum items in flight (default `2 × workers`) |
 | `retry` | `Retry \| None` | `None` | Per-item retry |
+| `ordered` | `bool` | `False` | Yield in input order instead of completion order |
+| `on_progress` | `Callable[[int, int], None] \| None` | `None` | `callback(done, total)` per completed item |
 
 !!! note "Changed in v0.5"
     `batch_size` is now an **in-flight bound**, not a chunk size. Earlier
@@ -256,7 +258,26 @@ Same as `parallel_map` except no `timeout` or `on_progress` (results stream as t
 ### Yields
 
 `ItemResult[T]` — each item includes `.index`, `.ok`, `.value`, and `.error`.
-Results arrive in **completion order** (not input order).
+Results arrive in **completion order** by default; pass `ordered=True`
+for input order.
+
+### Ordered streaming
+
+With `ordered=True`, completed items that arrive early wait in a reorder
+buffer. The window bounds in-flight **plus** buffered items, so memory
+stays constant even when one slow item holds back the stream — admission
+stalls until it completes (that's backpressure, not a hang).
+
+```python
+for item in parallel_iter(fetch, urls, workers=8, ordered=True):
+    print(item.index)  # 0, 1, 2, ... regardless of completion order
+```
+
+### Progress
+
+`on_progress` fires per **completed** item, before its yield — same
+contract as `parallel_map`. For unsized inputs `total` is the number of
+items consumed from the source so far.
 
 ### Stopping early
 

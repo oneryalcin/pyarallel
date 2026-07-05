@@ -16,6 +16,7 @@ from ._plan import (
     _PENDING,
     _plan_collected_map,
     _progress_total,
+    _total_if_known,
 )
 from .checkpoint import CheckpointError, _CheckpointStore, _task_signature
 from .limiter import Limiter, _as_limiter
@@ -221,9 +222,11 @@ async def async_parallel_iter[T, R](
     task_timeout: float | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    ordered: bool = False,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> AsyncIterator[ItemResult[R]]:
     """Execute async *fn* over *items*, yielding ``ItemResult`` in
-    completion order.
+    completion order (or input order with ``ordered=True``).
 
     Results stream as tasks finish — a bounded window of items is in
     flight at any moment, so memory stays constant and a straggler delays
@@ -234,6 +237,16 @@ async def async_parallel_iter[T, R](
     ``batch_size`` sets the window: the maximum number of
     started-but-unyielded tasks (default ``2 × concurrency``). It is a
     memory/lookahead bound, not a chunk size — there are no barriers.
+
+    With ``ordered=True`` completed items that arrive early wait in a
+    reorder buffer. The window bounds in-flight *plus* buffered
+    (``in_flight + buffered <= window``), so memory stays constant even
+    when one slow item holds back the stream — admission simply stalls
+    until it completes. That stall is backpressure, not a bug.
+
+    ``on_progress`` fires per *completed* item (before its yield). For
+    unsized inputs ``total`` is the number of items consumed from the
+    source so far, not the final count.
 
     Breaking out of the loop closes the generator: submission stops and
     in-flight tasks are cancelled (async tasks, unlike threads, are
@@ -261,20 +274,33 @@ async def async_parallel_iter[T, R](
                 return await asyncio.wait_for(fn(item), timeout=task_timeout)
             return await fn(item)
 
+    total = _total_if_known(items)
     source = enumerate(items)
+    seen = 0
+    completed = 0
     in_flight: dict[asyncio.Task[R], int] = {}
+    buffered: dict[int, ItemResult[R]] = {}
+    next_yield = 0
 
     def _submit_next() -> bool:
+        nonlocal seen
         try:
             idx, item = next(source)
         except StopIteration:
             return False
+        seen += 1
         in_flight[asyncio.create_task(_run(item))] = idx
         return True
 
-    try:
-        while len(in_flight) < window and _submit_next():
+    def _admit() -> None:
+        # The engine invariant: in_flight + buffered never exceeds the
+        # window. Gating admission on the sum (not on completions) is what
+        # keeps ordered mode bounded when a straggler blocks the buffer.
+        while len(in_flight) + len(buffered) < window and _submit_next():
             pass
+
+    try:
+        _admit()
         while in_flight:
             done, _pending = await asyncio.wait(
                 in_flight, return_when=asyncio.FIRST_COMPLETED
@@ -286,8 +312,19 @@ async def async_parallel_iter[T, R](
                     result = ItemResult(idx, value=task.result())
                 except Exception as exc:
                     result = ItemResult(idx, error=exc)
-                yield result
-                _submit_next()
+                completed += 1
+                if on_progress:
+                    on_progress(completed, total if total is not None else seen)
+                if ordered:
+                    buffered[idx] = result
+                else:
+                    yield result
+                    _admit()
+            if ordered:
+                while next_yield in buffered:
+                    yield buffered.pop(next_yield)
+                    next_yield += 1
+                _admit()
     finally:
         # Runs on exhaustion, on caller break (generator close), and when
         # the items iterator itself raises: cancel everything in flight.

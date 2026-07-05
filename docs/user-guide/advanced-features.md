@@ -322,6 +322,10 @@ finish in the background.
 
 Results arrive in **completion order** (fastest tasks first), not input order.
 Each `ItemResult` includes the original `.index` so you can match results to inputs.
+Pass `ordered=True` to yield in input order instead — early results wait in a
+reorder buffer that is counted inside the window, so memory stays bounded even
+behind a straggler. Streaming also takes `on_progress=` with the same contract
+as `parallel_map`.
 
 **When to use which:**
 

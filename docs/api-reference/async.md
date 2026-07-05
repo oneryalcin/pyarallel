@@ -123,6 +123,10 @@ async for item in async_parallel_iter(fetch, urls, concurrency=10):
     `batch_size` is now an **in-flight bound**, not a chunk size — there
     are no barriers between chunks, and input is never materialized.
 
+Takes the same `ordered=` and `on_progress=` options as `parallel_iter`:
+`ordered=True` yields in input order with a reorder buffer counted
+inside the window; `on_progress(done, total)` fires per completed item.
+
 Breaking out of the loop cancels in-flight tasks (async tasks, unlike
 threads, are genuinely cancellable).
 

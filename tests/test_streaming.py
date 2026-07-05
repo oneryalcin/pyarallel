@@ -368,6 +368,161 @@ class TestAsyncSlidingWindow:
                 pass
 
 
+class TestOrderedStreaming:
+    """ordered=True — input-order yields with a bounded reorder buffer."""
+
+    def test_ordered_yields_input_order_despite_reversed_completion(self):
+        from pyarallel import parallel_iter
+
+        def task(x):
+            time.sleep((5 - x) * 0.03)  # item 0 finishes last
+            return x * 10
+
+        results = list(parallel_iter(task, range(6), workers=6, ordered=True))
+        assert [item.index for item in results] == list(range(6))
+        assert [item.value for item in results] == [x * 10 for x in range(6)]
+
+    def test_ordered_reorder_buffer_is_bounded(self):
+        """The review finding: refill-on-completion admits unboundedly when
+        item 0 is slow and successors are fast. The invariant is measured,
+        not asserted: advanced - yielded == in_flight + buffered + 1 at
+        every source pull, and must never exceed the window."""
+        from pyarallel import parallel_iter
+
+        window = 8
+        advanced = 0
+        yielded = 0
+        peak = 0
+
+        def source():
+            nonlocal advanced, peak
+            for i in range(200):
+                advanced += 1
+                peak = max(peak, advanced - yielded)
+                yield i
+
+        def slow_first(x):
+            time.sleep(0.3 if x == 0 else 0.001)
+            return x
+
+        for item in parallel_iter(
+            slow_first, source(), workers=4, batch_size=window, ordered=True
+        ):
+            assert item.ok
+            yielded += 1
+
+        assert yielded == 200
+        assert peak <= window
+
+    def test_ordered_failures_keep_their_position(self):
+        from pyarallel import parallel_iter
+
+        def maybe_fail(x):
+            if x == 1:
+                raise ValueError("bad")
+            return x
+
+        results = list(parallel_iter(maybe_fail, range(4), workers=4, ordered=True))
+        assert [item.index for item in results] == [0, 1, 2, 3]
+        assert not results[1].ok
+        assert isinstance(results[1].error, ValueError)
+
+    async def test_async_ordered_yields_input_order(self):
+        from pyarallel import async_parallel_iter
+
+        async def task(x):
+            await asyncio.sleep((5 - x) * 0.03)
+            return x * 10
+
+        results = []
+        async for item in async_parallel_iter(
+            task, range(6), concurrency=6, ordered=True
+        ):
+            results.append(item)
+        assert [item.index for item in results] == list(range(6))
+        assert [item.value for item in results] == [x * 10 for x in range(6)]
+
+    async def test_async_ordered_reorder_buffer_is_bounded(self):
+        from pyarallel import async_parallel_iter
+
+        window = 8
+        advanced = 0
+        yielded = 0
+        peak = 0
+
+        def source():
+            nonlocal advanced, peak
+            for i in range(200):
+                advanced += 1
+                peak = max(peak, advanced - yielded)
+                yield i
+
+        async def slow_first(x):
+            await asyncio.sleep(0.3 if x == 0 else 0.001)
+            return x
+
+        async for item in async_parallel_iter(
+            slow_first, source(), concurrency=4, batch_size=window, ordered=True
+        ):
+            assert item.ok
+            yielded += 1
+
+        assert yielded == 200
+        assert peak <= window
+
+
+class TestStreamingProgress:
+    """on_progress for streaming — same contract as parallel_map."""
+
+    def test_progress_final_call_is_n_of_n_for_sized_input(self):
+        from pyarallel import parallel_iter
+
+        calls = []
+        list(
+            parallel_iter(
+                lambda x: x,
+                range(10),
+                workers=4,
+                on_progress=lambda done, total: calls.append((done, total)),
+            )
+        )
+        assert calls[-1] == (10, 10)
+        assert [done for done, _ in calls] == list(range(1, 11))  # monotone
+
+    def test_progress_total_grows_for_unsized_input(self):
+        from pyarallel import parallel_iter
+
+        calls = []
+        list(
+            parallel_iter(
+                lambda x: x,
+                (i for i in range(10)),
+                workers=2,
+                on_progress=lambda done, total: calls.append((done, total)),
+            )
+        )
+        assert len(calls) == 10
+        assert calls[-1][0] == 10
+        assert all(done <= total for done, total in calls)
+
+    async def test_async_progress_final_call_is_n_of_n(self):
+        from pyarallel import async_parallel_iter
+
+        async def identity(x):
+            return x
+
+        calls = []
+        async for _item in async_parallel_iter(
+            identity,
+            range(10),
+            concurrency=4,
+            on_progress=lambda done, total: calls.append((done, total)),
+        ):
+            pass
+        assert calls[-1] == (10, 10)
+        assert [done for done, _ in calls] == list(range(1, 11))
+
+
 class TestAsyncParallelIter:
     async def test_basic(self):
         from pyarallel import async_parallel_iter
