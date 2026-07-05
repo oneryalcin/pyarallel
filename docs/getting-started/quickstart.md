@@ -89,6 +89,36 @@ results = parallel_map(fetch, urls, workers=10,
                        retry=Retry(on=(ConnectionError, TimeoutError)))
 ```
 
+## Shared Quota and 429s
+
+When several calls spend one API key's budget, share a `Limiter` — and let
+`Retry-After` drive the backoff:
+
+```python
+from pyarallel import Limiter, RateLimit, Retry
+
+limiter = Limiter(RateLimit(100, "minute"))
+
+result = parallel_map(
+    call_api, ids,
+    rate_limit=limiter,   # same instance across calls = one budget
+    retry=Retry(attempts=4, wait_from=lambda e: getattr(e, "retry_after", None)),
+)
+```
+
+See [Advanced Features](../user-guide/advanced-features.md#shared-rate-limits-and-burst).
+
+## Resumable Runs
+
+Long job? One argument makes it crash-safe:
+
+```python
+result = parallel_map(embed, chunks, checkpoint="run.ckpt")
+# rerun the same line after a crash — completed items load from disk
+```
+
+See [Checkpoint / Resume](../user-guide/advanced-features.md#checkpoint-resume).
+
 ## Batching
 
 Control memory for large datasets — process in chunks:

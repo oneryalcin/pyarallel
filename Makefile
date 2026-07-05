@@ -18,7 +18,6 @@ docs-serve:
 	uv run mkdocs serve
 
 docs-deploy:
-	uv run python -c "import pyarallel; from pathlib import Path; yml = Path('mkdocs.yml').read_text(); Path('mkdocs.yml').write_text(yml.replace('version: .*', f'version: {pyarallel.__version__}'))"
 	uv run mkdocs gh-deploy
 
 format:
