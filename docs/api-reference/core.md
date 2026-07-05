@@ -13,11 +13,12 @@ results = parallel_map(
     *,
     workers=None,                    # Number of parallel workers
     executor="thread",               # "thread" or "process"
-    rate_limit=None,                 # RateLimit object or ops/second (float)
+    rate_limit=None,                 # RateLimit spec, shared Limiter, or ops/second
     timeout=None,                    # Total timeout in seconds
     on_progress=None,                # callback(completed, total)
     batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
+    checkpoint=None,                 # Path to a resume file (SQLite)
 )
 ```
 
@@ -31,11 +32,12 @@ results = parallel_map(
 | `items` | `Iterable` | required | Any iterable (list, generator, range, set, ...) |
 | `workers` | `int \| None` | `None` | Number of parallel workers. `None` lets the executor choose |
 | `executor` | `"thread" \| "process"` | `"thread"` | Thread pool or process pool |
-| `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting (float = ops/second) |
+| `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting (float = ops/second). Pass a shared `Limiter` to draw from one budget across calls |
 | `timeout` | `float \| None` | `None` | Total wall-clock timeout in seconds |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback `(completed, total)`. For unsized iterables with batching, `total` is items seen so far |
 | `batch_size` | `int \| None` | `None` | Process items in chunks of this size. With unsized iterables, input is consumed lazily one batch at a time |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
+| `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
 
 ### Examples
 
@@ -58,7 +60,43 @@ results = parallel_map(process, million_items, workers=8, batch_size=500)
 
 # With retry — flaky network calls
 results = parallel_map(fetch, urls, workers=10, retry=Retry(attempts=3, backoff=1.0))
+
+# Resumable — crash at item 40k does not restart from zero
+results = parallel_map(embed, chunks, checkpoint="embeddings.ckpt")
 ```
+
+### Checkpoint / Resume
+
+With `checkpoint=` set, every completed item's result is written to a SQLite
+file as it finishes. Rerunning the same call resumes: completed items load
+from disk, failed and unseen items execute. Rows are keyed by item index plus
+a fingerprint of the item, so a changed input at the same position is
+recomputed, never served stale. The file is also bound to the mapped
+function's identity — name, code digest, and visible captured config
+(defaults, closure values, `functools.partial` arguments): resuming with a
+different, edited, or reconfigured function raises `CheckpointError` —
+stale reuse fails closed, never silently. Live objects in captured state
+count by type only (config inside them is invisible — delete the file when
+it changes); bound methods and callable objects are rejected because their
+entire state is opaque. `CheckpointError` is raised plainly by both the
+sync and async APIs — never wrapped in an `ExceptionGroup`.
+
+Constraints, stated honestly:
+
+- **Items and results must be picklable.** A result that cannot be
+  checkpointed aborts the run with `CheckpointError` — the alternative
+  (mislabeling a successful item as failed, or continuing with a checkpoint
+  that cannot resume) would lie to you.
+- **Rows are positional.** Reordering, prepending, or removing input items
+  shifts indices; the fingerprint check then forces every shifted item to
+  recompute. Resume is designed for *the same call, rerun* — not for
+  evolving input lists.
+- **One run per file at a time.** Failures are never checkpointed; a
+  resumed run retries them. Sharing one file between concurrently running
+  jobs is not supported.
+
+Available on `parallel_map`, `async_parallel_map`, and `.map()` — not on
+starmap or the streaming APIs.
 
 ### Notes on Progress and Unsized Iterables
 
@@ -87,7 +125,7 @@ def fn(item): ...
 |---|---|---|---|
 | `workers` | `int \| None` | `None` | Default worker count for `.map()` |
 | `executor` | `"thread" \| "process"` | `"thread"` | Default executor type |
-| `rate_limit` | `RateLimit \| float \| None` | `None` | Default rate limiting |
+| `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Default rate limiting |
 
 ### Usage
 
@@ -200,7 +238,7 @@ Same as `parallel_map` except no `timeout` or `on_progress` (results stream as t
 | `items` | `Iterable` | required | Any iterable |
 | `workers` | `int \| None` | `None` | Number of parallel workers (stdlib default when `None`) |
 | `executor` | `"thread" \| "process"` | `"thread"` | Thread pool or process pool |
-| `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting |
+| `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting |
 | `batch_size` | `int \| None` | `None` | Process in chunks (controls memory) |
 | `retry` | `Retry \| None` | `None` | Per-item retry |
 
@@ -296,13 +334,14 @@ Immutable rate limit specification.
 ```python
 from pyarallel import RateLimit
 
-rate = RateLimit(count, per="second")
+rate = RateLimit(count, per="second", burst=1)
 ```
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `count` | `float` | required | Operations allowed per interval |
 | `per` | `"second" \| "minute" \| "hour"` | `"second"` | Time interval |
+| `burst` | `int` | `1` | Token-bucket capacity: calls that may fire immediately before the sustained rate applies |
 
 ### Property
 
@@ -311,10 +350,13 @@ rate = RateLimit(count, per="second")
 ### Examples
 
 ```python
-RateLimit(10)                # 10 per second
-RateLimit(100, "minute")     # 100 per minute
-RateLimit(1000, "hour")      # 1000 per hour
+RateLimit(10)                        # 10 per second, evenly spaced
+RateLimit(100, "minute")             # 100 per minute, evenly spaced
+RateLimit(100, "minute", burst=20)   # up to 20 at once, then refill pace
 ```
+
+To share one budget across several calls or functions, wrap the spec in a
+[`Limiter`](rate-limiting.md#sharing-one-budget-limiter).
 
 Or use the shorthand — pass a number directly to `rate_limit=`:
 
@@ -341,6 +383,9 @@ retry = Retry(attempts=3, backoff=1.0)
 | `max_delay` | `float` | `60.0` | Maximum sleep between retries |
 | `jitter` | `bool` | `True` | Randomize delays to avoid retry bursts |
 | `on` | `tuple[type[Exception], ...] \| None` | `None` | Retry only these exception types. `None` means retry all exceptions |
+| `retry_if` | `Callable[[Exception], bool] \| None` | `None` | Predicate on the exception instance. Both `on` and `retry_if` must pass |
+| `wait_from` | `Callable[[Exception], float \| None] \| None` | `None` | Extract a server-mandated wait in seconds (e.g. `Retry-After`). `None` falls back to backoff |
+| `max_server_wait` | `float \| None` | `600.0` | Ceiling on honored server waits — a malformed `Retry-After: 86400` must not pin a worker for a day. `None` trusts the server unconditionally |
 
 ### Backoff Behavior
 
@@ -382,3 +427,47 @@ results = parallel_map(
     batch_size=500,
 )
 ```
+
+### Server-Driven Backoff
+
+Real APIs speak 429 + `Retry-After`. `retry_if` decides retryability from the
+exception *instance*, and `wait_from` extracts the server-mandated wait — it
+replaces the backoff delay with no jitter and no `max_delay` cap, because the
+server knows better than we do:
+
+```python
+def parse_retry_after(exc):
+    header = getattr(exc.response, "headers", {}).get("Retry-After")
+    return float(header) if header else None
+
+results = parallel_map(
+    call_api, ids,
+    rate_limit=limiter,   # a shared Limiter
+    retry=Retry(
+        attempts=5,
+        on=(httpx.HTTPStatusError,),
+        retry_if=lambda exc: exc.response.status_code in (429, 503),
+        wait_from=parse_retry_after,
+    ),
+)
+```
+
+Server waits are honored up to `max_server_wait` (default 10 minutes) — a
+guard against a hostile or misconfigured server pinning worker threads for
+hours. Set it to `None` to trust the server unconditionally.
+
+When a shared `Limiter` is in play, a server-mandated wait also pauses the
+limiter — even if that task is on its final attempt — so one task's 429 slows
+the whole pool instead of every worker discovering the throttle separately.
+Every retry attempt also draws a fresh rate-limit token: a retry is a real
+API call and never bypasses the limiter. (With `executor="process"` neither
+applies inside workers: a limiter cannot cross process boundaries, so process
+retries pace only by backoff. A `Retry` carrying lambda predicates is
+rejected at submit time for process executors — its callables must be
+module-level functions to be picklable.)
+
+One footgun to avoid: `retry_if` and `wait_from` receive *every* exception
+that `on=` lets through. A predicate like `lambda exc: exc.response.status_code`
+raises `AttributeError` on a `ConnectionError`, and that error replaces the
+original in the failure report. Narrow with `on=` first, or write predicates
+defensively (`getattr(exc, "response", None)`).

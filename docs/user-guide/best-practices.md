@@ -72,6 +72,28 @@ For simple per-second limits, pass a number:
 results = parallel_map(fn, items, rate_limit=10)  # 10 per second
 ```
 
+### One Limiter per API Key
+
+A `RateLimit` passed directly creates a fresh private limiter each call —
+two concurrent maps would each assume they own the full quota. Whenever two
+calls spend the same budget, share a `Limiter`:
+
+```python
+from pyarallel import Limiter, RateLimit
+
+OPENAI_LIMITER = Limiter(RateLimit(450, "minute"))  # one per API key
+
+# every job against this key, sync or async, passes the same instance
+parallel_map(embed, texts, rate_limit=OPENAI_LIMITER)
+```
+
+### Burst: Default to Smooth
+
+`burst=1` (the default) spaces requests evenly — the safest choice against
+secondary per-second limits. Raise it only when you know the quota
+genuinely allows bursts, and keep it well under the documented burst
+allowance.
+
 ## Memory Control with Batching
 
 For large datasets, use `batch_size` to limit how many futures exist at once:
@@ -130,6 +152,29 @@ if not result.ok:
     retry_result = parallel_map(process, failed, workers=2)
 ```
 
+### Honor 429s with `wait_from`
+
+When an API sends `Retry-After`, use it — the server knows its own load
+better than your backoff curve does. With a shared `Limiter`, the wait
+pauses the whole pool, not just the throttled task:
+
+```python
+def retry_after(exc):
+    response = getattr(exc, "response", None)
+    header = response.headers.get("retry-after") if response else None
+    return float(header) if header else None
+
+results = parallel_map(
+    call_api, ids,
+    rate_limit=shared_limiter,
+    retry=Retry(attempts=4, on=(ApiError,), wait_from=retry_after),
+)
+```
+
+Write `retry_if`/`wait_from` defensively — they receive every exception
+that `on=` lets through, and a predicate that raises replaces the real
+error in the failure report.
+
 ### Composing with Tenacity
 
 For complex retry strategies (circuit breakers, custom stop conditions), use tenacity inside your function:
@@ -143,6 +188,25 @@ def resilient_fetch(url):
 
 results = parallel_map(resilient_fetch, urls, workers=10)
 ```
+
+## Long Jobs: Checkpoint Early
+
+Any run long enough that restarting it hurts should carry a checkpoint:
+
+```python
+results = parallel_map(process, fifty_thousand_items, checkpoint="run.ckpt")
+```
+
+Rules of thumb:
+
+- One checkpoint file per (function, input list) pair. Don't share a file
+  between different jobs — the function-identity guard will fail closed.
+- Delete the file when you *want* a full recompute (a config change
+  hidden inside a captured client object, reordered inputs). Plain captured
+  config — a changed default, closure value, or partial argument — is
+  caught automatically and fails closed.
+- Checkpointing requires picklable items and results; an unpicklable
+  result stops the run with `CheckpointError` rather than pretending.
 
 ## Testing
 
@@ -173,7 +237,9 @@ def test_decorated_function():
 
 1. **Match workers to workload** — too many workers waste resources on context switching
 2. **Use rate limiting for external APIs** — protects you and the service
-3. **Prefer threads for I/O** — processes have serialization overhead
-4. **Check `result.ok` before iterating** — avoids surprise `ExceptionGroup` raises
-5. **Use `on_progress` for long jobs** — for unsized iterables with batching,
+3. **Share one `Limiter` per API key** — separate specs per call each assume the full quota
+4. **Prefer threads for I/O** — processes have serialization overhead
+5. **Check `result.ok` before iterating** — avoids surprise `ExceptionGroup` raises
+6. **Use `on_progress` for long jobs** — for unsized iterables with batching,
    `total` is items seen so far, not the final size
+7. **Checkpoint anything you'd hate to restart** — `checkpoint="run.ckpt"` is one argument

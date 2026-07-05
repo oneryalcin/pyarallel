@@ -14,11 +14,12 @@ results = await async_parallel_map(
     items,                           # Any iterable
     *,
     concurrency=4,                   # Max concurrent tasks
-    rate_limit=None,                 # RateLimit or ops/second
+    rate_limit=None,                 # RateLimit spec, shared Limiter, or ops/second
     task_timeout=None,                    # Per-task timeout in seconds
     on_progress=None,                # callback(completed, total)
     batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
+    checkpoint=None,                 # Path to a resume file (SQLite)
 )
 ```
 
@@ -31,11 +32,12 @@ results = await async_parallel_map(
 | `fn` | async `Callable` | required | Async function to apply to each item |
 | `items` | `Iterable` | required | Any iterable |
 | `concurrency` | `int` | `4` | Maximum concurrent tasks |
-| `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting |
+| `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting. Pass a shared `Limiter` to draw from one budget across calls |
 | `task_timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback. For unsized iterables with batching, `total` is items seen so far |
 | `batch_size` | `int \| None` | `None` | Process items in chunks. With unsized iterables, input is consumed lazily one batch at a time |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
+| `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
 
 ### Why `concurrency` instead of `workers`?
 
@@ -143,7 +145,7 @@ async def fn(item): ...
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `concurrency` | `int` | `4` | Default concurrency for `.map()` |
-| `rate_limit` | `RateLimit \| float \| None` | `None` | Default rate limiting |
+| `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Default rate limiting |
 
 ### Usage
 

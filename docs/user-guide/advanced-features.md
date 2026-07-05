@@ -170,9 +170,88 @@ results = parallel_map(fetch, urls, workers=10,
 
 **How backoff works:** delay = `backoff * 2^attempt`, capped at `max_delay`. With `jitter=True` (default), the delay is multiplied by a random factor between 0.5 and 1.5 — this prevents all workers from retrying at the exact same moment when a service recovers.
 
-Retries happen *inside the worker* — only the failing item is retried, not the entire batch. This composes cleanly with rate limiting and batching.
+Retries happen *inside the worker* — only the failing item is retried, not the entire batch. This composes cleanly with rate limiting and batching: **every retry attempt draws a fresh rate-limit token**, so a retry storm can never blow through your quota.
+
+### Server-Driven Backoff (429 / Retry-After)
+
+Real APIs tell you how long to back off. `retry_if` decides retryability
+from the exception *instance*; `wait_from` extracts the server-mandated
+wait, which replaces the backoff delay (no jitter) and pauses the shared
+limiter so the whole pool slows down:
+
+```python
+def retry_after(exc):
+    response = getattr(exc, "response", None)
+    header = response.headers.get("retry-after") if response else None
+    return float(header) if header else None   # None → exponential backoff
+
+results = parallel_map(
+    call_api, ids,
+    rate_limit=limiter,   # a shared Limiter — see below
+    retry=Retry(
+        attempts=5,
+        on=(httpx.HTTPStatusError,),
+        retry_if=lambda exc: exc.response.status_code in (429, 503),
+        wait_from=retry_after,
+    ),
+)
+```
+
+Server waits are clamped by `max_server_wait` (default 10 minutes) so a
+malformed `Retry-After: 86400` can't pin a worker for a day. Write
+predicates defensively — they receive every exception `on=` lets through.
 
 For the full `Retry` API, see [API Reference](../api-reference/core.md#retry).
+
+## Shared Rate Limits and Burst
+
+A `RateLimit` passed directly creates a private limiter per call. When the
+quota belongs to an API key — the usual case — share one `Limiter`:
+
+```python
+from pyarallel import Limiter, RateLimit
+
+limiter = Limiter(RateLimit(100, "minute", burst=20))
+
+users  = parallel_map(fetch_user,  user_ids,  rate_limit=limiter)
+orders = parallel_map(fetch_order, order_ids, rate_limit=limiter)  # same budget
+```
+
+`burst` is the token-bucket capacity: how many calls may fire immediately
+before the sustained rate applies. The default of 1 gives smooth, evenly
+spaced pacing. One instance works concurrently across threads *and* event
+loops — sync and async calls can share a budget. Details in
+[Rate Limiting](../api-reference/rate-limiting.md).
+
+## Checkpoint / Resume
+
+For long jobs, `checkpoint=` persists every completed item's result to a
+SQLite file as it finishes. Rerunning the same call resumes — cached items
+load from disk, failed and unseen items execute:
+
+```python
+result = parallel_map(embed, chunks, checkpoint="embeddings.ckpt")
+# crashed at item 40,000? rerun the same line — only the remainder runs
+```
+
+Safety guards, stated honestly:
+
+- The file is bound to the mapped function's identity: name, code digest,
+  and visible captured config (default values, closure values,
+  `functools.partial` arguments). An edited function or a changed
+  `factor=3` raises `CheckpointError` — stale reuse fails closed, never
+  silently.
+- Live objects in captured state (clients, sessions) count by *type* only —
+  config hidden inside them is invisible. Delete the checkpoint when it
+  changes. Bound methods and callable objects are rejected outright: their
+  entire state is opaque.
+- A changed input at the same position is recomputed, never served stale.
+- Rows are positional: reordering or inserting inputs forces shifted items
+  to recompute. Resume is for *the same call, rerun*.
+- Items and results must be picklable; a result that cannot be
+  checkpointed aborts the run with `CheckpointError`.
+
+Available on `parallel_map`, `async_parallel_map`, and `.map()`.
 
 ## Batching
 

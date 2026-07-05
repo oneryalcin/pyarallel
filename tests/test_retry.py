@@ -2,8 +2,7 @@
 
 import time
 
-from pyarallel import parallel_map
-from pyarallel.core import Retry
+from pyarallel import Retry, parallel_map
 
 
 class TestRetryConfig:
@@ -374,3 +373,285 @@ class TestAsyncRetry:
         )
         assert not result.ok
         assert call_count == 1
+
+
+class RetryAfterError(Exception):
+    """Simulates an HTTP 429 carrying a Retry-After hint."""
+
+    def __init__(self, retry_after: float) -> None:
+        super().__init__(f"429: retry after {retry_after}s")
+        self.retry_after = retry_after
+
+
+class TestRetryIf:
+    def test_predicate_false_fails_immediately(self):
+        calls = {"n": 0}
+
+        def fail(x):
+            calls["n"] += 1
+            raise ValueError("permanent")
+
+        result = parallel_map(
+            fail,
+            [1],
+            retry=Retry(attempts=3, backoff=0, jitter=False, retry_if=lambda e: False),
+        )
+        assert not result.ok
+        assert calls["n"] == 1
+
+    def test_predicate_true_retries(self):
+        calls = {"n": 0}
+
+        def fail(x):
+            calls["n"] += 1
+            raise ValueError("transient")
+
+        parallel_map(
+            fail,
+            [1],
+            retry=Retry(attempts=3, backoff=0, jitter=False, retry_if=lambda e: True),
+        )
+        assert calls["n"] == 3
+
+    def test_predicate_composes_with_type_filter(self):
+        """`on` must match AND `retry_if` must pass — TypeError skips both retries."""
+        calls = {"n": 0}
+
+        def fail(x):
+            calls["n"] += 1
+            raise TypeError("not retryable by type")
+
+        result = parallel_map(
+            fail,
+            [1],
+            retry=Retry(
+                attempts=3,
+                backoff=0,
+                jitter=False,
+                on=(ValueError,),
+                retry_if=lambda e: True,
+            ),
+        )
+        assert not result.ok
+        assert calls["n"] == 1
+
+
+class TestWaitFrom:
+    def test_server_wait_used_as_retry_delay(self):
+        calls = {"n": 0}
+
+        def flaky(x):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RetryAfterError(0.3)
+            return x
+
+        start = time.monotonic()
+        result = parallel_map(
+            flaky,
+            [1],
+            retry=Retry(
+                attempts=2,
+                backoff=0,
+                jitter=False,
+                wait_from=lambda e: getattr(e, "retry_after", None),
+            ),
+        )
+        elapsed = time.monotonic() - start
+        assert result.ok
+        assert calls["n"] == 2
+        assert elapsed >= 0.25  # server-mandated wait, not the 0s backoff
+
+    def test_wait_from_none_falls_back_to_backoff(self):
+        calls = {"n": 0}
+
+        def fail(x):
+            calls["n"] += 1
+            raise ValueError("no retry-after here")
+
+        start = time.monotonic()
+        parallel_map(
+            fail,
+            [1],
+            retry=Retry(attempts=3, backoff=0, jitter=False, wait_from=lambda e: None),
+        )
+        elapsed = time.monotonic() - start
+        assert calls["n"] == 3
+        assert elapsed < 0.2  # fell back to the 0s backoff
+
+    def test_negative_server_wait_clamped_to_zero(self):
+        calls = {"n": 0}
+
+        def fail(x):
+            calls["n"] += 1
+            raise RetryAfterError(-5.0)
+
+        start = time.monotonic()
+        parallel_map(
+            fail,
+            [1],
+            retry=Retry(
+                attempts=3,
+                backoff=0,
+                jitter=False,
+                wait_from=lambda e: getattr(e, "retry_after", None),
+            ),
+        )
+        elapsed = time.monotonic() - start
+        assert calls["n"] == 3
+        assert elapsed < 0.2
+
+
+class TestServerWaitPausesLimiter:
+    def test_final_attempt_still_pauses_shared_limiter(self):
+        """A 429 from a task that gives up must still slow the pool."""
+        from pyarallel import Limiter, RateLimit
+
+        limiter = Limiter(RateLimit(1000, "second"))
+
+        def always_throttled(x):
+            raise RetryAfterError(0.5)
+
+        result = parallel_map(
+            always_throttled,
+            [1],
+            rate_limit=limiter,
+            retry=Retry(
+                attempts=1,  # no retry sleep — only the pause side effect
+                wait_from=lambda e: getattr(e, "retry_after", None),
+            ),
+        )
+        assert not result.ok
+        # The limiter must now hold new slots for ~0.5s.
+        assert limiter._probe() >= 0.2
+
+    async def test_async_server_wait_pauses_shared_limiter(self):
+        from pyarallel import Limiter, RateLimit, async_parallel_map
+
+        limiter = Limiter(RateLimit(1000, "second"))
+
+        async def always_throttled(x):
+            raise RetryAfterError(0.5)
+
+        result = await async_parallel_map(
+            always_throttled,
+            [1],
+            rate_limit=limiter,
+            retry=Retry(
+                attempts=1,
+                wait_from=lambda e: getattr(e, "retry_after", None),
+            ),
+        )
+        assert not result.ok
+        assert limiter._probe() >= 0.2
+
+
+class TestRetriesConsumeRateLimit:
+    """The adversarial-review finding: a retry is a fresh API call and must
+    draw a fresh token — retries must never bypass the shared limiter."""
+
+    def test_sync_retries_are_rate_limited(self):
+        from pyarallel import Limiter, RateLimit
+
+        limiter = Limiter(RateLimit(10, "second"))
+        timestamps = []
+
+        def flaky(x):
+            timestamps.append(time.monotonic())
+            if len(timestamps) < 4:
+                raise ValueError("transient")
+            return x
+
+        start = time.monotonic()
+        result = parallel_map(
+            flaky,
+            [1],
+            rate_limit=limiter,
+            retry=Retry(attempts=4, backoff=0, jitter=False),
+        )
+        elapsed = time.monotonic() - start
+        assert result.ok
+        assert len(timestamps) == 4
+        # 4 attempts against a 10/s budget: >= 0.3s of token spacing.
+        # Before the fix this ran in milliseconds (4x quota violation).
+        assert elapsed >= 0.25
+
+    async def test_async_retries_are_rate_limited(self):
+        from pyarallel import Limiter, RateLimit, async_parallel_map
+
+        limiter = Limiter(RateLimit(10, "second"))
+        calls = {"n": 0}
+
+        async def flaky(x):
+            calls["n"] += 1
+            if calls["n"] < 4:
+                raise ValueError("transient")
+            return x
+
+        start = time.monotonic()
+        result = await async_parallel_map(
+            flaky,
+            [1],
+            rate_limit=limiter,
+            retry=Retry(attempts=4, backoff=0, jitter=False),
+        )
+        elapsed = time.monotonic() - start
+        assert result.ok
+        assert calls["n"] == 4
+        assert elapsed >= 0.25
+
+
+class TestMaxServerWait:
+    """A hostile Retry-After: 86400 must not pin a worker for a day."""
+
+    def test_server_wait_clamped_by_default(self):
+        r = Retry(wait_from=lambda e: 86400.0)
+        assert r._server_wait(ValueError()) == 600.0
+
+    def test_none_disables_the_cap(self):
+        r = Retry(wait_from=lambda e: 86400.0, max_server_wait=None)
+        assert r._server_wait(ValueError()) == 86400.0
+
+    def test_custom_cap(self):
+        r = Retry(wait_from=lambda e: 100.0, max_server_wait=5.0)
+        assert r._server_wait(ValueError()) == 5.0
+
+    def test_negative_cap_rejected(self):
+        import pytest
+
+        with pytest.raises(ValueError, match="max_server_wait"):
+            Retry(max_server_wait=-1.0)
+
+    def test_waits_below_cap_pass_through(self):
+        r = Retry(wait_from=lambda e: 30.0)
+        assert r._server_wait(ValueError()) == 30.0
+
+
+class TestProcessExecutorRetryPickling:
+    """The Opus finding: process executor + lambda predicates used to fail
+    every item with PicklingError at result time. Now it fails fast at
+    submit with a clear message."""
+
+    def test_lambda_predicates_fail_fast(self):
+        import pytest
+
+        with pytest.raises(ValueError, match="module-level"):
+            parallel_map(
+                _module_level_square,
+                [1, 2],
+                executor="process",
+                retry=Retry(attempts=2, retry_if=lambda e: True),
+            )
+
+    def test_picklable_retry_still_works_with_process(self):
+        result = parallel_map(
+            _module_level_square,
+            [2, 3],
+            executor="process",
+            retry=Retry(attempts=2, backoff=0, jitter=False, on=(ValueError,)),
+        )
+        assert list(result) == [4, 9]
+
+
+def _module_level_square(x):
+    return x * x

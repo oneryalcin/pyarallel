@@ -1,10 +1,10 @@
 # Pyarallel
 
-Simple, explicit parallel execution for Python.
+The fan-out layer for rate-limited APIs. Simple, explicit parallel execution for Python.
 
 ## Overview
 
-Pyarallel wraps Python's `concurrent.futures` and `asyncio.TaskGroup` with better ergonomics: structured error handling, rate limiting, progress callbacks, and async support.
+Pyarallel is for "apply one function to many inputs" workloads against services that throttle you — LLM calls, embeddings, scraping, SaaS APIs — as well as general parallel processing. It wraps Python's `concurrent.futures` and `asyncio.TaskGroup` with the policies that workload actually needs: rate limiting, per-item retry, structured error handling, and progress callbacks. Sync and async, zero dependencies.
 
 **Design principles:**
 

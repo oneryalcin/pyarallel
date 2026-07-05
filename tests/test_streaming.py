@@ -2,8 +2,7 @@
 
 import time
 
-from pyarallel import RateLimit
-from pyarallel.core import Retry
+from pyarallel import RateLimit, Retry
 
 
 class TestParallelIterBasic:

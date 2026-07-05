@@ -3,7 +3,7 @@
 import pytest
 
 from pyarallel import ItemResult, ParallelResult
-from pyarallel.core import _Failure
+from pyarallel.result import _Failure
 
 
 class TestSuccessfulResult:
@@ -123,13 +123,13 @@ class TestValidation:
             RateLimit(-5)
 
     def test_retry_zero_attempts_raises(self):
-        from pyarallel.core import Retry
+        from pyarallel import Retry
 
         with pytest.raises(ValueError, match=">= 1"):
             Retry(attempts=0)
 
     def test_retry_negative_attempts_raises(self):
-        from pyarallel.core import Retry
+        from pyarallel import Retry
 
         with pytest.raises(ValueError, match=">= 1"):
             Retry(attempts=-1)
@@ -152,10 +152,13 @@ class TestValidation:
         with pytest.raises(ValueError, match=">= 1"):
             parallel_map(lambda x: x, [1], workers=0)
 
-    def test_task_timeout_in_sync_raises(self):
+    def test_task_timeout_not_in_sync_signature(self):
+        """Sync parallel_map deliberately has no task_timeout — threads
+        can't be cancelled. The parameter was removed rather than kept
+        as a NotImplementedError trap."""
         from pyarallel import parallel_map
 
-        with pytest.raises(NotImplementedError, match="task_timeout is not supported"):
+        with pytest.raises(TypeError, match="task_timeout"):
             parallel_map(lambda x: x, [1], task_timeout=5.0)
 
     def test_rate_limit_invalid_per_raises(self):

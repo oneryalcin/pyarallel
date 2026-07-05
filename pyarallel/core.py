@@ -1,15 +1,13 @@
-"""Pyarallel: Parallel execution that doesn't hide the ball.
+"""Sync engine: parallel_map, parallel_starmap, parallel_iter.
 
-Simple, explicit parallel execution for Python. No magic type detection,
-no global config singletons, no enterprise astronautics.
+Simple, explicit parallel execution over ``concurrent.futures``. No magic
+type detection, no global config singletons, no enterprise astronautics.
 """
 
 from __future__ import annotations
 
 import functools
-import importlib
-import random
-import threading
+import pickle
 import time
 from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import (
@@ -18,433 +16,138 @@ from concurrent.futures import (
     ThreadPoolExecutor,
     as_completed,
 )
-from dataclasses import dataclass
-from itertools import islice
+from pathlib import Path
 from typing import Any, Literal
+
+from ._plan import (
+    _PENDING,
+    _append_timeout_failures,
+    _mark_timeout_indices,
+    _plan_collected_map,
+    _progress_total,
+)
+from ._procexec import _call_resolved, _call_resolved_args, _resolve_process_target
+from .checkpoint import _CheckpointStore, _task_signature
+from .limiter import Limiter, _as_limiter
+from .policies import RateLimit, Retry
+from .result import ItemResult, ParallelResult, _Failure
 
 ExecutorType = Literal["thread", "process"]
 
-# Sentinel for "slot not yet filled" — distinct from a legitimate None return.
-_PENDING = object()
-_MISSING = object()
 
-
-# ---------------------------------------------------------------------------
-# Configuration objects — small, frozen, composable
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True, slots=True)
-class RateLimit:
-    """Rate limit specification.
-
-    Examples::
-
-        RateLimit(10)              # 10 per second
-        RateLimit(100, "minute")   # 100 per minute
-        RateLimit(1000, "hour")    # 1000 per hour
-    """
-
-    count: float
-    per: Literal["second", "minute", "hour"] = "second"
-
-    _VALID_INTERVALS = {"second": 1, "minute": 60, "hour": 3600}
-
-    def __post_init__(self) -> None:
-        if self.count <= 0:
-            raise ValueError(f"RateLimit count must be positive, got {self.count}")
-        if self.per not in self._VALID_INTERVALS:
-            raise ValueError(
-                f'RateLimit per must be "second", "minute", or "hour", got {self.per!r}'
-            )
-
-    @property
-    def per_second(self) -> float:
-        return self.count / self._VALID_INTERVALS[self.per]
-
-
-@dataclass(frozen=True, slots=True)
-class Retry:
-    """Per-item retry with exponential backoff and jitter.
-
-    Examples::
-
-        Retry()                          # 3 attempts, 1s base, exponential + jitter
-        Retry(attempts=5, backoff=2.0)   # 5 attempts, 2s base
-        Retry(on=(ConnectionError, TimeoutError))  # only retry these
-        Retry(jitter=False)              # deterministic delays (testing)
-
-    Delay formula: ``min(backoff * 2^attempt, max_delay) * jitter``
-    """
-
-    attempts: int = 3
-    backoff: float = 1.0
-    max_delay: float = 60.0
-    jitter: bool = True
-    on: tuple[type[Exception], ...] | None = None
-
-    def __post_init__(self) -> None:
-        if self.attempts < 1:
-            raise ValueError(f"Retry attempts must be >= 1, got {self.attempts}")
-
-    def _delay(self, attempt: int) -> float:
-        """Compute delay before retry *attempt* (0-indexed)."""
-        delay = min(self.backoff * (2**attempt), self.max_delay)
-        if self.jitter:
-            delay *= random.uniform(0.5, 1.5)
-        return delay
-
-    def _should_retry(self, exc: Exception) -> bool:
-        """True if this exception type is retryable."""
-        if self.on is None:
-            return True
-        return isinstance(exc, self.on)
-
-
-@dataclass(init=False, frozen=True, slots=True)
-class ItemResult[R]:
-    """Single streaming result item.
-
-    Exactly one of ``value`` or ``error`` is set.
-    """
-
-    index: int
-    value: R | None
-    error: Exception | None
-
-    def __init__(
-        self,
-        index: int,
-        value: R | None | object = _MISSING,
-        error: Exception | None | object = _MISSING,
-    ) -> None:
-        has_value = value is not _MISSING
-        has_error = error is not _MISSING
-        if has_value == has_error:
-            raise ValueError("Exactly one of value or error must be set")
-        object.__setattr__(self, "index", index)
-        object.__setattr__(self, "value", value if has_value else None)
-        object.__setattr__(self, "error", error if has_error else None)
-
-    @property
-    def ok(self) -> bool:
-        """True when this item succeeded."""
-        return self.error is None
-
-
-# ---------------------------------------------------------------------------
-# Internals
-# ---------------------------------------------------------------------------
-
-
-class _Failure:
-    """Sentinel wrapping a failed task result."""
-
-    __slots__ = ("exception",)
-
-    def __init__(self, exception: Exception) -> None:
-        self.exception = exception
-
-
-@dataclass(slots=True)
-class _CollectedMapPlan:
-    """Shared input plan for collected sync/async map execution."""
-
-    results: list[Any]
-    total: int | None
-    batches: Iterable[list[tuple[int, Any]]]
-    remaining: Iterator[Any] | None = None
-
-
-class _TokenBucket:
-    """Thread-safe token bucket rate limiter.
-
-    Each caller claims a time-slot; callers sleep until their slot arrives.
-    The lock is held only for the bookkeeping — never during sleep.
-    """
-
-    __slots__ = ("_interval", "_next", "_lock")
-
-    def __init__(self, rate_limit: RateLimit) -> None:
-        self._interval = 1.0 / rate_limit.per_second
-        self._next = time.monotonic()
-        self._lock = threading.Lock()
-
-    def wait(self) -> None:
-        with self._lock:
-            now = time.monotonic()
-            target = max(self._next, now)
-            self._next = target + self._interval
-            delay = target - now
-        if delay > 0:
-            time.sleep(delay)
-
-
-def _merge_opts(defaults: dict[str, Any], **overrides: Any) -> dict[str, Any]:
-    """Merge decorator defaults with per-call overrides (skip None values)."""
-    opts = dict(defaults)
-    opts.update({k: v for k, v in overrides.items() if v is not None})
-    return opts
-
-
-def _coerce_rate_limit(rate_limit: RateLimit | float | None) -> RateLimit | None:
-    """Normalize numeric rate limits into ``RateLimit`` objects."""
-    if isinstance(rate_limit, (int, float)):
-        return RateLimit(rate_limit)
-    return rate_limit
-
-
-def _progress_total(total: int | None, results: list[Any]) -> int:
-    """Return the best total to report in progress callbacks."""
-    return total if total is not None else len(results)
-
-
-def _make_chunks(n: int, batch_size: int | None) -> list[range]:
-    """Split range(n) into chunks for batched processing."""
-    if batch_size is not None and batch_size < n:
-        return [
-            range(start, min(start + batch_size, n))
-            for start in range(0, n, batch_size)
-        ]
-    return [range(n)]
-
-
-def _iter_batches(
-    items: Iterable[Any], batch_size: int
-) -> Iterator[list[tuple[int, Any]]]:
-    """Yield indexed item batches lazily from *items*."""
-    yield from _iter_batches_from_iterator(iter(items), batch_size)
-
-
-def _iter_batches_from_iterator(
-    it: Iterator[Any], batch_size: int
-) -> Iterator[list[tuple[int, Any]]]:
-    """Yield indexed item batches lazily from an existing iterator."""
-    index = 0
-    while True:
-        batch = list(islice(it, batch_size))
-        if not batch:
-            break
-        start = index
-        index += len(batch)
-        yield list(enumerate(batch, start))
-
-
-def _plan_collected_map(
-    items: Iterable[Any], batch_size: int | None
-) -> _CollectedMapPlan:
-    """Build the shared input plan for collected map-style execution."""
-    if batch_size is None:
-        items_list = list(items)
-        total = len(items_list)
-        batches = (
-            [*enumerate(items_list[start:stop], start)]
-            for start, stop in (
-                (chunk.start, chunk.stop) for chunk in _make_chunks(total, batch_size)
-            )
-        )
-        return _CollectedMapPlan(
-            results=[_PENDING] * total,
-            total=total,
-            batches=batches,
-        )
-
-    return _CollectedMapPlan(
-        results=[],
-        total=_total_if_known(items),
-        batches=_iter_batches_from_iterator(source := iter(items), batch_size),
-        remaining=source,
-    )
-
-
-def _timeout_failure(timeout: float, idx: int) -> _Failure:
-    """Create a consistent timeout failure wrapper."""
-    return _Failure(TimeoutError(f"Task {idx} did not complete within {timeout}s"))
-
-
-def _mark_timeout_indices(
-    results: list[Any], indices: Iterable[int], timeout: float
-) -> None:
-    """Fill any still-pending result slots at *indices* with timeout failures."""
-    for idx in indices:
-        if results[idx] is _PENDING:
-            results[idx] = _timeout_failure(timeout, idx)
-
-
-def _append_timeout_failures(
-    results: list[Any], remaining: Iterator[Any] | None, timeout: float
-) -> None:
-    """Drain remaining unseen input items and append timeout failures."""
-    if remaining is None:
-        return
-    for _item in remaining:
-        results.append(_timeout_failure(timeout, len(results)))
-
-
-def _total_if_known(items: Iterable[Any]) -> int | None:
-    """Return len(items) when available without forcing materialization."""
-    try:
-        return len(items)  # type: ignore[arg-type]
-    except TypeError:
-        return None
-
-
-def _resolve_process_target(
+def _run_with_retry(
     fn: Callable[..., Any],
-) -> tuple[str, str] | None:
-    """Return a module/qualname pair when *fn* can be re-imported in a worker.
-
-    This keeps process execution working for decorated top-level functions,
-    whose original function object is no longer the module-global binding.
-    """
-    if getattr(fn, "__self__", None) is not None:
-        return None
-
-    module_name = getattr(fn, "__module__", None)
-    qualname = getattr(fn, "__qualname__", None)
-    if not module_name or not qualname or "<locals>" in qualname:
-        return None
-    return (module_name, qualname)
-
-
-@functools.cache
-def _load_process_target(module_name: str, qualname: str) -> Callable[..., Any]:
-    """Import and resolve a callable by module and qualname."""
-    target: Any = importlib.import_module(module_name)
-    for part in qualname.split("."):
-        target = getattr(target, part)
-    if not callable(target):
-        raise TypeError(f"{module_name}.{qualname} is not callable")
-    return target
-
-
-def _call_resolved(item: Any, *, module_name: str, qualname: str) -> Any:
-    """Resolve a callable inside the worker process and call it with one item."""
-    return _load_process_target(module_name, qualname)(item)
-
-
-def _call_resolved_args(
-    args: tuple[Any, ...], *, module_name: str, qualname: str
+    item: Any,
+    retry: Retry,
+    limiter: Limiter | None = None,
 ) -> Any:
-    """Resolve a callable inside the worker process and call it with *args."""
-    return _load_process_target(module_name, qualname)(*args)
+    """Call *fn(item)*, retrying on failure with backoff or server-driven waits.
 
-
-# ---------------------------------------------------------------------------
-# ParallelResult
-# ---------------------------------------------------------------------------
-
-
-class ParallelResult[R]:
-    """Results from parallel execution.
-
-    Behaves like a ``list[R]`` when every task succeeded.
-    When some tasks failed, use ``.successes()``, ``.failures()``,
-    or ``.raise_on_failure()`` for structured access.
-
-    Iterating or calling ``.values()`` raises ``ExceptionGroup``
-    if any task failed — you always see errors, never silently.
+    Every retry attempt is a fresh API call, so it draws a fresh token from
+    the shared *limiter* (the first attempt's token was paid at submission).
+    A server-mandated wait (``Retry.wait_from``) also pauses the limiter —
+    even on the final attempt, so a 429 from a task that is about to give
+    up still slows the rest of the pool.
     """
-
-    __slots__ = ("_entries",)
-
-    def __init__(self, entries: list[Any]) -> None:
-        self._entries = entries
-
-    # --- Introspection ---
-
-    @property
-    def ok(self) -> bool:
-        """True when every task succeeded."""
-        return not any(isinstance(e, _Failure) for e in self._entries)
-
-    def values(self) -> list[R]:
-        """All results in input order. Raises if any task failed."""
-        self.raise_on_failure()
-        return list(self._entries)
-
-    def successes(self) -> list[tuple[int, R]]:
-        """``(index, value)`` for each task that succeeded."""
-        return [
-            (i, v) for i, v in enumerate(self._entries) if not isinstance(v, _Failure)
-        ]
-
-    def failures(self) -> list[tuple[int, Exception]]:
-        """``(index, exception)`` for each task that failed."""
-        return [
-            (i, f.exception)
-            for i, f in enumerate(self._entries)
-            if isinstance(f, _Failure)
-        ]
-
-    def raise_on_failure(self) -> None:
-        """Raise ``ExceptionGroup`` containing all task failures."""
-        fails = self.failures()
-        if fails:
-            n = len(self._entries)
-            raise ExceptionGroup(
-                f"{len(fails)} of {n} tasks failed",
-                [e for _, e in fails],
-            )
-
-    # --- list-like interface (raises on failure) ---
-
-    def __iter__(self) -> Iterator[R]:
-        return iter(self.values())
-
-    def __getitem__(self, index: int | slice) -> Any:
-        self.raise_on_failure()
-        return self._entries[index]
-
-    def __len__(self) -> int:
-        return len(self._entries)
-
-    def __bool__(self) -> bool:
-        return len(self._entries) > 0
-
-    def __repr__(self) -> str:
-        if self.ok:
-            return f"ParallelResult({list(self._entries)})"
-        s, f = len(self.successes()), len(self.failures())
-        return f"ParallelResult({s} ok, {f} failed)"
-
-
-# ---------------------------------------------------------------------------
-# parallel_map — the workhorse
-# ---------------------------------------------------------------------------
-
-
-def _run_with_retry(fn: Callable[..., Any], item: Any, retry: Retry) -> Any:
-    """Call *fn(item)*, retrying on failure with exponential backoff."""
     last_exc: Exception | None = None
     for attempt in range(retry.attempts):
         try:
+            if attempt > 0 and limiter is not None:
+                limiter.wait()
             return fn(item)
         except Exception as exc:
             last_exc = exc
             if not retry._should_retry(exc):
                 raise
+            server_wait = retry._server_wait(exc)
+            if server_wait is not None and limiter is not None:
+                limiter.pause(server_wait)
             if attempt < retry.attempts - 1:
-                delay = retry._delay(attempt)
+                delay = (
+                    server_wait if server_wait is not None else retry._delay(attempt)
+                )
                 if delay > 0:
                     time.sleep(delay)
     raise last_exc  # type: ignore[misc]
 
 
-def parallel_map[R](
-    fn: Callable[..., R],
-    items: Iterable[Any],
+def _validate_common(
+    workers: int | None, executor: str, batch_size: int | None
+) -> None:
+    """Shared argument validation for the sync entry points."""
+    if batch_size is not None and batch_size < 1:
+        raise ValueError(f"batch_size must be >= 1, got {batch_size}")
+    if workers is not None and workers < 1:
+        raise ValueError(f"workers must be >= 1, got {workers}")
+    if executor not in ("thread", "process"):
+        raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
+
+
+def _build_task_fn(
+    fn: Callable[..., Any],
+    executor: ExecutorType,
+    retry: Retry | None,
+    limiter: Limiter | None,
+) -> Callable[..., Any]:
+    """Compose the per-item callable: process-safe target first, then retry.
+
+    Order matters — the retry wrapper must live *outside* the process
+    resolution so retries happen inside the worker, around the real call.
+
+    The limiter is threaded into the retry loop for thread executors only:
+    a ``Limiter`` holds a lock and cannot be pickled, and pausing a copy in
+    a worker process would not affect the parent's limiter anyway. Process
+    workers still honor server-mandated waits as their own retry delay.
+    """
+    task_fn = fn
+    if executor == "process":
+        if retry is not None:
+            try:
+                pickle.dumps(retry)
+            except Exception as exc:
+                raise ValueError(
+                    "This Retry cannot be pickled for executor='process' — "
+                    "its retry_if/wait_from callables must be module-level "
+                    "functions, not lambdas or closures. Alternatively use "
+                    "executor='thread'."
+                ) from exc
+        resolved = _resolve_process_target(fn)
+        if resolved is not None:
+            module_name, qualname = resolved
+            task_fn = functools.partial(
+                _call_resolved,
+                module_name=module_name,
+                qualname=qualname,
+            )
+    if retry is not None:
+        task_fn = functools.partial(
+            _run_with_retry,
+            task_fn,
+            retry=retry,
+            limiter=limiter if executor == "thread" else None,
+        )
+    return task_fn
+
+
+def parallel_map[T, R](
+    fn: Callable[[T], R],
+    items: Iterable[T],
     *,
     workers: int | None = None,
     executor: ExecutorType = "thread",
-    rate_limit: RateLimit | float | None = None,
+    rate_limit: Limiter | RateLimit | float | None = None,
     timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
-    task_timeout: float | None = None,
+    checkpoint: str | Path | None = None,
 ) -> ParallelResult[R]:
     """Execute *fn* over *items* in parallel, returning ordered results.
+
+    Note: there is deliberately no ``task_timeout`` here — Python threads
+    cannot be cancelled mid-execution. Use ``timeout=`` for a total
+    wall-clock limit, put timeouts inside your function, or use
+    ``async_parallel_map`` for per-task timeouts.
 
     Args:
         fn: Function applied to each item.
@@ -453,7 +156,9 @@ def parallel_map[R](
             the executor decide — ``min(32, cpu_count+4)`` for threads,
             ``cpu_count()`` for processes.
         executor: ``"thread"`` for I/O-bound, ``"process"`` for CPU-bound.
-        rate_limit: ``RateLimit`` object, or a plain number (ops per second).
+        rate_limit: ``RateLimit`` spec, a plain number (ops per second), or
+            a shared ``Limiter`` instance to draw from one budget across
+            multiple calls.
         timeout: Total wall-clock timeout in seconds for the whole operation.
         on_progress: ``callback(completed, total)`` fired after each task.
             When ``items`` has no known length and ``batch_size`` is set,
@@ -464,54 +169,24 @@ def parallel_map[R](
             lazily one batch at a time. Without batching, all items are
             submitted at once.
         retry: ``Retry`` object for per-item retry with backoff.
+        checkpoint: Path to a checkpoint file (created if missing, SQLite).
+            Completed item results are stored there; rerunning the same
+            call resumes — cached items load from disk, failed and unseen
+            items execute. The file is bound to the mapped function's
+            identity: resuming with a different function raises
+            ``CheckpointError``. Items and results must be picklable; a
+            result that cannot be checkpointed aborts the run with
+            ``CheckpointError``. Rows are positional — reordering or
+            inserting inputs forces shifted items to recompute.
 
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
     """
-    rate_limit = _coerce_rate_limit(rate_limit)
-    if batch_size is not None and batch_size < 1:
-        raise ValueError(f"batch_size must be >= 1, got {batch_size}")
-    if workers is not None and workers < 1:
-        raise ValueError(f"workers must be >= 1, got {workers}")
-    if executor not in ("thread", "process"):
-        raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
-    if task_timeout is not None:
-        raise NotImplementedError(
-            "task_timeout is not supported in sync parallel_map — Python "
-            "threads cannot be cancelled mid-execution. Use timeout= for a "
-            "total wall-clock limit, or put timeouts inside your function "
-            "(e.g. requests.get(url, timeout=5)). "
-            "For per-task timeouts, use async_parallel_map with task_timeout=."
-        )
+    _validate_common(workers, executor, batch_size)
 
-    task_fn = fn
-    if executor == "process":
-        resolved = _resolve_process_target(fn)
-        if resolved is not None:
-            module_name, qualname = resolved
-            task_fn = functools.partial(
-                _call_resolved,
-                module_name=module_name,
-                qualname=qualname,
-            )
-    if retry is not None:
-        task_fn = functools.partial(_run_with_retry, fn, retry=retry)
-        if executor == "process":
-            resolved = _resolve_process_target(fn)
-            if resolved is not None:
-                module_name, qualname = resolved
-                task_fn = functools.partial(
-                    _run_with_retry,
-                    functools.partial(
-                        _call_resolved,
-                        module_name=module_name,
-                        qualname=qualname,
-                    ),
-                    retry=retry,
-                )
-
+    bucket = _as_limiter(rate_limit)
+    task_fn = _build_task_fn(fn, executor, retry, bucket)
     pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
-    bucket = _TokenBucket(rate_limit) if rate_limit else None
     completed = 0
     deadline = (time.monotonic() + timeout) if timeout is not None else None
     timed_out = False
@@ -521,6 +196,12 @@ def parallel_map[R](
         return ParallelResult([])
     results = plan.results
 
+    store = (
+        _CheckpointStore(checkpoint, _task_signature(fn))
+        if checkpoint is not None
+        else None
+    )
+    fingerprints: dict[int, bytes] = {}
     pool = pool_cls(max_workers=workers)
     try:
         for batch in plan.batches:
@@ -543,6 +224,18 @@ def parallel_map[R](
 
             futures: dict[Future[R], int] = {}
             for idx, item in batch:
+                if store is not None:
+                    fp = _CheckpointStore.fingerprint(item)
+                    cached = store.get(idx, fp)
+                    if cached is not None:
+                        results[idx] = cached[0]
+                        completed += 1
+                        if on_progress:
+                            on_progress(
+                                completed, _progress_total(plan.total, results)
+                            )
+                        continue
+                    fingerprints[idx] = fp
                 if bucket:
                     bucket.wait()
                 futures[pool.submit(task_fn, item)] = idx
@@ -554,6 +247,12 @@ def parallel_map[R](
                         results[idx] = future.result()
                     except Exception as exc:
                         results[idx] = _Failure(exc)
+                    else:
+                        # Outside the try: a checkpoint write failure raises
+                        # CheckpointError instead of mislabeling a genuine
+                        # success as an item failure.
+                        if store is not None:
+                            store.put(idx, fingerprints.pop(idx), results[idx])
                     completed += 1
                     if on_progress:
                         on_progress(completed, _progress_total(plan.total, results))
@@ -568,6 +267,8 @@ def parallel_map[R](
                 break
     finally:
         pool.shutdown(wait=not timed_out, cancel_futures=timed_out)
+        if store is not None:
+            store.close()
 
     return ParallelResult(results)
 
@@ -584,7 +285,7 @@ def parallel_starmap[R](
     *,
     workers: int | None = None,
     executor: ExecutorType = "thread",
-    rate_limit: RateLimit | float | None = None,
+    rate_limit: Limiter | RateLimit | float | None = None,
     timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
@@ -631,13 +332,13 @@ def parallel_starmap[R](
     )
 
 
-def parallel_iter[R](
-    fn: Callable[..., R],
-    items: Iterable[Any],
+def parallel_iter[T, R](
+    fn: Callable[[T], R],
+    items: Iterable[T],
     *,
     workers: int | None = None,
     executor: ExecutorType = "thread",
-    rate_limit: RateLimit | float | None = None,
+    rate_limit: Limiter | RateLimit | float | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
 ) -> Iterator[ItemResult[R]]:
@@ -655,43 +356,11 @@ def parallel_iter[R](
             else:
                 log_error(item.index, item.error)
     """
-    if isinstance(rate_limit, (int, float)):
-        rate_limit = RateLimit(rate_limit)
-    if batch_size is not None and batch_size < 1:
-        raise ValueError(f"batch_size must be >= 1, got {batch_size}")
-    if workers is not None and workers < 1:
-        raise ValueError(f"workers must be >= 1, got {workers}")
-    if executor not in ("thread", "process"):
-        raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
+    _validate_common(workers, executor, batch_size)
 
-    task_fn = fn
-    if executor == "process":
-        resolved = _resolve_process_target(fn)
-        if resolved is not None:
-            module_name, qualname = resolved
-            task_fn = functools.partial(
-                _call_resolved,
-                module_name=module_name,
-                qualname=qualname,
-            )
-    if retry is not None:
-        task_fn = functools.partial(_run_with_retry, fn, retry=retry)
-        if executor == "process":
-            resolved = _resolve_process_target(fn)
-            if resolved is not None:
-                module_name, qualname = resolved
-                task_fn = functools.partial(
-                    _run_with_retry,
-                    functools.partial(
-                        _call_resolved,
-                        module_name=module_name,
-                        qualname=qualname,
-                    ),
-                    retry=retry,
-                )
-
+    bucket = _as_limiter(rate_limit)
+    task_fn = _build_task_fn(fn, executor, retry, bucket)
     pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
-    bucket = _TokenBucket(rate_limit) if rate_limit else None
     it = iter(items)
     index = 0
 
@@ -722,188 +391,3 @@ def parallel_iter[R](
                     yield ItemResult(idx, error=exc)
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
-
-
-# ---------------------------------------------------------------------------
-# @parallel decorator
-# ---------------------------------------------------------------------------
-
-
-class _BoundParallel:
-    """Bound version of a @parallel method (carries self/cls)."""
-
-    __slots__ = ("_fn", "_defaults")
-
-    def __init__(self, fn: Callable[..., Any], defaults: dict[str, Any]) -> None:
-        self._fn = fn
-        self._defaults = defaults
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self._fn(*args, **kwargs)
-
-    def map(
-        self,
-        items: Iterable[Any],
-        *,
-        workers: int | None = None,
-        executor: ExecutorType | None = None,
-        rate_limit: RateLimit | float | None = None,
-        timeout: float | None = None,
-        on_progress: Callable[[int, int], None] | None = None,
-        batch_size: int | None = None,
-        retry: Retry | None = None,
-    ) -> ParallelResult[Any]:
-        """Run this function over *items* in parallel."""
-        return parallel_map(
-            self._fn,
-            items,
-            **_merge_opts(
-                self._defaults,
-                workers=workers,
-                executor=executor,
-                rate_limit=rate_limit,
-                timeout=timeout,
-                on_progress=on_progress,
-                batch_size=batch_size,
-                retry=retry,
-            ),
-        )
-
-    def starmap(
-        self,
-        items: Iterable[tuple[Any, ...]],
-        **kwargs: Any,
-    ) -> ParallelResult[Any]:
-        """Like ``.map()`` but unpacks each item as ``fn(*args)``."""
-        return parallel_starmap(
-            self._fn, items, **_merge_opts(self._defaults, **kwargs)
-        )
-
-    def stream(
-        self,
-        items: Iterable[Any],
-        **kwargs: Any,
-    ) -> Iterator[ItemResult[Any]]:
-        """Yield ``ItemResult`` in completion order — constant memory."""
-        return parallel_iter(self._fn, items, **_merge_opts(self._defaults, **kwargs))
-
-
-class _ParallelFunc:
-    """Wrapper returned by ``@parallel``.  Adds ``.map()`` without
-    changing the original function's call signature or return type.
-    Also participates in the descriptor protocol so ``.map()`` works
-    on instance methods.
-    """
-
-    def __init__(
-        self,
-        fn: Callable[..., Any],
-        *,
-        workers: int | None,
-        executor: ExecutorType,
-        rate_limit: RateLimit | float | None,
-    ) -> None:
-        self.__wrapped__ = fn
-        self._defaults: dict[str, Any] = {"executor": executor}
-        if workers is not None:
-            self._defaults["workers"] = workers
-        if rate_limit is not None:
-            self._defaults["rate_limit"] = rate_limit
-        functools.update_wrapper(self, fn)
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return self.__wrapped__(*args, **kwargs)
-
-    def __get__(self, obj: Any, objtype: type | None = None) -> Any:
-        if obj is None:
-            return self
-        bound = functools.partial(self.__wrapped__, obj)
-        return _BoundParallel(bound, self._defaults)
-
-    def map(
-        self,
-        items: Iterable[Any],
-        *,
-        workers: int | None = None,
-        executor: ExecutorType | None = None,
-        rate_limit: RateLimit | float | None = None,
-        timeout: float | None = None,
-        on_progress: Callable[[int, int], None] | None = None,
-        batch_size: int | None = None,
-        retry: Retry | None = None,
-    ) -> ParallelResult[Any]:
-        """Run this function over *items* in parallel."""
-        return parallel_map(
-            self.__wrapped__,
-            items,
-            **_merge_opts(
-                self._defaults,
-                workers=workers,
-                executor=executor,
-                rate_limit=rate_limit,
-                timeout=timeout,
-                on_progress=on_progress,
-                batch_size=batch_size,
-                retry=retry,
-            ),
-        )
-
-    def starmap(
-        self,
-        items: Iterable[tuple[Any, ...]],
-        **kwargs: Any,
-    ) -> ParallelResult[Any]:
-        """Like ``.map()`` but unpacks each item as ``fn(*args)``."""
-        return parallel_starmap(
-            self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs)
-        )
-
-    def stream(
-        self,
-        items: Iterable[Any],
-        **kwargs: Any,
-    ) -> Iterator[ItemResult[Any]]:
-        """Yield ``ItemResult`` in completion order — constant memory."""
-        return parallel_iter(
-            self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs)
-        )
-
-
-def parallel[R](
-    fn: Callable[..., R] | None = None,
-    *,
-    workers: int | None = None,
-    executor: ExecutorType = "thread",
-    rate_limit: RateLimit | float | None = None,
-) -> Any:
-    """Decorator: adds ``.map()`` for parallel execution.
-
-    The decorated function **keeps its original behaviour**.
-    Single calls return ``T``, not ``list[T]``.
-    Call ``.map(items)`` for parallel execution.
-
-    Examples::
-
-        @parallel(workers=4)
-        def fetch(url):
-            return requests.get(url).json()
-
-        result  = fetch("http://example.com")      # dict  (normal call)
-        results = fetch.map(["u1", "u2", "u3"])     # ParallelResult[dict]
-
-        @parallel
-        def double(x):
-            return x * 2
-
-        double(5)             # 10
-        double.map([1,2,3])   # ParallelResult([2, 4, 6])
-    """
-
-    def decorator(fn: Callable[..., R]) -> _ParallelFunc:
-        return _ParallelFunc(
-            fn, workers=workers, executor=executor, rate_limit=rate_limit
-        )
-
-    if fn is not None:
-        return decorator(fn)
-    return decorator
