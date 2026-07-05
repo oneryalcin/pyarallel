@@ -13,6 +13,8 @@ import pytest
 
 from pyarallel import (
     Aborted,
+    CheckpointError,
+    RateLimit,
     Retry,
     async_parallel_map,
     parallel_iter,
@@ -322,3 +324,150 @@ class TestDecoratorMaxErrors:
         results = list(dead.stream(range(1000), max_errors=3))
         assert sum(1 for r in results if not r.ok) == 3
         assert len(results) < 1000
+
+
+class TestMidPlanReviewFindings:
+    """Regression tests from the mid-plan review cycle — each names the
+    finding it prevents."""
+
+    def test_poison_source_is_not_consumed_after_abort(self):
+        """Codex adversarial [high]: the abort path drained unsized sources
+        to append placeholders — consuming (or raising from) input that
+        must never be touched after the stop."""
+        consumed = Counter()
+
+        def source():
+            for i in range(1000):
+                consumed.bump()
+                yield i
+                if consumed.n > 50:
+                    raise RuntimeError("source poisoned past the abort point")
+
+        def dead(x):
+            raise ConnectionError("down")
+
+        result = parallel_map(dead, source(), workers=2, max_errors=3)
+        assert not result.ok  # returned a result — the poison never raised
+        assert consumed.n <= 3 + 4 + WINDOW_SLACK  # trigger + window (2x2)
+        # Unsized input: the result covers only the items actually pulled.
+        assert len(result) == consumed.n
+
+    async def test_async_poison_source_is_not_consumed_after_abort(self):
+        consumed = Counter()
+
+        def source():
+            for i in range(1000):
+                consumed.bump()
+                yield i
+
+        async def dead(x):
+            raise ConnectionError("down")
+
+        result = await async_parallel_map(dead, source(), concurrency=2, max_errors=3)
+        assert not result.ok
+        assert consumed.n <= 3 + 4 + WINDOW_SLACK
+        assert len(result) == consumed.n
+
+    def test_timeout_already_expired_runs_nothing(self):
+        """Codex review [P2]: an expired deadline must not admit work —
+        timeout=0 means zero tasks run, not a full window of them."""
+        calls = Counter()
+
+        def task(x):
+            calls.bump()
+            return x
+
+        result = parallel_map(task, range(50), workers=4, max_errors=5, timeout=0)
+        assert calls.n == 0
+        assert len(result) == 50
+        assert all(isinstance(e, TimeoutError) for _, e in result.failures())
+
+    def test_rate_limited_dead_api_stops_admission_mid_fill(self):
+        """Codex adversarial [medium]: with a rate limiter the driver paid
+        one paced wait per window slot even after the first failure had
+        already completed. Admission must stop mid-fill."""
+        calls = Counter()
+
+        def dead(x):
+            calls.bump()
+            raise ConnectionError("down")
+
+        start = time.monotonic()
+        result = parallel_map(
+            dead,
+            range(1000),
+            workers=8,
+            max_errors=1,
+            rate_limit=RateLimit(10, "second"),
+        )
+        elapsed = time.monotonic() - start
+        assert not result.ok
+        assert calls.n <= 5  # not a full window of 16 paced submissions
+        assert elapsed < 2.0  # not 16 x 0.1s of pacing
+
+    def test_streaming_rate_limited_dead_api_stops_admission_mid_fill(self):
+        calls = Counter()
+
+        def dead(x):
+            calls.bump()
+            raise ConnectionError("down")
+
+        start = time.monotonic()
+        results = list(
+            parallel_iter(
+                dead,
+                range(1000),
+                workers=8,
+                max_errors=1,
+                rate_limit=RateLimit(10, "second"),
+            )
+        )
+        elapsed = time.monotonic() - start
+        assert sum(1 for r in results if not r.ok) == 1
+        assert calls.n <= 5
+        assert elapsed < 2.0
+
+    def test_checkpoint_write_failure_aborts_loudly_on_windowed_path(self, tmp_path):
+        """Opus finding: the CheckpointError fail-loud contract was
+        untested on the windowed (max_errors) engine."""
+
+        def unpicklable_result(x):
+            return lambda: x
+
+        with pytest.raises(CheckpointError):
+            parallel_map(
+                unpicklable_result,
+                range(10),
+                workers=2,
+                max_errors=5,
+                checkpoint=str(tmp_path / "bad.ckpt"),
+            )
+
+    def test_ordered_abort_ends_after_straggler_in_order(self):
+        """Codex adversarial [high]: the ordered+max_errors contract, made
+        explicit — the stream ends after the Nth failure is yielded in
+        input order; failures buffered behind a straggler wait for it, but
+        admission has already stopped, so cost stays window-bounded."""
+        calls = Counter()
+
+        def slow_head_then_dead(x):
+            calls.bump()
+            if x == 0:
+                time.sleep(0.4)
+                return x
+            raise ConnectionError("down")
+
+        results = list(
+            parallel_iter(
+                slow_head_then_dead,
+                range(1000),
+                workers=4,
+                batch_size=8,
+                ordered=True,
+                max_errors=3,
+            )
+        )
+        assert results[0].index == 0 and results[0].ok  # straggler, in order
+        assert [r.index for r in results] == list(range(len(results)))
+        assert sum(1 for r in results if not r.ok) == 3
+        assert calls.n <= 1 + 8 + WINDOW_SLACK  # admission stopped at window

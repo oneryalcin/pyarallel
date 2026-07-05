@@ -12,6 +12,10 @@ from typing import Any
 
 _MISSING = object()
 
+# Sentinel for "slot not yet filled" — distinct from a legitimate None return.
+# Lives here so ParallelResult can refuse to be built around a leaked one.
+_PENDING = object()
+
 
 class Aborted(RuntimeError):
     """The run stopped early because ``max_errors`` failures accumulated.
@@ -119,6 +123,12 @@ class ParallelResult[R]:
     __slots__ = ("_entries",)
 
     def __init__(self, entries: list[Any]) -> None:
+        # A leaked unfilled slot must fail loudly here, not surface later
+        # as a silent "success" value from .values()/.ok.
+        if any(e is _PENDING for e in entries):
+            raise RuntimeError(
+                "internal error: unfilled result slot leaked into ParallelResult"
+            )
         self._entries = entries
 
     # --- Introspection ---

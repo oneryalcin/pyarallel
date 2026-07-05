@@ -9,6 +9,7 @@ from __future__ import annotations
 import functools
 import os
 import pickle
+import sys
 import time
 from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import (
@@ -23,11 +24,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 from ._plan import (
-    _PENDING,
     _append_timeout_failures,
     _mark_timeout_indices,
     _plan_collected_map,
     _progress_total,
+    _timeout_failure,
     _total_if_known,
     _validate_max_errors,
 )
@@ -36,6 +37,7 @@ from .checkpoint import _CheckpointStore, _task_signature
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
 from .result import (
+    _PENDING,
     Aborted,
     ItemResult,
     ParallelResult,
@@ -217,7 +219,10 @@ def parallel_map[T, R](
             are exhausted). Work is then admitted through a bounded window
             rather than submitted upfront, so a dead API costs tens of
             calls, not thousands. Items that never ran are marked with
-            ``Aborted`` — distinguishable from real failures.
+            ``Aborted`` — distinguishable from real failures. The source
+            is never consumed after the stop: sized inputs get one
+            ``Aborted`` entry per unseen item, unsized inputs return a
+            result covering only the items actually pulled.
 
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
@@ -433,8 +438,20 @@ def _collected_map_windowed(
 
     try:
         while True:
-            while not aborted and len(in_flight) < window and _submit_next():
-                pass
+            # Deadline first — an already-expired timeout must not admit
+            # any work at all (timeout=0 means zero tasks run).
+            if deadline is not None and time.monotonic() >= deadline:
+                timed_out = True
+                break
+            while not aborted and len(in_flight) < window:
+                if not _submit_next():
+                    break
+                # Absorb whatever finished while we were pacing: with a
+                # rate limiter, filling the window can take whole seconds,
+                # and a dead API must stop admission mid-fill, not after.
+                done_now, _pending_now = wait(in_flight, timeout=0)
+                for future in done_now:
+                    _absorb(future, in_flight.pop(future))
             if not in_flight:
                 break
             wait_timeout: float | None = None
@@ -451,12 +468,18 @@ def _collected_map_windowed(
             if aborted:
                 break
 
+        # Aftermath fills never touch the source again: a poison, blocking,
+        # or infinite input must not be consumed after the run has stopped.
+        # Sized inputs get one placeholder per unseen item (by count);
+        # unsized inputs yield a shorter result — documented.
         if timed_out:
             assert timeout is not None
             for future in in_flight:
                 future.cancel()
             _mark_timeout_indices(results, in_flight.values(), timeout)
-            _append_timeout_failures(results, source, timeout)
+            if total is not None:
+                for idx in range(len(results), total):
+                    results.append(_timeout_failure(timeout, idx))
         elif aborted:
             # Salvage completions that raced the stop, drop the rest.
             done, pending = wait(in_flight, timeout=0)
@@ -468,10 +491,14 @@ def _collected_map_windowed(
             for idx in in_flight.values():
                 if results[idx] is _PENDING:
                     results[idx] = _Failure(Aborted(reason))
-            for _item in source:
-                results.append(_Failure(Aborted(reason)))
+            if total is not None:
+                results.extend(
+                    _Failure(Aborted(reason)) for _ in range(total - len(results))
+                )
     finally:
-        stopped = timed_out or aborted
+        # An escaping exception (e.g. CheckpointError from store.put) must
+        # also stop the engine cold — cancel, don't drain the window.
+        stopped = timed_out or aborted or sys.exc_info()[0] is not None
         pool.shutdown(wait=not stopped, cancel_futures=stopped)
         if store is not None:
             store.close()
@@ -570,14 +597,21 @@ def parallel_iter[T, R](
     when one slow item holds back the stream — admission simply stalls
     until it completes. That stall is backpressure, not a bug.
 
-    ``on_progress`` fires per *completed* item (before its yield). For
-    unsized inputs ``total`` is the number of items consumed from the
-    source so far, not the final count.
+    ``on_progress`` fires per *completed* item, in completion order —
+    with ``ordered=True`` that is decoupled from yield order (item 5 can
+    be counted done while item 0 is still unyielded). For unsized inputs
+    ``total`` is the number of items consumed from the source so far,
+    not the final count.
 
     ``max_errors`` stops the stream early: once that many failures have
     been yielded (counted after retries are exhausted), admission stops
     and the stream ends — no placeholder items for unseen input. A
-    consumer detects the abort by counting error items.
+    consumer detects the abort by counting error items. With
+    ``ordered=True`` the stream still ends only after the Nth failure is
+    yielded *in input order* — failures that completed out of order wait
+    for the items ahead of them to finish first. Admission has already
+    stopped by then, so the extra wait is bounded by the in-flight
+    window, never by unseen input.
 
     Breaking out of the loop closes the generator: submission stops and
     not-yet-started tasks are cancelled. Tasks already running in a
@@ -627,14 +661,30 @@ def parallel_iter[T, R](
         in_flight[pool.submit(task_fn, item)] = idx
         return True
 
+    def _failures_pending() -> int:
+        # Completed-but-unprocessed failures, peeked without consuming
+        # (Future.result() on a done future is idempotent). With a rate
+        # limiter, filling the window can take whole seconds — a dead API
+        # must stop admission mid-fill, not after the window is paid for.
+        n = 0
+        for f in list(in_flight):
+            if f.done():
+                try:
+                    if f.result().error is not None:
+                        n += 1
+                except Exception:
+                    n += 1
+        return n
+
     def _admit() -> None:
         # The engine invariant: in_flight + buffered never exceeds the
         # window. Gating admission on the sum (not on completions) is what
         # keeps ordered mode bounded when a straggler blocks the buffer.
-        if max_errors is not None and failures >= max_errors:
-            return  # aborting — no new work
-        while len(in_flight) + len(buffered) < window and _submit_next():
-            pass
+        while len(in_flight) + len(buffered) < window:
+            if max_errors is not None and failures + _failures_pending() >= max_errors:
+                return  # aborting — no new work
+            if not _submit_next():
+                return
 
     def _yield_ends_stream(item_result: ItemResult[R]) -> bool:
         nonlocal yielded_failures

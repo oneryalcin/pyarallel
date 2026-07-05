@@ -95,7 +95,14 @@ Composes with `timeout=` (whichever fires first wins, each marking its
 own failure type) and with `checkpoint=` — completed successes are
 already persisted, so the aborted job resumes exactly where it stopped.
 Streaming APIs take `max_errors` too: the stream simply ends after the
-Nth failure is yielded, with no placeholder items.
+Nth failure is yielded, with no placeholder items (in `ordered=True`
+mode the ending failure is still delivered in input order — admission
+has stopped, so the wait is bounded by the window).
+
+The input source is **never consumed after the stop** — a blocking or
+infinite generator stays untouched. Sized inputs get one `Aborted`
+entry per unseen item (by count); unsized inputs return a result
+covering only the items actually pulled from the source.
 
 ### Checkpoint / Resume
 

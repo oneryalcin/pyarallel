@@ -11,10 +11,7 @@ from dataclasses import dataclass
 from itertools import islice
 from typing import Any
 
-from .result import _Failure
-
-# Sentinel for "slot not yet filled" — distinct from a legitimate None return.
-_PENDING = object()
+from .result import _PENDING, _Failure
 
 
 @dataclass(slots=True)

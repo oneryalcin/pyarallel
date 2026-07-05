@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 
 from ._plan import (
-    _PENDING,
     _plan_collected_map,
     _progress_total,
     _total_if_known,
@@ -24,6 +23,7 @@ from .checkpoint import CheckpointError, _CheckpointStore, _task_signature
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
 from .result import (
+    _PENDING,
     Aborted,
     ItemResult,
     ParallelResult,
@@ -128,7 +128,10 @@ async def async_parallel_map[T, R](
             are exhausted). Tasks are then created through a bounded
             window rather than all upfront, so a dead API costs tens of
             calls, not thousands. Items that never ran are marked with
-            ``Aborted`` — distinguishable from real failures.
+            ``Aborted`` — distinguishable from real failures. The source
+            is never consumed after the stop: sized inputs get one
+            ``Aborted`` entry per unseen item, unsized inputs return a
+            result covering only the items actually pulled.
 
     Returns:
         ``ParallelResult`` — same container as the sync API.
@@ -335,8 +338,13 @@ async def _async_collected_map_windowed(
             for idx in in_flight.values():
                 if results[idx] is _PENDING:
                     results[idx] = _Failure(Aborted(reason))
-            for _item in source:
-                results.append(_Failure(Aborted(reason)))
+            # Never touch the source after the stop: a poison, blocking, or
+            # infinite input must not be consumed post-abort. Sized inputs
+            # get placeholders by count; unsized yield a shorter result.
+            if total is not None:
+                results.extend(
+                    _Failure(Aborted(reason)) for _ in range(total - len(results))
+                )
     finally:
         for task in in_flight:
             task.cancel()
@@ -409,14 +417,21 @@ async def async_parallel_iter[T, R](
     when one slow item holds back the stream — admission simply stalls
     until it completes. That stall is backpressure, not a bug.
 
-    ``on_progress`` fires per *completed* item (before its yield). For
-    unsized inputs ``total`` is the number of items consumed from the
-    source so far, not the final count.
+    ``on_progress`` fires per *completed* item, in completion order —
+    with ``ordered=True`` that is decoupled from yield order (item 5 can
+    be counted done while item 0 is still unyielded). For unsized inputs
+    ``total`` is the number of items consumed from the source so far,
+    not the final count.
 
     ``max_errors`` stops the stream early: once that many failures have
     been yielded (counted after retries are exhausted), admission stops
     and the stream ends — no placeholder items for unseen input. A
-    consumer detects the abort by counting error items.
+    consumer detects the abort by counting error items. With
+    ``ordered=True`` the stream still ends only after the Nth failure is
+    yielded *in input order* — failures that completed out of order wait
+    for the items ahead of them to finish first. Admission has already
+    stopped by then, so the extra wait is bounded by the in-flight
+    window, never by unseen input.
 
     Breaking out of the loop closes the generator: submission stops and
     in-flight tasks are cancelled (async tasks, unlike threads, are
