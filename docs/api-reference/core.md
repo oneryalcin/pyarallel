@@ -211,12 +211,15 @@ add.starmap([(1, 2), (3, 4)])  # ParallelResult([3, 7])
 ## `parallel_iter`
 
 Streaming version of `parallel_map` — yields `ItemResult` in completion order.
-Results are **not accumulated in memory**.
+
+A bounded window of items is in flight at any moment: memory stays
+constant, input is consumed lazily (generators are never materialized),
+and a slow item delays only itself — items behind it keep streaming.
 
 ```python
 from pyarallel import parallel_iter
 
-for item in parallel_iter(fn, items, workers=4, batch_size=1000):
+for item in parallel_iter(fn, items, workers=4):
     if item.ok:
         db.save(item.value)
     else:
@@ -239,13 +242,28 @@ Same as `parallel_map` except no `timeout` or `on_progress` (results stream as t
 | `workers` | `int \| None` | `None` | Number of parallel workers (stdlib default when `None`) |
 | `executor` | `"thread" \| "process"` | `"thread"` | Thread pool or process pool |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting |
-| `batch_size` | `int \| None` | `None` | Process in chunks (controls memory) |
+| `batch_size` | `int \| None` | `None` | Maximum items in flight (default `2 × workers`) |
 | `retry` | `Retry \| None` | `None` | Per-item retry |
+
+!!! note "Changed in v0.5"
+    `batch_size` is now an **in-flight bound**, not a chunk size. Earlier
+    versions processed chunks with a barrier between them (one slow item
+    stalled the next chunk) and materialized the whole input when
+    `batch_size` was unset. Neither is true anymore — the default window
+    of `2 × workers` already gives constant memory; raise `batch_size`
+    only to increase lookahead.
 
 ### Yields
 
 `ItemResult[T]` — each item includes `.index`, `.ok`, `.value`, and `.error`.
 Results arrive in **completion order** (not input order).
+
+### Stopping early
+
+Breaking out of the loop stops the engine: nothing new is submitted and
+not-yet-started tasks are cancelled. Tasks already running in a worker
+thread or process cannot be interrupted and finish in the background
+(at most one window's worth).
 
 Also available as `.stream()` on `@parallel` decorated functions:
 
@@ -253,7 +271,7 @@ Also available as `.stream()` on `@parallel` decorated functions:
 @parallel(workers=8)
 def process(item): ...
 
-for item in process.stream(huge_list, batch_size=1000):
+for item in process.stream(huge_list):
     if item.ok:
         db.save(item.value)
     else:

@@ -50,13 +50,6 @@ def _make_chunks(n: int, batch_size: int | None) -> list[range]:
     return [range(n)]
 
 
-def _iter_batches(
-    items: Iterable[Any], batch_size: int
-) -> Iterator[list[tuple[int, Any]]]:
-    """Yield indexed item batches lazily from *items*."""
-    yield from _iter_batches_from_iterator(iter(items), batch_size)
-
-
 def _iter_batches_from_iterator(
     it: Iterator[Any], batch_size: int
 ) -> Iterator[list[tuple[int, Any]]]:

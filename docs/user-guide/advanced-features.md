@@ -295,9 +295,8 @@ For large-scale processing where results shouldn't accumulate in memory, use `pa
 ```python
 from pyarallel import parallel_iter
 
-# Process 10M items — only one batch of results in memory at a time
-for item in parallel_iter(process, ten_million_items,
-                          workers=8, batch_size=1000):
+# Process 10M items — a bounded window in flight, everything else on disk
+for item in parallel_iter(process, ten_million_items, workers=8):
     if item.ok:
         db.save(item.value)
     else:
@@ -307,12 +306,19 @@ for item in parallel_iter(process, ten_million_items,
 @parallel(workers=8)
 def process(item): ...
 
-for item in process.stream(huge_list, batch_size=1000):
+for item in process.stream(huge_list):
     if item.ok:
         db.save(item.value)
     else:
         log_error(item.index, item.error)
 ```
+
+The engine keeps a bounded window of items in flight (default
+`2 × workers`; set `batch_size` to change it). Input is consumed lazily —
+generators are never materialized — and a slow item delays only itself:
+there are no batch barriers. Breaking out of the loop stops submission
+and cancels not-yet-started tasks; tasks already running in a worker
+finish in the background.
 
 Results arrive in **completion order** (fastest tasks first), not input order.
 Each `ItemResult` includes the original `.index` so you can match results to inputs.
@@ -322,7 +328,7 @@ Each `ItemResult` includes the original `.index` so you can match results to inp
 | API | Memory | Use case |
 |---|---|---|
 | `.map()` / `parallel_map` | All results in memory | Results fit in memory, need `.ok`, `.failures()` |
-| `.stream()` / `parallel_iter` | Constant (one batch) | ETL, streaming to DB, 10M+ items |
+| `.stream()` / `parallel_iter` | Constant (one window) | ETL, streaming to DB, 10M+ items |
 
 ## Structured Error Handling
 

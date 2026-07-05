@@ -231,9 +231,7 @@ class TestCallableStateGuards:
         def scale(x, *, factor):
             return x * factor
 
-        assert parallel_map(
-            functools.partial(scale, factor=2), [1], checkpoint=ckpt
-        ).ok
+        assert parallel_map(functools.partial(scale, factor=2), [1], checkpoint=ckpt).ok
         with pytest.raises(CheckpointError, match="different function"):
             parallel_map(functools.partial(scale, factor=3), [1], checkpoint=ckpt)
 

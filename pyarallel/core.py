@@ -7,14 +7,17 @@ type detection, no global config singletons, no enterprise astronautics.
 from __future__ import annotations
 
 import functools
+import os
 import pickle
 import time
 from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import (
+    FIRST_COMPLETED,
     Future,
     ProcessPoolExecutor,
     ThreadPoolExecutor,
     as_completed,
+    wait,
 )
 from pathlib import Path
 from typing import Any, Literal
@@ -81,6 +84,19 @@ def _validate_common(
         raise ValueError(f"workers must be >= 1, got {workers}")
     if executor not in ("thread", "process"):
         raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
+
+
+def _effective_workers(workers: int | None, executor: ExecutorType) -> int:
+    """The worker count actually in force — the caller's, else the stdlib default.
+
+    Used to size the streaming window: ``parallel_iter(..., workers=2)``
+    must window at 4, not at the thread pool's default of up to 64.
+    """
+    if workers is not None:
+        return workers
+    if executor == "thread":
+        return min(32, (os.cpu_count() or 1) + 4)  # ThreadPoolExecutor default
+    return os.cpu_count() or 1  # ProcessPoolExecutor default
 
 
 def _build_task_fn(
@@ -231,9 +247,7 @@ def parallel_map[T, R](
                         results[idx] = cached[0]
                         completed += 1
                         if on_progress:
-                            on_progress(
-                                completed, _progress_total(plan.total, results)
-                            )
+                            on_progress(completed, _progress_total(plan.total, results))
                         continue
                     fingerprints[idx] = fp
                 if bucket:
@@ -345,12 +359,24 @@ def parallel_iter[T, R](
     """Execute *fn* over *items* in parallel, yielding ``ItemResult`` in
     completion order.
 
-    Unlike ``parallel_map``, results are not accumulated in memory — they
-    are yielded as they complete.
+    Results stream as tasks finish — a bounded window of items is in
+    flight at any moment, so memory stays constant and a straggler delays
+    only itself, never the items behind it. Input is consumed lazily,
+    exactly one window ahead of the yields; generators are never
+    materialized.
+
+    ``batch_size`` sets the window: the maximum number of
+    submitted-but-unyielded items (default ``2 × workers``). It is a
+    memory/lookahead bound, not a chunk size — there are no barriers.
+
+    Breaking out of the loop closes the generator: submission stops and
+    not-yet-started tasks are cancelled. Tasks already running in a
+    worker thread or process cannot be interrupted and finish in the
+    background.
 
     Example::
 
-        for item in parallel_iter(process, huge_list, batch_size=1000):
+        for item in parallel_iter(process, huge_list):
             if item.ok:
                 db.save(item.value)
             else:
@@ -361,33 +387,42 @@ def parallel_iter[T, R](
     bucket = _as_limiter(rate_limit)
     task_fn = _build_task_fn(fn, executor, retry, bucket)
     pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
-    it = iter(items)
-    index = 0
+    window = (
+        batch_size
+        if batch_size is not None
+        else 2 * _effective_workers(workers, executor)
+    )
+    source = enumerate(items)
+    in_flight: dict[Future[R], int] = {}
 
     pool = pool_cls(max_workers=workers)
+
+    def _submit_next() -> bool:
+        try:
+            idx, item = next(source)
+        except StopIteration:
+            return False
+        if bucket:
+            bucket.wait()
+        in_flight[pool.submit(task_fn, item)] = idx
+        return True
+
     try:
-        while True:
-            # Consume one chunk from the iterable lazily
-            chunk_items: list[tuple[int, Any]] = []
-            for item in it:
-                chunk_items.append((index, item))
-                index += 1
-                if batch_size is not None and len(chunk_items) >= batch_size:
-                    break
-            if not chunk_items:
-                break
-
-            futures: dict[Future[R], int] = {}
-            for i, item in chunk_items:
-                if bucket:
-                    bucket.wait()
-                futures[pool.submit(task_fn, item)] = i
-
-            for future in as_completed(futures):
-                idx = futures[future]
+        while len(in_flight) < window and _submit_next():
+            pass
+        while in_flight:
+            done, _pending = wait(in_flight, return_when=FIRST_COMPLETED)
+            for future in done:
+                idx = in_flight.pop(future)
+                result: ItemResult[R]
                 try:
-                    yield ItemResult(idx, value=future.result())
+                    result = ItemResult(idx, value=future.result())
                 except Exception as exc:
-                    yield ItemResult(idx, error=exc)
+                    result = ItemResult(idx, error=exc)
+                yield result
+                _submit_next()
     finally:
+        # Runs on exhaustion, on caller break (generator close), and when
+        # the items iterator itself raises — in-flight work is abandoned,
+        # unstarted futures are cancelled, the error (if any) propagates.
         pool.shutdown(wait=False, cancel_futures=True)

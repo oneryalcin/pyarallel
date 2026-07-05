@@ -104,7 +104,10 @@ Takes the same options as `async_parallel_map`. Also available as `.starmap()` o
 
 ## `async_parallel_iter`
 
-Async streaming — yields `ItemResult` in completion order. Constant memory.
+Async streaming — yields `ItemResult` in completion order. A bounded
+window of tasks is in flight at any moment (default `2 × concurrency`,
+override with `batch_size`): memory stays constant, input is consumed
+lazily, and a slow item delays only itself.
 
 ```python
 from pyarallel import async_parallel_iter
@@ -116,13 +119,20 @@ async for item in async_parallel_iter(fetch, urls, concurrency=10):
         log_error(item.index, item.error)
 ```
 
+!!! note "Changed in v0.5"
+    `batch_size` is now an **in-flight bound**, not a chunk size — there
+    are no barriers between chunks, and input is never materialized.
+
+Breaking out of the loop cancels in-flight tasks (async tasks, unlike
+threads, are genuinely cancellable).
+
 Also available as `.stream()` on `@async_parallel` decorated functions:
 
 ```python
 @async_parallel(concurrency=10)
 async def fetch(url): ...
 
-async for item in fetch.stream(urls, batch_size=1000):
+async for item in fetch.stream(urls):
     if item.ok:
         await db.save(item.value)
     else:

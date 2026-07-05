@@ -14,8 +14,6 @@ from typing import Any
 
 from ._plan import (
     _PENDING,
-    _iter_batches,
-    _make_chunks,
     _plan_collected_map,
     _progress_total,
 )
@@ -225,68 +223,76 @@ async def async_parallel_iter[T, R](
     retry: Retry | None = None,
 ) -> AsyncIterator[ItemResult[R]]:
     """Execute async *fn* over *items*, yielding ``ItemResult`` in
-    completion order. Constant memory — results are not accumulated.
+    completion order.
+
+    Results stream as tasks finish — a bounded window of items is in
+    flight at any moment, so memory stays constant and a straggler delays
+    only itself, never the items behind it. Input is consumed lazily,
+    exactly one window ahead of the yields; generators are never
+    materialized.
+
+    ``batch_size`` sets the window: the maximum number of
+    started-but-unyielded tasks (default ``2 × concurrency``). It is a
+    memory/lookahead bound, not a chunk size — there are no barriers.
+
+    Breaking out of the loop closes the generator: submission stops and
+    in-flight tasks are cancelled (async tasks, unlike threads, are
+    genuinely cancellable).
     """
     if batch_size is not None and batch_size < 1:
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if concurrency < 1:
         raise ValueError(f"concurrency must be >= 1, got {concurrency}")
 
-    if batch_size is None:
-        items_list = list(items)
-        n = len(items_list)
-        if n == 0:
-            return
-        batches: Iterable[list[tuple[int, Any]]] = (
-            [*enumerate(items_list[chunk.start : chunk.stop], chunk.start)]
-            for chunk in _make_chunks(n, batch_size)
-        )
-    else:
-        batches = _iter_batches(items, batch_size)
-
+    window = batch_size if batch_size is not None else 2 * concurrency
     semaphore = asyncio.Semaphore(concurrency)
     limiter = _as_limiter(rate_limit)
-    queue: asyncio.Queue[ItemResult[Any] | None] = asyncio.Queue()
 
-    async def _run(i: int, item: Any) -> None:
+    async def _run(item: Any) -> R:
         async with semaphore:
             if limiter:
                 await limiter.wait_async()
-            try:
-                if retry is not None:
-                    result = await _async_run_with_retry(
-                        fn, item, retry, task_timeout=task_timeout, limiter=limiter
-                    )
-                elif task_timeout is not None:
-                    result = await asyncio.wait_for(fn(item), timeout=task_timeout)
-                else:
-                    result = await fn(item)
-                await queue.put(ItemResult(i, value=result))
-            except Exception as exc:
-                await queue.put(ItemResult(i, error=exc))
+            if retry is not None:
+                result: R = await _async_run_with_retry(
+                    fn, item, retry, task_timeout=task_timeout, limiter=limiter
+                )
+                return result
+            if task_timeout is not None:
+                return await asyncio.wait_for(fn(item), timeout=task_timeout)
+            return await fn(item)
 
-    active_tasks: list[asyncio.Task[None]] = []
+    source = enumerate(items)
+    in_flight: dict[asyncio.Task[R], int] = {}
+
+    def _submit_next() -> bool:
+        try:
+            idx, item = next(source)
+        except StopIteration:
+            return False
+        in_flight[asyncio.create_task(_run(item))] = idx
+        return True
+
     try:
-        for batch in batches:
-            chunk_tasks = []
-            for i, item in batch:
-                t = asyncio.create_task(_run(i, item))
-                chunk_tasks.append(t)
-                active_tasks.append(t)
-
-            yielded_in_chunk = 0
-            while yielded_in_chunk < len(chunk_tasks):
-                item = await queue.get()
-                if item is not None:
-                    yield item
-                    yielded_in_chunk += 1
-
-            for t in chunk_tasks:
-                await t
-            active_tasks.clear()
+        while len(in_flight) < window and _submit_next():
+            pass
+        while in_flight:
+            done, _pending = await asyncio.wait(
+                in_flight, return_when=asyncio.FIRST_COMPLETED
+            )
+            for task in done:
+                idx = in_flight.pop(task)
+                result: ItemResult[R]
+                try:
+                    result = ItemResult(idx, value=task.result())
+                except Exception as exc:
+                    result = ItemResult(idx, error=exc)
+                yield result
+                _submit_next()
     finally:
-        for t in active_tasks:
-            t.cancel()
-        for t in active_tasks:
-            with contextlib.suppress(asyncio.CancelledError):
-                await t
+        # Runs on exhaustion, on caller break (generator close), and when
+        # the items iterator itself raises: cancel everything in flight.
+        for task in in_flight:
+            task.cancel()
+        for task in in_flight:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
