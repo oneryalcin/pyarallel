@@ -72,9 +72,14 @@ file as it finishes. Rerunning the same call resumes: completed items load
 from disk, failed and unseen items execute. Rows are keyed by item index plus
 a fingerprint of the item, so a changed input at the same position is
 recomputed, never served stale. The file is also bound to the mapped
-function's identity (name + code digest): resuming with a different or
-edited function raises `CheckpointError` — stale reuse fails closed, never
-silently.
+function's identity — name, code digest, and visible captured config
+(defaults, closure values, `functools.partial` arguments): resuming with a
+different, edited, or reconfigured function raises `CheckpointError` —
+stale reuse fails closed, never silently. Live objects in captured state
+count by type only (config inside them is invisible — delete the file when
+it changes); bound methods and callable objects are rejected because their
+entire state is opaque. `CheckpointError` is raised plainly by both the
+sync and async APIs — never wrapped in an `ExceptionGroup`.
 
 Constraints, stated honestly:
 

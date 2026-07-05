@@ -187,3 +187,118 @@ class TestStaleReuseFailsClosed:
         assert (await async_parallel_map(first, [1], checkpoint=ckpt)).ok
         with pytest.raises(CheckpointError, match="different function"):
             await async_parallel_map(second, [1], checkpoint=ckpt)
+
+
+class TestCallableStateGuards:
+    """Second-round adversarial findings: captured state must join the
+    checkpoint identity (visible config), be tolerated by type (live
+    objects, mutable counters), or be rejected (opaque instance state)."""
+
+    def test_changed_closure_config_raises(self, tmp_path):
+        ckpt = tmp_path / "run.ckpt"
+
+        def make_worker(factor):
+            def work(x):
+                return x * factor
+
+            return work
+
+        assert parallel_map(make_worker(2), [1, 2], checkpoint=ckpt).ok
+        with pytest.raises(CheckpointError, match="different function"):
+            parallel_map(make_worker(3), [1, 2], checkpoint=ckpt)
+
+    def test_same_closure_config_resumes(self, tmp_path):
+        ckpt = tmp_path / "run.ckpt"
+        runs = []
+
+        def make_worker(factor):
+            def work(x):
+                runs.append(x)
+                return x * factor
+
+            return work
+
+        assert parallel_map(make_worker(2), [1], checkpoint=ckpt).ok
+        runs.clear()
+        assert list(parallel_map(make_worker(2), [1], checkpoint=ckpt)) == [2]
+        assert runs == []  # identical config — served from disk
+
+    def test_changed_partial_keyword_raises(self, tmp_path):
+        import functools
+
+        ckpt = tmp_path / "run.ckpt"
+
+        def scale(x, *, factor):
+            return x * factor
+
+        assert parallel_map(
+            functools.partial(scale, factor=2), [1], checkpoint=ckpt
+        ).ok
+        with pytest.raises(CheckpointError, match="different function"):
+            parallel_map(functools.partial(scale, factor=3), [1], checkpoint=ckpt)
+
+    def test_changed_default_raises(self, tmp_path):
+        ckpt = tmp_path / "run.ckpt"
+        ns1, ns2 = {}, {}
+        exec("def work(x, factor=2):\n    return x * factor", ns1)
+        exec("def work(x, factor=3):\n    return x * factor", ns2)
+
+        assert parallel_map(ns1["work"], [1], checkpoint=ckpt).ok
+        with pytest.raises(CheckpointError, match="different function"):
+            parallel_map(ns2["work"], [1], checkpoint=ckpt)
+
+    def test_bound_method_rejected(self, tmp_path):
+        class Client:
+            def fetch(self, x):
+                return x
+
+        with pytest.raises(CheckpointError, match="bound method"):
+            parallel_map(Client().fetch, [1], checkpoint=tmp_path / "run.ckpt")
+
+    def test_callable_object_rejected(self, tmp_path):
+        class Worker:
+            def __call__(self, x):
+                return x
+
+        with pytest.raises(CheckpointError, match="callable object"):
+            parallel_map(Worker(), [1], checkpoint=tmp_path / "run.ckpt")
+
+    def test_live_object_closure_is_stable_across_runs(self, tmp_path):
+        """A captured client contributes its type, not its address — the
+        flagship closure-over-client pattern must survive reruns."""
+        ckpt = tmp_path / "run.ckpt"
+        calls = []
+
+        class FakeClient:
+            def get(self, x):
+                calls.append(x)
+                return x * 10
+
+        def make_worker():
+            client = FakeClient()  # fresh instance (new address) per run
+
+            def work(x):
+                return client.get(x)
+
+            return work
+
+        assert parallel_map(make_worker(), [1, 2], checkpoint=ckpt).ok
+        calls.clear()
+        assert list(parallel_map(make_worker(), [1, 2], checkpoint=ckpt)) == [10, 20]
+        assert calls == []  # resumed, no spurious identity mismatch
+
+
+class TestAsyncCheckpointErrorContract:
+    async def test_async_unpicklable_result_raises_plain_checkpoint_error(
+        self, tmp_path
+    ):
+        """The TaskGroup must not leak an ExceptionGroup — `except
+        CheckpointError` has to work identically for sync and async."""
+
+        async def work(x):
+            return lambda: x  # unpicklable
+
+        with pytest.raises(CheckpointError, match="item 0") as excinfo:
+            await async_parallel_map(work, [1], checkpoint=tmp_path / "run.ckpt")
+        assert not isinstance(excinfo.value, BaseExceptionGroup)
+        assert excinfo.value.__cause__ is not None  # pickle error chain kept

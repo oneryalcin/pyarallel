@@ -19,8 +19,10 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import inspect
 import pickle
 import sqlite3
+import types
 from pathlib import Path
 from typing import Any
 
@@ -29,9 +31,11 @@ class CheckpointError(RuntimeError):
     """A checkpoint file cannot be used or written.
 
     Raised when resuming with a different function than the one that
-    created the file (stale-reuse protection, fails closed), or when a
-    completed result cannot be persisted (the checkpoint contract would
-    silently break, so the run stops loudly instead).
+    created the file (stale-reuse protection, fails closed), when the
+    mapped callable carries state the checkpoint cannot see (bound
+    methods, callable objects), or when a completed result cannot be
+    persisted (the checkpoint contract would silently break, so the run
+    stops loudly instead).
     """
 
 
@@ -51,22 +55,87 @@ def _code_digest(code: Any) -> bytes:
     return h.digest()
 
 
+_PLAIN_IMMUTABLE = (str, bytes, int, float, complex, bool, type(None))
+
+
+def _state_token(value: Any) -> str:
+    """Stable identity token for one piece of captured state.
+
+    Plain immutable values — the config-drift case: a model name, a
+    ``factor=3`` — contribute their full repr, so changing them invalidates
+    the checkpoint. Everything else (live clients, sessions, mutable
+    counters) contributes only its type: object reprs embed memory
+    addresses and mutable containers legitimately change during a run —
+    either would make the signature differ on every rerun and turn the
+    fail-closed guard into a false-positive machine.
+    """
+    if isinstance(value, _PLAIN_IMMUTABLE):
+        return repr(value)
+    if isinstance(value, (tuple, frozenset)):
+        inner = [_state_token(v) for v in value]
+        if isinstance(value, frozenset):
+            inner.sort()
+        return f"{type(value).__name__}({','.join(inner)})"
+    return f"<{type(value).__module__}.{type(value).__qualname__}>"
+
+
+def _reject_stateful(kind: str) -> CheckpointError:
+    return CheckpointError(
+        f"checkpoint= cannot bind to a {kind} — its instance state shapes "
+        "the results but is invisible to the checkpoint, so a state change "
+        "between runs would silently serve stale rows. Wrap the call in a "
+        "module-level function instead."
+    )
+
+
 def _task_signature(fn: Any) -> str:
     """Stable identity for the mapped callable.
 
-    ``module.qualname`` plus a code digest when available, so an edited
-    function invalidates the checkpoint instead of silently reusing its
-    predecessor's results. Objects without ``__code__`` (builtins, partials
-    over C functions) fall back to name-only identity.
+    ``module.qualname`` plus a digest of the code (including constants),
+    default argument values, closure cell contents, and any
+    ``functools.partial`` arguments — visible state joins the identity, so
+    an edited function or changed captured config invalidates the
+    checkpoint instead of silently reusing its predecessor's results.
+
+    Live objects in that state contribute only their type (see
+    ``_state_token``); config hidden *inside* them is invisible — delete
+    the checkpoint file when it changes. Callables whose entire calling
+    state is an opaque instance (bound methods, callable objects) are
+    rejected: there is no function code to anchor an honest identity.
     """
-    fn = getattr(fn, "__func__", fn)
+    state = hashlib.sha256()
     while isinstance(fn, functools.partial):
+        for arg in fn.args:
+            state.update(_state_token(arg).encode())
+        for key, value in sorted(fn.keywords.items()):
+            state.update(f"{key}={_state_token(value)}".encode())
         fn = fn.func
+
+    if inspect.ismethod(fn):
+        raise _reject_stateful("bound method")
+    self_obj = getattr(fn, "__self__", None)
+    if self_obj is not None and not isinstance(self_obj, types.ModuleType):
+        raise _reject_stateful("bound method")
+
+    code = getattr(fn, "__code__", None)
+    if code is not None:
+        state.update(_code_digest(code))
+        for default in getattr(fn, "__defaults__", None) or ():
+            state.update(_state_token(default).encode())
+        for key, value in sorted((getattr(fn, "__kwdefaults__", None) or {}).items()):
+            state.update(f"{key}={_state_token(value)}".encode())
+        for cell in getattr(fn, "__closure__", None) or ():
+            try:
+                state.update(_state_token(cell.cell_contents).encode())
+            except ValueError:  # empty cell (e.g. not-yet-bound recursive name)
+                state.update(b"<empty-cell>")
+    elif not isinstance(fn, (types.BuiltinFunctionType, type)):
+        # No code object, not a builtin or a class: a callable instance.
+        raise _reject_stateful("callable object")
+
     module = getattr(fn, "__module__", None) or "?"
     qualname = getattr(fn, "__qualname__", None) or type(fn).__name__
-    code = getattr(fn, "__code__", None)
-    digest = _code_digest(code).hex()[:16] if code is not None else ""
-    return f"{module}.{qualname}:{digest}"
+    return f"{module}.{qualname}:{state.hexdigest()[:16]}"
 
 
 class _CheckpointStore:

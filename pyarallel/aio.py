@@ -19,7 +19,7 @@ from ._plan import (
     _plan_collected_map,
     _progress_total,
 )
-from .checkpoint import _CheckpointStore, _task_signature
+from .checkpoint import CheckpointError, _CheckpointStore, _task_signature
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
 from .result import ItemResult, ParallelResult, _Failure
@@ -173,6 +173,12 @@ async def async_parallel_map[T, R](
                             continue
                         fingerprints[i] = fp
                     tg.create_task(_run(i, item))
+    except* CheckpointError as eg:
+        # The TaskGroup wraps child exceptions in an ExceptionGroup; re-raise
+        # the CheckpointError plainly so `except CheckpointError` works the
+        # same for sync and async callers, preserving its original cause.
+        error = eg.exceptions[0]
+        raise error from error.__cause__
     finally:
         if store is not None:
             store.close()

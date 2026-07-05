@@ -236,9 +236,15 @@ result = parallel_map(embed, chunks, checkpoint="embeddings.ckpt")
 
 Safety guards, stated honestly:
 
-- The file is bound to the mapped function's identity (name + code digest).
-  Resuming with a different or edited function raises `CheckpointError` —
-  stale reuse fails closed, never silently.
+- The file is bound to the mapped function's identity: name, code digest,
+  and visible captured config (default values, closure values,
+  `functools.partial` arguments). An edited function or a changed
+  `factor=3` raises `CheckpointError` — stale reuse fails closed, never
+  silently.
+- Live objects in captured state (clients, sessions) count by *type* only —
+  config hidden inside them is invisible. Delete the checkpoint when it
+  changes. Bound methods and callable objects are rejected outright: their
+  entire state is opaque.
 - A changed input at the same position is recomputed, never served stale.
 - Rows are positional: reordering or inserting inputs forces shifted items
   to recompute. Resume is for *the same call, rerun*.

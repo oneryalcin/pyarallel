@@ -201,8 +201,10 @@ Rules of thumb:
 
 - One checkpoint file per (function, input list) pair. Don't share a file
   between different jobs — the function-identity guard will fail closed.
-- Delete the file when you *want* a full recompute (model upgrade, prompt
-  change that the code digest can't see, reordered inputs).
+- Delete the file when you *want* a full recompute (a config change
+  hidden inside a captured client object, reordered inputs). Plain captured
+  config — a changed default, closure value, or partial argument — is
+  caught automatically and fails closed.
 - Checkpointing requires picklable items and results; an unpicklable
   result stops the run with `CheckpointError` rather than pretending.
 
