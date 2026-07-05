@@ -35,18 +35,29 @@ from ._procexec import _call_resolved, _call_resolved_args, _resolve_process_tar
 from .checkpoint import _CheckpointStore, _task_signature
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
-from .result import Aborted, ItemResult, ParallelResult, _Failure
+from .result import (
+    Aborted,
+    ItemResult,
+    ParallelResult,
+    _Failure,
+    _item_result,
+    _Outcome,
+)
 
 ExecutorType = Literal["thread", "process"]
 
 
-def _run_with_retry(
+def _execute_outcome(
     fn: Callable[..., Any],
     item: Any,
-    retry: Retry,
+    retry: Retry | None = None,
     limiter: Limiter | None = None,
-) -> Any:
-    """Call *fn(item)*, retrying on failure with backoff or server-driven waits.
+) -> _Outcome:
+    """Run one item to its final outcome, counting attempts and timing.
+
+    The clock starts inside the worker (queue wait excluded) and stops at
+    the final success or failure — retry backoff sleeps included. That is
+    the duration a latency budget cares about.
 
     Every retry attempt is a fresh API call, so it draws a fresh token from
     the shared *limiter* (the first attempt's token was paid at submission).
@@ -54,26 +65,32 @@ def _run_with_retry(
     even on the final attempt, so a 429 from a task that is about to give
     up still slows the rest of the pool.
     """
+    start = time.perf_counter()
+    attempts = retry.attempts if retry is not None else 1
     last_exc: Exception | None = None
-    for attempt in range(retry.attempts):
+    made = 0
+    for attempt in range(attempts):
+        made = attempt + 1
         try:
             if attempt > 0 and limiter is not None:
                 limiter.wait()
-            return fn(item)
+            value = fn(item)
         except Exception as exc:
             last_exc = exc
-            if not retry._should_retry(exc):
-                raise
+            if retry is None or not retry._should_retry(exc):
+                break
             server_wait = retry._server_wait(exc)
             if server_wait is not None and limiter is not None:
                 limiter.pause(server_wait)
-            if attempt < retry.attempts - 1:
+            if attempt < attempts - 1:
                 delay = (
                     server_wait if server_wait is not None else retry._delay(attempt)
                 )
                 if delay > 0:
                     time.sleep(delay)
-    raise last_exc  # type: ignore[misc]
+        else:
+            return _Outcome(value, None, made, time.perf_counter() - start)
+    return _Outcome(None, last_exc, made, time.perf_counter() - start)
 
 
 def _validate_common(
@@ -106,11 +123,12 @@ def _build_task_fn(
     executor: ExecutorType,
     retry: Retry | None,
     limiter: Limiter | None,
-) -> Callable[..., Any]:
-    """Compose the per-item callable: process-safe target first, then retry.
+) -> Callable[..., _Outcome]:
+    """Compose the per-item callable: process-safe target, then execution.
 
-    Order matters — the retry wrapper must live *outside* the process
-    resolution so retries happen inside the worker, around the real call.
+    Every task runs through ``_execute_outcome``, which owns retries,
+    attempt counting, and wall-clock timing — the future always resolves
+    to an ``_Outcome``, and task exceptions travel inside it.
 
     The limiter is threaded into the retry loop for thread executors only:
     a ``Limiter`` holds a lock and cannot be pickled, and pausing a copy in
@@ -137,14 +155,12 @@ def _build_task_fn(
                 module_name=module_name,
                 qualname=qualname,
             )
-    if retry is not None:
-        task_fn = functools.partial(
-            _run_with_retry,
-            task_fn,
-            retry=retry,
-            limiter=limiter if executor == "thread" else None,
-        )
-    return task_fn
+    return functools.partial(
+        _execute_outcome,
+        task_fn,
+        retry=retry,
+        limiter=limiter if executor == "thread" else None,
+    )
 
 
 def parallel_map[T, R](
@@ -262,7 +278,7 @@ def parallel_map[T, R](
                     timed_out = True
                     break
 
-            futures: dict[Future[R], int] = {}
+            futures: dict[Future[_Outcome], int] = {}
             for idx, item in batch:
                 if store is not None:
                     fp = _CheckpointStore.fingerprint(item)
@@ -282,15 +298,21 @@ def parallel_map[T, R](
                 for future in as_completed(futures, timeout=chunk_timeout):
                     idx = futures[future]
                     try:
-                        results[idx] = future.result()
+                        outcome = future.result()
                     except Exception as exc:
+                        # Infrastructure failure (broken pool, unpicklable
+                        # return) — task errors travel inside the outcome.
                         results[idx] = _Failure(exc)
                     else:
-                        # Outside the try: a checkpoint write failure raises
-                        # CheckpointError instead of mislabeling a genuine
-                        # success as an item failure.
-                        if store is not None:
-                            store.put(idx, fingerprints.pop(idx), results[idx])
+                        if outcome.error is not None:
+                            results[idx] = _Failure(outcome.error)
+                        else:
+                            results[idx] = outcome.value
+                            # Outside the try: a checkpoint write failure
+                            # raises CheckpointError instead of mislabeling
+                            # a genuine success as an item failure.
+                            if store is not None:
+                                store.put(idx, fingerprints.pop(idx), results[idx])
                     completed += 1
                     if on_progress:
                         on_progress(completed, _progress_total(plan.total, results))
@@ -344,7 +366,7 @@ def _collected_map_windowed(
     total = _total_if_known(items)
     source = iter(items)
     results: list[Any] = []
-    in_flight: dict[Future[Any], int] = {}
+    in_flight: dict[Future[_Outcome], int] = {}
     fingerprints: dict[int, bytes] = {}
     completed = 0
     failures = 0
@@ -386,17 +408,23 @@ def _collected_map_windowed(
             in_flight[pool.submit(task_fn, item)] = idx
             return True
 
-    def _absorb(future: Future[Any], idx: int) -> None:
+    def _absorb(future: Future[_Outcome], idx: int) -> None:
         nonlocal completed, failures, aborted
+        error: Exception | None
         try:
-            results[idx] = future.result()
+            outcome = future.result()
         except Exception as exc:
-            results[idx] = _Failure(exc)
+            error = exc  # infrastructure failure — task errors ride the outcome
+        else:
+            error = outcome.error
+        if error is not None:
+            results[idx] = _Failure(error)
             failures += 1
             if failures >= max_errors:
                 aborted = True
         else:
-            # Outside the try: a checkpoint write failure raises
+            results[idx] = outcome.value
+            # Outside the except: a checkpoint write failure raises
             # CheckpointError instead of mislabeling a success as a failure.
             if store is not None:
                 store.put(idx, fingerprints.pop(idx), results[idx])
@@ -581,7 +609,7 @@ def parallel_iter[T, R](
     completed = 0
     failures = 0
     yielded_failures = 0
-    in_flight: dict[Future[R], int] = {}
+    in_flight: dict[Future[_Outcome], int] = {}
     buffered: dict[int, ItemResult[R]] = {}
     next_yield = 0
 
@@ -623,9 +651,10 @@ def parallel_iter[T, R](
                 idx = in_flight.pop(future)
                 result: ItemResult[R]
                 try:
-                    result = ItemResult(idx, value=future.result())
+                    result = _item_result(idx, future.result())
                 except Exception as exc:
                     result = ItemResult(idx, error=exc)
+                if not result.ok:
                     failures += 1
                 completed += 1
                 if on_progress:

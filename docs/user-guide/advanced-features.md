@@ -374,6 +374,9 @@ as `parallel_map`.
 ```python
 result = parallel_map(process, items, workers=4)
 
+# The common partial-failure path: keep what worked
+good = result.ok_values()          # values only, input order, never raises
+
 # Inspect successes and failures separately
 for idx, value in result.successes():
     save(idx, value)

@@ -31,22 +31,63 @@ class _Failure:
         self.exception = exception
 
 
+@dataclass(slots=True)
+class _Outcome:
+    """Internal task outcome with execution metadata.
+
+    Returned by the worker-side execution wrapper; module-level and
+    plain-field so it pickles across process boundaries. Exactly one of
+    ``value`` / ``error`` is meaningful, discriminated by ``error is None``.
+    """
+
+    value: Any
+    error: Exception | None
+    attempts: int
+    duration: float
+
+
+def _item_result(idx: int, outcome: _Outcome) -> ItemResult[Any]:
+    """Build the streaming result item from a task outcome."""
+    if outcome.error is not None:
+        return ItemResult(
+            idx,
+            error=outcome.error,
+            attempts=outcome.attempts,
+            duration=outcome.duration,
+        )
+    return ItemResult(
+        idx,
+        value=outcome.value,
+        attempts=outcome.attempts,
+        duration=outcome.duration,
+    )
+
+
 @dataclass(init=False, frozen=True, slots=True)
 class ItemResult[R]:
     """Single streaming result item.
 
     Exactly one of ``value`` or ``error`` is set.
+
+    ``attempts`` is the number of attempts actually made (1 = no retry).
+    ``duration`` is wall-clock seconds from the start of the first
+    attempt to the final outcome — *including* retry backoff sleeps,
+    *excluding* time spent queued before a worker picked the item up.
     """
 
     index: int
     value: R | None
     error: Exception | None
+    attempts: int
+    duration: float
 
     def __init__(
         self,
         index: int,
         value: R | None | object = _MISSING,
         error: Exception | None | object = _MISSING,
+        attempts: int = 1,
+        duration: float = 0.0,
     ) -> None:
         has_value = value is not _MISSING
         has_error = error is not _MISSING
@@ -55,6 +96,8 @@ class ItemResult[R]:
         object.__setattr__(self, "index", index)
         object.__setattr__(self, "value", value if has_value else None)
         object.__setattr__(self, "error", error if has_error else None)
+        object.__setattr__(self, "attempts", attempts)
+        object.__setattr__(self, "duration", duration)
 
     @property
     def ok(self) -> bool:
@@ -95,6 +138,10 @@ class ParallelResult[R]:
         return [
             (i, v) for i, v in enumerate(self._entries) if not isinstance(v, _Failure)
         ]
+
+    def ok_values(self) -> list[R]:
+        """Values of successful tasks only, in input order. Never raises."""
+        return [v for _, v in self.successes()]
 
     def failures(self) -> list[tuple[int, Exception]]:
         """``(index, exception)`` for each task that failed."""

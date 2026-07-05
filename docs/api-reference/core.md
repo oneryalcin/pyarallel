@@ -346,10 +346,19 @@ and `.stream()`.
 | `.ok` | `bool` | `True` when this item succeeded |
 | `.value` | `T \| None` | Result value for successful items. May legitimately be `None` |
 | `.error` | `Exception \| None` | Exception for failed items |
+| `.attempts` | `int` | Attempts actually made (`1` = no retry needed) |
+| `.duration` | `float` | Seconds from the start of the first attempt to the final outcome — **including** retry backoff sleeps, **excluding** queue wait |
 
 ### Invariant
 
 Exactly one of `.value` or `.error` is set. Success and failure are explicit.
+
+### Accounting example
+
+```python
+for item in parallel_iter(fetch, urls, workers=8, retry=Retry(attempts=3)):
+    metrics.observe(latency=item.duration, retries=item.attempts - 1)
+```
 
 ### Example
 
@@ -373,6 +382,7 @@ Container for parallel execution results. Behaves like a `list` when all tasks s
 |---|---|---|
 | `.ok` | `bool` | `True` if every task succeeded |
 | `.values()` | `list[R]` | All results in order. Raises `ExceptionGroup` on failure |
+| `.ok_values()` | `list[R]` | Values of successful tasks only, in input order. Never raises |
 | `.successes()` | `list[tuple[int, R]]` | `(index, value)` for each success |
 | `.failures()` | `list[tuple[int, Exception]]` | `(index, exception)` for each failure |
 | `.raise_on_failure()` | `None` | Raises `ExceptionGroup` if any task failed |
@@ -390,8 +400,7 @@ if result.ok:
     for value in result:
         print(value)
 else:
-    for idx, value in result.successes():
-        save(idx, value)
+    good = result.ok_values()          # just the values that succeeded
     for idx, error in result.failures():
         log(idx, error)
 ```

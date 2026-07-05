@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 from pathlib import Path
 from typing import Any
@@ -22,17 +23,29 @@ from ._plan import (
 from .checkpoint import CheckpointError, _CheckpointStore, _task_signature
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
-from .result import Aborted, ItemResult, ParallelResult, _Failure
+from .result import (
+    Aborted,
+    ItemResult,
+    ParallelResult,
+    _Failure,
+    _item_result,
+    _Outcome,
+)
 
 
-async def _async_run_with_retry(
+async def _async_execute_outcome(
     fn: Callable[..., Any],
     item: Any,
-    retry: Retry,
+    retry: Retry | None = None,
     task_timeout: float | None = None,
     limiter: Limiter | None = None,
-) -> Any:
-    """Call async *fn(item)*, retrying with backoff or server-driven waits.
+) -> _Outcome:
+    """Run one async item to its final outcome, counting attempts and timing.
+
+    Async twin of ``core._execute_outcome``: the clock starts here (queue
+    and semaphore wait excluded) and stops at the final success or failure,
+    retry backoff sleeps included. Task exceptions travel inside the
+    outcome; ``CancelledError`` still propagates.
 
     Every retry attempt is a fresh API call, so it draws a fresh token from
     the shared *limiter* (the first attempt's token was paid before entry).
@@ -40,28 +53,35 @@ async def _async_run_with_retry(
     even on the final attempt, so a 429 from a task that is about to give
     up still slows the rest of the pool.
     """
+    start = time.perf_counter()
+    attempts = retry.attempts if retry is not None else 1
     last_exc: Exception | None = None
-    for attempt in range(retry.attempts):
+    made = 0
+    for attempt in range(attempts):
+        made = attempt + 1
         try:
             if attempt > 0 and limiter is not None:
                 await limiter.wait_async()
             if task_timeout is not None:
-                return await asyncio.wait_for(fn(item), timeout=task_timeout)
-            return await fn(item)
+                value = await asyncio.wait_for(fn(item), timeout=task_timeout)
+            else:
+                value = await fn(item)
         except Exception as exc:
             last_exc = exc
-            if not retry._should_retry(exc):
-                raise
+            if retry is None or not retry._should_retry(exc):
+                break
             server_wait = retry._server_wait(exc)
             if server_wait is not None and limiter is not None:
                 limiter.pause(server_wait)
-            if attempt < retry.attempts - 1:
+            if attempt < attempts - 1:
                 delay = (
                     server_wait if server_wait is not None else retry._delay(attempt)
                 )
                 if delay > 0:
                     await asyncio.sleep(delay)
-    raise last_exc  # type: ignore[misc]
+        else:
+            return _Outcome(value, None, made, time.perf_counter() - start)
+    return _Outcome(None, last_exc, made, time.perf_counter() - start)
 
 
 async def async_parallel_map[T, R](
@@ -153,24 +173,18 @@ async def async_parallel_map[T, R](
         async with semaphore:
             if limiter:
                 await limiter.wait_async()
-            try:
-                if retry is not None:
-                    result = await _async_run_with_retry(
-                        fn, item, retry, task_timeout=task_timeout, limiter=limiter
-                    )
-                elif task_timeout is not None:
-                    result = await asyncio.wait_for(fn(item), timeout=task_timeout)
-                else:
-                    result = await fn(item)
-            except Exception as exc:
-                results[i] = _Failure(exc)
+            outcome = await _async_execute_outcome(
+                fn, item, retry, task_timeout=task_timeout, limiter=limiter
+            )
+            if outcome.error is not None:
+                results[i] = _Failure(outcome.error)
             else:
-                results[i] = result
-                # Outside the try: a checkpoint write failure raises
-                # CheckpointError (aborting the TaskGroup) instead of
-                # mislabeling a genuine success as an item failure.
+                results[i] = outcome.value
+                # A checkpoint write failure raises CheckpointError
+                # (aborting the TaskGroup) instead of mislabeling a
+                # genuine success as an item failure.
                 if store is not None:
-                    store.put(i, fingerprints.pop(i), result)
+                    store.put(i, fingerprints.pop(i), outcome.value)
             completed += 1
             if on_progress:
                 on_progress(completed, _progress_total(plan.total, results))
@@ -231,7 +245,7 @@ async def _async_collected_map_windowed(
     total = _total_if_known(items)
     source = iter(items)
     results: list[Any] = []
-    in_flight: dict[asyncio.Task[Any], int] = {}
+    in_flight: dict[asyncio.Task[_Outcome], int] = {}
     fingerprints: dict[int, bytes] = {}
     completed = 0
     failures = 0
@@ -243,17 +257,13 @@ async def _async_collected_map_windowed(
         else None
     )
 
-    async def _run(item: Any) -> Any:
+    async def _run(item: Any) -> _Outcome:
         async with semaphore:
             if limiter:
                 await limiter.wait_async()
-            if retry is not None:
-                return await _async_run_with_retry(
-                    fn, item, retry, task_timeout=task_timeout, limiter=limiter
-                )
-            if task_timeout is not None:
-                return await asyncio.wait_for(fn(item), timeout=task_timeout)
-            return await fn(item)
+            return await _async_execute_outcome(
+                fn, item, retry, task_timeout=task_timeout, limiter=limiter
+            )
 
     def _report() -> None:
         if on_progress:
@@ -280,17 +290,23 @@ async def _async_collected_map_windowed(
             in_flight[asyncio.create_task(_run(item))] = idx
             return True
 
-    def _absorb(task: asyncio.Task[Any], idx: int) -> None:
+    def _absorb(task: asyncio.Task[_Outcome], idx: int) -> None:
         nonlocal completed, failures, aborted
+        error: Exception | None
         try:
-            results[idx] = task.result()
+            outcome = task.result()
         except Exception as exc:
-            results[idx] = _Failure(exc)
+            error = exc  # infrastructure failure — task errors ride the outcome
+        else:
+            error = outcome.error
+        if error is not None:
+            results[idx] = _Failure(error)
             failures += 1
             if failures >= max_errors:
                 aborted = True
         else:
-            # Outside the try: a checkpoint write failure raises
+            results[idx] = outcome.value
+            # Outside the except: a checkpoint write failure raises
             # CheckpointError instead of mislabeling a success as a failure.
             if store is not None:
                 store.put(idx, fingerprints.pop(idx), results[idx])
@@ -416,18 +432,13 @@ async def async_parallel_iter[T, R](
     semaphore = asyncio.Semaphore(concurrency)
     limiter = _as_limiter(rate_limit)
 
-    async def _run(item: Any) -> R:
+    async def _run(item: Any) -> _Outcome:
         async with semaphore:
             if limiter:
                 await limiter.wait_async()
-            if retry is not None:
-                result: R = await _async_run_with_retry(
-                    fn, item, retry, task_timeout=task_timeout, limiter=limiter
-                )
-                return result
-            if task_timeout is not None:
-                return await asyncio.wait_for(fn(item), timeout=task_timeout)
-            return await fn(item)
+            return await _async_execute_outcome(
+                fn, item, retry, task_timeout=task_timeout, limiter=limiter
+            )
 
     total = _total_if_known(items)
     source = enumerate(items)
@@ -435,7 +446,7 @@ async def async_parallel_iter[T, R](
     completed = 0
     failures = 0
     yielded_failures = 0
-    in_flight: dict[asyncio.Task[R], int] = {}
+    in_flight: dict[asyncio.Task[_Outcome], int] = {}
     buffered: dict[int, ItemResult[R]] = {}
     next_yield = 0
 
@@ -475,9 +486,10 @@ async def async_parallel_iter[T, R](
                 idx = in_flight.pop(task)
                 result: ItemResult[R]
                 try:
-                    result = ItemResult(idx, value=task.result())
+                    result = _item_result(idx, task.result())
                 except Exception as exc:
                     result = ItemResult(idx, error=exc)
+                if not result.ok:
                     failures += 1
                 completed += 1
                 if on_progress:
