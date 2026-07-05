@@ -5,6 +5,7 @@ from .aio import (
     async_parallel_map,
     async_parallel_starmap,
 )
+from .checkpoint import CheckpointError
 from .core import (
     parallel_iter,
     parallel_map,
@@ -22,6 +23,7 @@ __all__ = [
     "RateLimit",
     "Retry",
     "Limiter",
+    "CheckpointError",
     "parallel",
     "parallel_iter",
     "parallel_map",

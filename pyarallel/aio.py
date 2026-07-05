@@ -19,7 +19,7 @@ from ._plan import (
     _plan_collected_map,
     _progress_total,
 )
-from .checkpoint import _CheckpointStore
+from .checkpoint import _CheckpointStore, _task_signature
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
 from .result import ItemResult, ParallelResult, _Failure
@@ -34,13 +34,17 @@ async def _async_run_with_retry(
 ) -> Any:
     """Call async *fn(item)*, retrying with backoff or server-driven waits.
 
-    A server-mandated wait (``Retry.wait_from``) also pauses the shared
-    *limiter* — even on the final attempt, so a 429 from a task that is
-    about to give up still slows the rest of the pool.
+    Every retry attempt is a fresh API call, so it draws a fresh token from
+    the shared *limiter* (the first attempt's token was paid before entry).
+    A server-mandated wait (``Retry.wait_from``) also pauses the limiter —
+    even on the final attempt, so a 429 from a task that is about to give
+    up still slows the rest of the pool.
     """
     last_exc: Exception | None = None
     for attempt in range(retry.attempts):
         try:
+            if attempt > 0 and limiter is not None:
+                await limiter.wait_async()
             if task_timeout is not None:
                 return await asyncio.wait_for(fn(item), timeout=task_timeout)
             return await fn(item)
@@ -93,8 +97,12 @@ async def async_parallel_map[T, R](
         checkpoint: Path to a checkpoint file (created if missing, SQLite).
             Completed item results are stored there; rerunning the same
             call resumes — cached items load from disk, failed and unseen
-            items execute. Items and results must be picklable; a result
-            that cannot be pickled is reported as that item's failure.
+            items execute. The file is bound to the mapped function's
+            identity: resuming with a different function raises
+            ``CheckpointError``. Items and results must be picklable; a
+            result that cannot be checkpointed aborts the run with
+            ``CheckpointError``. Rows are positional — reordering or
+            inserting inputs forces shifted items to recompute.
 
     Returns:
         ``ParallelResult`` — same container as the sync API.
@@ -112,7 +120,11 @@ async def async_parallel_map[T, R](
     limiter = _as_limiter(rate_limit)
     completed = 0
 
-    store = _CheckpointStore(checkpoint) if checkpoint is not None else None
+    store = (
+        _CheckpointStore(checkpoint, _task_signature(fn))
+        if checkpoint is not None
+        else None
+    )
     fingerprints: dict[int, bytes] = {}
 
     async def _run(i: int, item: Any) -> None:
@@ -129,11 +141,15 @@ async def async_parallel_map[T, R](
                     result = await asyncio.wait_for(fn(item), timeout=task_timeout)
                 else:
                     result = await fn(item)
-                results[i] = result
-                if store is not None:
-                    store.put(i, fingerprints.pop(i), result)
             except Exception as exc:
                 results[i] = _Failure(exc)
+            else:
+                results[i] = result
+                # Outside the try: a checkpoint write failure raises
+                # CheckpointError (aborting the TaskGroup) instead of
+                # mislabeling a genuine success as an item failure.
+                if store is not None:
+                    store.put(i, fingerprints.pop(i), result)
             completed += 1
             if on_progress:
                 on_progress(completed, _progress_total(plan.total, results))

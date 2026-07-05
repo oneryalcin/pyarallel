@@ -161,6 +161,15 @@ dead API, don't waste 10,000 calls when the first 10 all failed. Returns
 partial results. This is circuit-breaker-lite — we ship this *instead of* a
 separate circuit breaker abstraction.
 
+### Adversarial-review follow-ups (deferred from the v0.4 review)
+
+- **`checkpoint_key=`** — caller-supplied stable ID per item (e.g.
+  `lambda item: item.id`) so resume survives reordered or prepended
+  inputs. Positional keying is documented as a limitation until then.
+- **Decorator kwarg dedup** — the four wrapper classes hand-copy the same
+  parameter list; a signature change touches five places. Consolidate
+  without adding abstraction layers.
+
 ### Parity and ergonomics (small, cheap, after the above)
 
 - **Sequential/testing mode** — `sequential=True` runs in the calling thread.

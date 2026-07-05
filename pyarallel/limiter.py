@@ -16,6 +16,13 @@ from collections.abc import Callable
 
 from .policies import RateLimit
 
+# Grant when within this fraction of a full token — avoids a float-precision
+# spin where a caller is repeatedly told to wait ~1e-17s for the remainder.
+_GRANT_EPSILON = 1e-9
+# Never tell a caller to sleep less than this; guarantees the clock advances
+# between acquire attempts.
+_MIN_WAIT = 1e-6
+
 
 class Limiter:
     """Shareable token-bucket rate limiter.
@@ -25,9 +32,18 @@ class Limiter:
     many threads and event loops at once — the internal lock is held only
     for bookkeeping, never while sleeping.
 
-    ``pause(seconds)`` holds *all* future slots until the deadline passes.
-    This is the hook for server-mandated backoff (HTTP 429 ``Retry-After``):
-    one task's throttle signal slows the whole pool, not just itself.
+    A token is consumed only at the moment a caller is *granted* its slot.
+    A caller that gives up while waiting (timeout, cancellation) consumes
+    nothing, and sleeping callers re-check shared state when they wake — a
+    ``pause()`` issued while they slept is honored, never bypassed. Waiters
+    are not queued FIFO; under heavy contention grant order is not
+    guaranteed, only the aggregate rate.
+
+    ``pause(seconds)`` holds *all* slots until the deadline passes and
+    empties the bucket, so traffic resumes at the refill rate — one call at
+    the deadline, then paced — rather than bursting into a server that just
+    said stop. This is the hook for server-mandated backoff (HTTP 429
+    ``Retry-After``): one task's throttle signal slows the whole pool.
 
     Example::
 
@@ -55,47 +71,72 @@ class Limiter:
         self._updated = self._clock()
         self._not_before = 0.0
 
-    def _reserve(self) -> float:
-        """Claim one slot; return how long the caller must wait for it.
+    def _try_acquire(self) -> float:
+        """Take one token if available now.
 
-        Tokens may go negative — a queue of debt. Each caller's wait is the
-        time until its claimed token exists. Refill is capped at burst
-        capacity, so idle time never accumulates more than one burst of
-        credit.
+        Returns 0.0 on success (the token is consumed) or the seconds to
+        sleep before trying again (nothing is consumed — no debt, so a
+        caller that abandons the wait leaks no capacity).
         """
         with self._lock:
             now = self._clock()
-            self._tokens = min(
-                self._capacity, self._tokens + (now - self._updated) * self._rate
-            )
-            self._updated = now
-            self._tokens -= 1.0
-            wait = max(0.0, self._not_before - now)
-            if self._tokens < 0.0:
-                wait = max(wait, -self._tokens / self._rate)
-            return wait
+            if self._not_before > now:
+                return self._not_before - now
+            elapsed = max(0.0, now - self._updated)
+            self._tokens = min(self._capacity, self._tokens + elapsed * self._rate)
+            self._updated = max(self._updated, now)
+            if self._tokens >= 1.0 - _GRANT_EPSILON:
+                self._tokens -= 1.0
+                return 0.0
+            return max((1.0 - self._tokens) / self._rate, _MIN_WAIT)
 
     def wait(self) -> None:
-        """Block the calling thread until its slot arrives."""
-        delay = self._reserve()
-        if delay > 0:
+        """Block the calling thread until a token is granted."""
+        while True:
+            delay = self._try_acquire()
+            if delay <= 0:
+                return
             time.sleep(delay)
 
     async def wait_async(self) -> None:
-        """Await until the caller's slot arrives."""
-        delay = self._reserve()
-        if delay > 0:
+        """Await until a token is granted."""
+        while True:
+            delay = self._try_acquire()
+            if delay <= 0:
+                return
             await asyncio.sleep(delay)
 
     def pause(self, seconds: float) -> None:
-        """Hold all future slots for *seconds* (server-mandated backoff).
+        """Hold all slots for *seconds* (server-mandated backoff).
 
-        Concurrent pauses don't stack — the furthest deadline wins.
+        Concurrent pauses don't stack — the furthest deadline wins. The
+        bucket is left with exactly one token at the deadline: the retrying
+        task proceeds the moment the server allows, everyone else resumes
+        at the refill pace.
         """
         if seconds <= 0:
             return
         with self._lock:
-            self._not_before = max(self._not_before, self._clock() + seconds)
+            deadline = self._clock() + seconds
+            if deadline > self._not_before:
+                self._not_before = deadline
+                self._tokens = 1.0
+                self._updated = deadline
+
+    def _probe(self) -> float:
+        """Current wait a new caller would face, without consuming anything.
+
+        Test seam — like ``_try_acquire`` but side-effect-free on grant.
+        """
+        with self._lock:
+            now = self._clock()
+            if self._not_before > now:
+                return self._not_before - now
+            elapsed = max(0.0, now - self._updated)
+            tokens = min(self._capacity, self._tokens + elapsed * self._rate)
+            if tokens >= 1.0 - _GRANT_EPSILON:
+                return 0.0
+            return (1.0 - tokens) / self._rate
 
 
 def _as_limiter(

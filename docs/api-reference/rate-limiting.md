@@ -66,23 +66,34 @@ concurrently.
 
 ### Server-Mandated Holds: `pause()`
 
-`Limiter.pause(seconds)` holds all future slots until the deadline passes.
-You rarely call it yourself — `Retry(wait_from=...)` calls it automatically
-when a task hits a 429 (see [Retry](core.md)), so one task's throttle signal
-slows the whole pool. Concurrent pauses don't stack; the furthest deadline
-wins.
+`Limiter.pause(seconds)` holds all slots until the deadline passes — including
+callers already sleeping toward a slot, who re-check on wake and honor the
+hold. You rarely call it yourself — `Retry(wait_from=...)` calls it
+automatically when a task hits a 429 (see [Retry](core.md)), so one task's
+throttle signal slows the whole pool. Concurrent pauses don't stack; the
+furthest deadline wins. The pause also empties the bucket: traffic resumes
+with one call at the deadline and the rest at the refill pace, never a burst
+into a server that just said stop.
 
 ## How It Works
 
-Rate limiting uses a **token bucket** with a debt model:
+Rate limiting uses a **token bucket** with commit-at-grant acquisition:
 
 1. The bucket holds up to `burst` tokens and refills at the spec's rate
-2. Each operation takes a token; when the bucket is empty, tokens go
-   negative and the caller waits until its claimed token exists
-3. Refill is capped at `burst` — idle time never accumulates more than one
+2. A caller consumes a token only at the moment it is granted; a caller
+   that gives up while waiting (timeout, cancellation) consumes nothing —
+   abandoned waits never leak capacity
+3. Sleeping callers re-check shared state when they wake, so a `pause()`
+   issued mid-sleep is honored, never bypassed
+4. Refill is capped at `burst` — idle time never accumulates more than one
    burst of credit
-4. Thread-safe and event-loop-safe — the lock is held only for bookkeeping,
-   never while sleeping
+5. Thread-safe and event-loop-safe — the lock is held only for bookkeeping,
+   never while sleeping. Waiters are not queued FIFO; under heavy contention
+   grant order is not guaranteed, only the aggregate rate
+6. With `retry=`, every retry attempt draws a fresh token — retries are API
+   calls too and never bypass the limiter (exception: `executor="process"`
+   workers can't share the parent's limiter, so their retries pace only by
+   backoff)
 
 ## With the Decorator
 

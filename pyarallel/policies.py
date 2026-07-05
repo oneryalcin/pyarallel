@@ -60,9 +60,12 @@ class Retry:
     ``wait_from`` extracts a server-mandated wait in seconds from the
     exception (e.g. an HTTP 429 ``Retry-After`` header); when it returns a
     number, that wait replaces the backoff delay — no jitter, no
-    ``max_delay`` cap, because the server knows better than we do. When a
-    shared ``Limiter`` is in play, a server-mandated wait also pauses the
-    limiter, so one task's throttle signal slows the whole pool.
+    ``max_delay`` cap. It is clamped only by ``max_server_wait`` (default
+    10 minutes), a guard against a hostile or misconfigured server pinning
+    worker threads for hours; set it to ``None`` to trust the server
+    unconditionally. When a shared ``Limiter`` is in play, a server-mandated
+    wait also pauses the limiter, so one task's throttle signal slows the
+    whole pool.
 
     Examples::
 
@@ -88,10 +91,16 @@ class Retry:
     on: tuple[type[Exception], ...] | None = None
     retry_if: Callable[[Exception], bool] | None = None
     wait_from: Callable[[Exception], float | None] | None = None
+    max_server_wait: float | None = 600.0
 
     def __post_init__(self) -> None:
         if self.attempts < 1:
             raise ValueError(f"Retry attempts must be >= 1, got {self.attempts}")
+        if self.max_server_wait is not None and self.max_server_wait < 0:
+            raise ValueError(
+                f"Retry max_server_wait must be >= 0 or None, got "
+                f"{self.max_server_wait}"
+            )
 
     def _delay(self, attempt: int) -> float:
         """Compute backoff delay before retry *attempt* (0-indexed)."""
@@ -107,8 +116,18 @@ class Retry:
         return self.retry_if is None or self.retry_if(exc)
 
     def _server_wait(self, exc: Exception) -> float | None:
-        """Server-mandated wait extracted from *exc*, or None."""
+        """Server-mandated wait extracted from *exc*, or None.
+
+        Clamped to ``[0, max_server_wait]`` — a malformed ``Retry-After``
+        must not pin a worker thread (and, via the executor's atexit join,
+        the whole process) for an unbounded time.
+        """
         if self.wait_from is None:
             return None
         wait = self.wait_from(exc)
-        return None if wait is None else max(0.0, float(wait))
+        if wait is None:
+            return None
+        wait = max(0.0, float(wait))
+        if self.max_server_wait is not None:
+            wait = min(wait, self.max_server_wait)
+        return wait

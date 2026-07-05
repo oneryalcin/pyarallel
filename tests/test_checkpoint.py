@@ -1,6 +1,8 @@
 """Tests for checkpoint/resume — crash at item 40k must not restart from zero."""
 
-from pyarallel import async_parallel_map, parallel, parallel_map
+import pytest
+
+from pyarallel import CheckpointError, async_parallel_map, parallel, parallel_map
 
 
 class TestResume:
@@ -75,15 +77,16 @@ class TestResume:
         assert attempts["count"][5] == 2
         assert all(attempts["count"][i] == 1 for i in range(8) if i != 5)
 
-    def test_unpicklable_result_reported_as_failure(self, tmp_path):
+    def test_unpicklable_result_aborts_loudly(self, tmp_path):
+        """A result that can't be checkpointed breaks the resume contract —
+        the run must stop with CheckpointError, not mislabel a success."""
         ckpt = tmp_path / "run.ckpt"
 
         def work(x):
             return lambda: x  # lambdas can't be pickled
 
-        result = parallel_map(work, [1], checkpoint=ckpt)
-        assert not result.ok
-        assert len(result.failures()) == 1
+        with pytest.raises(CheckpointError, match="item 0"):
+            parallel_map(work, [1], checkpoint=ckpt)
 
     def test_progress_counts_cached_items(self, tmp_path):
         ckpt = tmp_path / "run.ckpt"
@@ -133,3 +136,54 @@ class TestDecoratorCheckpoint:
         calls.clear()
         assert list(work.map([1, 2], checkpoint=ckpt)) == [2, 3]
         assert calls == []
+
+
+class TestStaleReuseFailsClosed:
+    """The Codex adversarial finding: same checkpoint + different function
+    must never silently serve the previous computation's results."""
+
+    def test_different_function_raises(self, tmp_path):
+        ckpt = tmp_path / "run.ckpt"
+
+        def embed(x):
+            return x * 2
+
+        def summarize(x):
+            return x * 100
+
+        assert parallel_map(embed, [1, 2], checkpoint=ckpt).ok
+        with pytest.raises(CheckpointError, match="different function"):
+            parallel_map(summarize, [1, 2], checkpoint=ckpt)
+
+    def test_edited_function_body_raises(self, tmp_path):
+        """Same name, different bytecode — still fails closed."""
+        ckpt = tmp_path / "run.ckpt"
+        ns1, ns2 = {}, {}
+        exec("def work(x):\n    return x * 2", ns1)
+        exec("def work(x):\n    return x * 3", ns2)
+
+        assert parallel_map(ns1["work"], [1], checkpoint=ckpt).ok
+        with pytest.raises(CheckpointError, match="different function"):
+            parallel_map(ns2["work"], [1], checkpoint=ckpt)
+
+    def test_same_function_reopens_cleanly(self, tmp_path):
+        ckpt = tmp_path / "run.ckpt"
+
+        def work(x):
+            return x + 1
+
+        assert parallel_map(work, [1], checkpoint=ckpt).ok
+        assert list(parallel_map(work, [1], checkpoint=ckpt)) == [2]
+
+    async def test_async_different_function_raises(self, tmp_path):
+        ckpt = tmp_path / "run.ckpt"
+
+        async def first(x):
+            return x
+
+        async def second(x):
+            return -x
+
+        assert (await async_parallel_map(first, [1], checkpoint=ckpt)).ok
+        with pytest.raises(CheckpointError, match="different function"):
+            await async_parallel_map(second, [1], checkpoint=ckpt)

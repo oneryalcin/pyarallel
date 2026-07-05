@@ -71,12 +71,27 @@ With `checkpoint=` set, every completed item's result is written to a SQLite
 file as it finishes. Rerunning the same call resumes: completed items load
 from disk, failed and unseen items execute. Rows are keyed by item index plus
 a fingerprint of the item, so a changed input at the same position is
-recomputed, never served stale.
+recomputed, never served stale. The file is also bound to the mapped
+function's identity (name + code digest): resuming with a different or
+edited function raises `CheckpointError` — stale reuse fails closed, never
+silently.
 
-Constraints: items and results must be picklable — a result that cannot be
-pickled is reported as that item's failure. Failures are never checkpointed;
-a resumed run retries them. Available on `parallel_map`,
-`async_parallel_map`, and `.map()`.
+Constraints, stated honestly:
+
+- **Items and results must be picklable.** A result that cannot be
+  checkpointed aborts the run with `CheckpointError` — the alternative
+  (mislabeling a successful item as failed, or continuing with a checkpoint
+  that cannot resume) would lie to you.
+- **Rows are positional.** Reordering, prepending, or removing input items
+  shifts indices; the fingerprint check then forces every shifted item to
+  recompute. Resume is designed for *the same call, rerun* — not for
+  evolving input lists.
+- **One run per file at a time.** Failures are never checkpointed; a
+  resumed run retries them. Sharing one file between concurrently running
+  jobs is not supported.
+
+Available on `parallel_map`, `async_parallel_map`, and `.map()` — not on
+starmap or the streaming APIs.
 
 ### Notes on Progress and Unsized Iterables
 
@@ -365,6 +380,7 @@ retry = Retry(attempts=3, backoff=1.0)
 | `on` | `tuple[type[Exception], ...] \| None` | `None` | Retry only these exception types. `None` means retry all exceptions |
 | `retry_if` | `Callable[[Exception], bool] \| None` | `None` | Predicate on the exception instance. Both `on` and `retry_if` must pass |
 | `wait_from` | `Callable[[Exception], float \| None] \| None` | `None` | Extract a server-mandated wait in seconds (e.g. `Retry-After`). `None` falls back to backoff |
+| `max_server_wait` | `float \| None` | `600.0` | Ceiling on honored server waits — a malformed `Retry-After: 86400` must not pin a worker for a day. `None` trusts the server unconditionally |
 
 ### Backoff Behavior
 
@@ -431,8 +447,22 @@ results = parallel_map(
 )
 ```
 
+Server waits are honored up to `max_server_wait` (default 10 minutes) — a
+guard against a hostile or misconfigured server pinning worker threads for
+hours. Set it to `None` to trust the server unconditionally.
+
 When a shared `Limiter` is in play, a server-mandated wait also pauses the
 limiter — even if that task is on its final attempt — so one task's 429 slows
 the whole pool instead of every worker discovering the throttle separately.
-(With `executor="process"` the pause stays local to each worker: a limiter
-cannot cross process boundaries.)
+Every retry attempt also draws a fresh rate-limit token: a retry is a real
+API call and never bypasses the limiter. (With `executor="process"` neither
+applies inside workers: a limiter cannot cross process boundaries, so process
+retries pace only by backoff. A `Retry` carrying lambda predicates is
+rejected at submit time for process executors — its callables must be
+module-level functions to be picklable.)
+
+One footgun to avoid: `retry_if` and `wait_from` receive *every* exception
+that `on=` lets through. A predicate like `lambda exc: exc.response.status_code`
+raises `AttributeError` on a `ConnectionError`, and that error replaces the
+original in the failure report. Narrow with `on=` first, or write predicates
+defensively (`getattr(exc, "response", None)`).

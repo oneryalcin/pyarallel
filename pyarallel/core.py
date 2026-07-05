@@ -7,6 +7,7 @@ type detection, no global config singletons, no enterprise astronautics.
 from __future__ import annotations
 
 import functools
+import pickle
 import time
 from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import (
@@ -26,7 +27,7 @@ from ._plan import (
     _progress_total,
 )
 from ._procexec import _call_resolved, _call_resolved_args, _resolve_process_target
-from .checkpoint import _CheckpointStore
+from .checkpoint import _CheckpointStore, _task_signature
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
 from .result import ItemResult, ParallelResult, _Failure
@@ -42,13 +43,17 @@ def _run_with_retry(
 ) -> Any:
     """Call *fn(item)*, retrying on failure with backoff or server-driven waits.
 
-    A server-mandated wait (``Retry.wait_from``) also pauses the shared
-    *limiter* — even on the final attempt, so a 429 from a task that is
-    about to give up still slows the rest of the pool.
+    Every retry attempt is a fresh API call, so it draws a fresh token from
+    the shared *limiter* (the first attempt's token was paid at submission).
+    A server-mandated wait (``Retry.wait_from``) also pauses the limiter —
+    even on the final attempt, so a 429 from a task that is about to give
+    up still slows the rest of the pool.
     """
     last_exc: Exception | None = None
     for attempt in range(retry.attempts):
         try:
+            if attempt > 0 and limiter is not None:
+                limiter.wait()
             return fn(item)
         except Exception as exc:
             last_exc = exc
@@ -96,6 +101,16 @@ def _build_task_fn(
     """
     task_fn = fn
     if executor == "process":
+        if retry is not None:
+            try:
+                pickle.dumps(retry)
+            except Exception as exc:
+                raise ValueError(
+                    "This Retry cannot be pickled for executor='process' — "
+                    "its retry_if/wait_from callables must be module-level "
+                    "functions, not lambdas or closures. Alternatively use "
+                    "executor='thread'."
+                ) from exc
         resolved = _resolve_process_target(fn)
         if resolved is not None:
             module_name, qualname = resolved
@@ -125,10 +140,14 @@ def parallel_map[T, R](
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
-    task_timeout: float | None = None,
     checkpoint: str | Path | None = None,
 ) -> ParallelResult[R]:
     """Execute *fn* over *items* in parallel, returning ordered results.
+
+    Note: there is deliberately no ``task_timeout`` here — Python threads
+    cannot be cancelled mid-execution. Use ``timeout=`` for a total
+    wall-clock limit, put timeouts inside your function, or use
+    ``async_parallel_map`` for per-task timeouts.
 
     Args:
         fn: Function applied to each item.
@@ -153,21 +172,17 @@ def parallel_map[T, R](
         checkpoint: Path to a checkpoint file (created if missing, SQLite).
             Completed item results are stored there; rerunning the same
             call resumes — cached items load from disk, failed and unseen
-            items execute. Items and results must be picklable; a result
-            that cannot be pickled is reported as that item's failure.
+            items execute. The file is bound to the mapped function's
+            identity: resuming with a different function raises
+            ``CheckpointError``. Items and results must be picklable; a
+            result that cannot be checkpointed aborts the run with
+            ``CheckpointError``. Rows are positional — reordering or
+            inserting inputs forces shifted items to recompute.
 
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
     """
     _validate_common(workers, executor, batch_size)
-    if task_timeout is not None:
-        raise NotImplementedError(
-            "task_timeout is not supported in sync parallel_map — Python "
-            "threads cannot be cancelled mid-execution. Use timeout= for a "
-            "total wall-clock limit, or put timeouts inside your function "
-            "(e.g. requests.get(url, timeout=5)). "
-            "For per-task timeouts, use async_parallel_map with task_timeout=."
-        )
 
     bucket = _as_limiter(rate_limit)
     task_fn = _build_task_fn(fn, executor, retry, bucket)
@@ -181,7 +196,11 @@ def parallel_map[T, R](
         return ParallelResult([])
     results = plan.results
 
-    store = _CheckpointStore(checkpoint) if checkpoint is not None else None
+    store = (
+        _CheckpointStore(checkpoint, _task_signature(fn))
+        if checkpoint is not None
+        else None
+    )
     fingerprints: dict[int, bytes] = {}
     pool = pool_cls(max_workers=workers)
     try:
@@ -226,10 +245,14 @@ def parallel_map[T, R](
                     idx = futures[future]
                     try:
                         results[idx] = future.result()
-                        if store is not None:
-                            store.put(idx, fingerprints.pop(idx), results[idx])
                     except Exception as exc:
                         results[idx] = _Failure(exc)
+                    else:
+                        # Outside the try: a checkpoint write failure raises
+                        # CheckpointError instead of mislabeling a genuine
+                        # success as an item failure.
+                        if store is not None:
+                            store.put(idx, fingerprints.pop(idx), results[idx])
                     completed += 1
                     if on_progress:
                         on_progress(completed, _progress_total(plan.total, results))
