@@ -2,54 +2,247 @@
 
 This roadmap should be read together with the [DevX Principles](devx-principles.md).
 
-## Current (v0.3.0)
+## Positioning
+
+Pyarallel is **the fan-out layer for rate-limited APIs**: apply one function to
+many inputs against services that throttle you — LLM calls, embeddings,
+scraping, SaaS APIs — with the policies that workload actually needs built in.
+
+Today everyone hand-rolls the same stack for this job: a semaphore, tenacity,
+a rate limiter, ad-hoc 429 handling, and a prayer that the job doesn't crash at
+item 40,000. Each piece exists as a separate library; nothing owns the
+combination. Pyarallel's structural advantage is owning **both the retry policy
+and the concurrency/rate gate in one place** — which is exactly what makes
+server-driven backoff and resumable jobs possible, and what a pile of separate
+libraries can't do cleanly.
+
+The library stays general-purpose (`parallel_map` over anything), but every
+roadmap decision is judged against one question: *does this make pyarallel
+decisively better than hand-rolling for API fan-out?*
+
+## Current (v0.4.0)
 
 - `parallel_map()` / `.map()` — explicit parallel execution over iterables
 - `parallel_starmap()` / `.starmap()` — multi-argument parallel execution
 - `parallel_iter()` / `.stream()` — streaming results in completion order, constant memory
-- `@parallel` and `@async_parallel` decorators — preserves function signature
+- `@parallel` and `@async_parallel` decorators — preserve function signature *and types* (generic over params and return)
 - Full async support via `asyncio.TaskGroup`
 - `ParallelResult` with structured error handling (`ExceptionGroup`)
-- `RateLimit` — token bucket rate limiting (sync and async)
-- `Retry` — per-item retry with exponential backoff, jitter, and exception filtering
+- `RateLimit` — token-bucket spec with `burst` capacity
+- `Limiter` — shareable rate-limit runtime: one budget across calls, functions, sync and async
+- `Retry` — per-item retry with backoff, jitter, exception filtering, `retry_if` predicate, and `wait_from` server-driven waits that pause the shared limiter
+- `checkpoint=` — resumable runs (SQLite-backed, stdlib only) on `parallel_map` / `async_parallel_map` / `.map()`
 - `batch_size` — process items in chunks to control memory
 - Progress callbacks via `on_progress`
 - Timeout support (`timeout` for sync total, `task_timeout` for async per-task)
 - Instance method support via descriptor protocol
+- `mypy --strict` clean, with typed-interface assertions in CI (`tests/typing_assertions.py`)
 
-## Planned
+---
 
-### Near Term
+## v0.4 — Own the niche *(shipped in 0.4.0)*
 
-- **`max_errors`** — stop early after N failures instead of processing all items. When hitting a dead API, don't waste 10,000 calls when the first 10 all failed. Returns partial results.
-- **Ordered streaming** — `parallel_iter(..., ordered=True)` yields results in input order instead of completion order. Essential for ETL, CSV writing, and pipelines where output order must match input.
-- **`async_parallel_map` with `timeout=`** — sync `parallel_map` has total wall-clock timeout, async doesn't. Add parity so async workloads can enforce an overall deadline.
-- **Context variable propagation** — copy `contextvars.Context` into worker threads so structured logging (correlation IDs) and request tracing work correctly. Without this, correlation IDs and request traces silently disappear in worker threads.
-- **`max_tasks_per_worker`** — restart process workers after N tasks to prevent memory leaks in long-running pools. Passes through to `ProcessPoolExecutor(max_tasks_per_child=)`.
-- **Sequential/testing mode** — `workers=0` or `sequential=True` runs everything in the calling thread. Makes debugging deterministic, breakpoints work, stack traces are readable.
-- **Worker initializer** — `worker_init=` callback run once per worker thread/process (e.g., open a DB connection, load a model). Passes through to executor `initializer=`.
-- **`on_progress` for streaming** — `parallel_iter` currently has no progress callback. Add it for parity with `parallel_map`.
+The features that make pyarallel decisively better than hand-rolling.
+Nothing else ships before these.
 
-### Exploring
+### 1. Server-driven backoff
 
-- **`.then()` chaining** — `parallel_map(fn, items).then(fn2)` for lightweight pipelines without building a DAG engine. Chain a second parallel operation on results without extracting values manually.
-- **Circuit breaker** — composable with `Retry` for API-heavy workloads. When a downstream service is failing, stop hammering it and fail fast for a cooldown period.
-- **Shared kwargs** — `kwargs={"timeout": 5}` passed to every `fn` call alongside the item. Convenience over `functools.partial`, but partial is one line and well-known.
-- **Free-threading support** — leverage Python 3.13+ no-GIL for true thread parallelism.
-- **Per-task timeout (sync)** — Python threads can't be cancelled mid-execution, so this is a hard problem. For now, use `timeout=` for total wall-clock or put timeouts inside your function.
+`Retry` today only sees exception *types*, and the rate limiter runs at a
+blind fixed rate. Real APIs speak 429 + `Retry-After`. Add:
+
+```python
+Retry(
+    attempts=5,
+    on=(httpx.HTTPStatusError,),
+    retry_if=lambda exc: exc.response.status_code in (429, 503),
+    wait_from=lambda exc: parse_retry_after(exc),  # seconds, or None → backoff
+)
+```
+
+- `retry_if` — predicate on the exception instance, composable with `on`.
+- `wait_from` — extract the server-mandated wait (e.g. `Retry-After` header)
+  from the exception; `None` falls back to exponential backoff.
+
+This is the killer feature: tenacity can't do it *well* because it doesn't own
+the concurrency layer — one task learning "back off 30s" should be able to
+inform the shared limiter, not just its own sleep. Design spike required for
+that coupling (see Limiter below); the `retry_if`/`wait_from` API itself is
+straightforward.
+
+### 2. Shared `Limiter`
+
+Real quotas are per-API-key, not per-`.map()`-call. Today every call builds a
+private token bucket, so two concurrent maps — or `.map()` in a loop — blow
+the quota. Split the concept:
+
+- `RateLimit` stays the immutable **spec** (current behavior: passing it
+  creates a private limiter for that call).
+- New `Limiter(RateLimit(...))` is a shareable **instance**: pass the same
+  object to multiple functions and calls, sync or async, and they draw from
+  one budget.
+
+```python
+limiter = Limiter(RateLimit(100, "minute"))
+users  = parallel_map(fetch_user,  user_ids,  rate_limit=limiter)
+orders = parallel_map(fetch_order, order_ids, rate_limit=limiter)  # same quota
+```
+
+Without this, rate limiting is honestly broken for its main use case.
+
+### 3. Real token bucket (burst)
+
+What we call a token bucket is an even-spacing pacer: `RateLimit(100,
+"minute")` issues one request per 0.6s with no burst. An API allowing 100/min
+lets you fire 100 *now*. Add burst capacity:
+
+```python
+RateLimit(100, "minute", burst=20)   # up to 20 immediately, then refill pace
+```
+
+Default stays `burst=1` (current smooth pacing) — it's the safest default
+against secondary per-second limits — but the option must exist, and the docs
+must stop calling the pacer a token bucket until it is one.
+
+### 4. Checkpoint / resume
+
+A 50k-item embedding job that dies at item 40k restarts from zero. No
+micro-library offers resume; it's the feature that turns approval into
+adoption.
+
+```python
+result = parallel_map(embed, chunks, checkpoint="embeddings.ckpt")
+# after a crash, rerun the same line: completed items load from disk,
+# only the remainder executes
+```
+
+- SQLite-backed (stdlib — zero-deps preserved), keyed by item index plus an
+  input fingerprint to detect changed inputs.
+- Results must be picklable; documented honestly as the constraint.
+- Failures are not checkpointed — a resumed run retries them.
+
+### 5. Typing that matches the principles
+
+DevX principle #3 promises strong typing; the implementation returns `Any`.
+`items: Iterable[Any]` doesn't bind to `fn`'s parameter, and the decorators
+erase everything — `fetch.map(urls)` has zero autocomplete or checking.
+
+- `parallel_map[T, R](fn: Callable[[T], R], items: Iterable[T]) -> ParallelResult[R]`
+- Generic `_ParallelFunc` / `_AsyncParallelFunc` so decorated functions keep
+  their signature and `.map()` returns `ParallelResult[R]`.
+- `mypy --strict` on the package and on a typing test file in CI.
+
+Pre-1.0 is the time (principle #7); this may not survive as a pure-addition
+change and that's acceptable now.
+
+---
+
+## v0.5 — Structural quality
+
+### Sliding-window streaming
+
+`parallel_iter` has a batch barrier: one straggler stalls the entire next
+batch, and *without* `batch_size` it materializes the whole input. Replace the
+batch loop with a bounded in-flight window — submit the next item as each
+completes. This makes streaming truly streaming by default, removes the
+barrier, and makes **`ordered=True`** (yield in input order) nearly free.
+
+### Result metadata
+
+`ItemResult` and failure entries gain `attempts` and `duration`. Cheap to
+record, and exactly what API jobs need for cost and latency accounting. Add
+`ParallelResult.ok_values()` — extracting successful values from a partial
+failure is currently `[v for _, v in result.successes()]`, which is clunky for
+the most common path.
+
+### `max_errors`
+
+Stop early after N failures instead of processing all items. When hitting a
+dead API, don't waste 10,000 calls when the first 10 all failed. Returns
+partial results. This is circuit-breaker-lite — we ship this *instead of* a
+separate circuit breaker abstraction.
+
+### Parity and ergonomics (small, cheap, after the above)
+
+- **Sequential/testing mode** — `sequential=True` runs in the calling thread.
+  Deterministic debugging, working breakpoints, readable stack traces.
+- **`async_parallel_map` with `timeout=`** — total wall-clock parity with sync.
+- **Context variable propagation** — copy `contextvars.Context` into worker
+  threads so correlation IDs and request tracing survive.
+- **`on_progress` for streaming** — parity with `parallel_map`.
+- **Worker initializer** — `worker_init=` pass-through to executor `initializer=`.
+- **`max_tasks_per_worker`** — pass-through to `max_tasks_per_child=`.
+
+---
+
+## v0.6 — Forward bets
+
+### Free-threaded Python
+
+CI on 3.13t/3.14t free-threaded builds; document what actually parallelizes.
+No-GIL makes `executor="thread"` viable for CPU-bound work, and pyarallel is
+positioned as the ergonomic layer over it. Cheap to verify, real story to tell.
+
+### `executor="interpreter"`
+
+Python 3.14's `InterpreterPoolExecutor` (PEP 734) as a third executor —
+near-pass-through implementation, guarded by version check.
+
+---
+
+## v1.0 — Freeze
+
+Criteria, not features:
+
+- API surface frozen; anything conceptually wrong was fixed in 0.4–0.6
+  (principle #7 — pre-v1 is the time).
+- Typing complete, `mypy --strict` clean.
+- Comparison page shipped: vs tenacity + semaphore hand-roll, aiometer, mpire,
+  joblib — including honest "when *not* to use pyarallel."
+- Recipes shipped for the workloads people actually search for: embed 100k
+  documents against a rate-limited API with resume; polite scraping at scale;
+  CPU-bound fan-out with processes.
+
+## Distribution
+
+Not a code tier, but the step that decides whether any of this matters —
+sequenced after v0.4 lands, not before:
+
+1. **Recipes page** targeting the niche by name (LLM calls, embeddings,
+   scraping). These are the queries people actually type.
+2. **Comparison page** (see v1.0 criteria) — credibility through honesty.
+3. **One good write-up** (blog / Show HN / r/Python) demonstrating the
+   before/after with server-driven backoff and resume. Without this step the
+   engineering work is unfalsifiable effort.
+
+---
 
 ## Not Planned
 
-Things we've considered and decided against. Pyarallel is a parallelization library, not a distributed computing framework.
+Things we've considered and decided against. Pyarallel is a parallelization
+library, not a distributed computing framework.
 
-- **Telemetry / metrics dashboards** — use your existing observability stack (OpenTelemetry, Prometheus, Datadog). We give you `on_progress` and `ParallelResult`; instrument from there.
+- **`.then()` chaining** — the first step toward a pipeline framework we've
+  promised not to build. Use two calls and a variable.
+- **Shared kwargs** (`kwargs={...}` passed to every call) — `functools.partial`
+  is one line and well-known.
+- **Circuit breaker** as a separate abstraction — `max_errors` plus
+  server-driven backoff covers the real use case without new machinery.
+- **Telemetry / metrics dashboards** — use your existing observability stack.
+  We give you `on_progress`, result metadata, and `ParallelResult`; instrument
+  from there.
 - **CLI tools** — no dashboard, no profiler. Use `htop`, `py-spy`, or your IDE.
-- **Logging framework** — Python's `logging` module is fine. We don't add our own.
-- **Smart scheduling** (priority queues, deadlines, DAGs) — use Celery, Airflow, or Prefect.
+- **Logging framework** — Python's `logging` module is fine.
+- **Smart scheduling** (priority queues, deadlines, DAGs) — use Celery,
+  Airflow, or Prefect.
 - **Dead letter queues** — message queue concept, not a parallelization concern.
-- **Resource monitoring** (memory, CPU, disk, network) — OS-level. `batch_size` is the right abstraction for memory control.
-- **Resource-aware scheduling** — adaptive worker counts based on system load. This is autoscaling, a different problem domain. Set `workers` explicitly based on your environment.
-- **Plugin / hook system** — slippery slope. `on_progress` callback covers the real use case.
+- **Resource monitoring** (memory, CPU, disk, network) — OS-level. `batch_size`
+  is the right abstraction for memory control.
+- **Resource-aware scheduling** — adaptive worker counts based on system load
+  is autoscaling, a different problem domain. Set `workers` explicitly.
+- **Plugin / hook system** — slippery slope. Callbacks cover the real use case.
+- **Per-task timeout (sync)** — Python threads can't be cancelled
+  mid-execution. Use `timeout=` for total wall-clock, put timeouts inside your
+  function, or use `async_parallel_map` with `task_timeout=`.
 
 ---
 

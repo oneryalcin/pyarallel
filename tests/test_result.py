@@ -3,7 +3,7 @@
 import pytest
 
 from pyarallel import ItemResult, ParallelResult
-from pyarallel.core import _Failure
+from pyarallel.result import _Failure
 
 
 class TestSuccessfulResult:
@@ -123,13 +123,13 @@ class TestValidation:
             RateLimit(-5)
 
     def test_retry_zero_attempts_raises(self):
-        from pyarallel.core import Retry
+        from pyarallel import Retry
 
         with pytest.raises(ValueError, match=">= 1"):
             Retry(attempts=0)
 
     def test_retry_negative_attempts_raises(self):
-        from pyarallel.core import Retry
+        from pyarallel import Retry
 
         with pytest.raises(ValueError, match=">= 1"):
             Retry(attempts=-1)

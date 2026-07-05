@@ -2,8 +2,7 @@
 
 import time
 
-from pyarallel import RateLimit
-from pyarallel.core import Retry
+from pyarallel import RateLimit, Retry
 
 
 def _add(a, b):

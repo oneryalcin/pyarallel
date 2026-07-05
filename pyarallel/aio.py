@@ -1,4 +1,4 @@
-"""Async parallel execution — mirror of the sync API.
+"""Async engine: mirror of the sync API.
 
 Uses ``asyncio.TaskGroup`` for structured concurrency and
 ``asyncio.Semaphore`` for concurrency control.
@@ -8,57 +8,21 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import functools
-from collections.abc import AsyncIterator, Callable, Iterable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
+from pathlib import Path
 from typing import Any
 
-from .core import (
+from ._plan import (
     _PENDING,
-    ItemResult,
-    ParallelResult,
-    RateLimit,
-    Retry,
-    _coerce_rate_limit,
-    _Failure,
     _iter_batches,
     _make_chunks,
-    _merge_opts,
     _plan_collected_map,
     _progress_total,
 )
-
-# ---------------------------------------------------------------------------
-# Async rate limiter
-# ---------------------------------------------------------------------------
-
-
-class _AsyncTokenBucket:
-    """Async-friendly rate limiter.  Same slot-claiming algorithm as the
-    sync ``_TokenBucket``, but sleeps with ``asyncio.sleep``."""
-
-    __slots__ = ("_interval", "_next", "_lock")
-
-    def __init__(self, rate_limit: RateLimit) -> None:
-        self._interval = 1.0 / rate_limit.per_second
-        self._next: float = 0.0
-        self._lock = asyncio.Lock()
-
-    async def wait(self) -> None:
-        async with self._lock:
-            loop = asyncio.get_running_loop()
-            now = loop.time()
-            if self._next == 0.0:
-                self._next = now
-            target = max(self._next, now)
-            self._next = target + self._interval
-            delay = target - now
-        if delay > 0:
-            await asyncio.sleep(delay)
-
-
-# ---------------------------------------------------------------------------
-# async_parallel_map
-# ---------------------------------------------------------------------------
+from .checkpoint import _CheckpointStore
+from .limiter import Limiter, _as_limiter
+from .policies import RateLimit, Retry
+from .result import ItemResult, ParallelResult, _Failure
 
 
 async def _async_run_with_retry(
@@ -66,8 +30,14 @@ async def _async_run_with_retry(
     item: Any,
     retry: Retry,
     task_timeout: float | None = None,
+    limiter: Limiter | None = None,
 ) -> Any:
-    """Call async *fn(item)*, retrying on failure with exponential backoff."""
+    """Call async *fn(item)*, retrying with backoff or server-driven waits.
+
+    A server-mandated wait (``Retry.wait_from``) also pauses the shared
+    *limiter* — even on the final attempt, so a 429 from a task that is
+    about to give up still slows the rest of the pool.
+    """
     last_exc: Exception | None = None
     for attempt in range(retry.attempts):
         try:
@@ -78,23 +48,29 @@ async def _async_run_with_retry(
             last_exc = exc
             if not retry._should_retry(exc):
                 raise
+            server_wait = retry._server_wait(exc)
+            if server_wait is not None and limiter is not None:
+                limiter.pause(server_wait)
             if attempt < retry.attempts - 1:
-                delay = retry._delay(attempt)
+                delay = (
+                    server_wait if server_wait is not None else retry._delay(attempt)
+                )
                 if delay > 0:
                     await asyncio.sleep(delay)
     raise last_exc  # type: ignore[misc]
 
 
-async def async_parallel_map[R](
-    fn: Callable[..., Any],
-    items: Iterable[Any],
+async def async_parallel_map[T, R](
+    fn: Callable[[T], Awaitable[R]],
+    items: Iterable[T],
     *,
     concurrency: int = 4,
-    rate_limit: RateLimit | float | None = None,
+    rate_limit: Limiter | RateLimit | float | None = None,
     task_timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    checkpoint: str | Path | None = None,
 ) -> ParallelResult[R]:
     """Execute an async *fn* over *items* concurrently.
 
@@ -102,7 +78,9 @@ async def async_parallel_map[R](
         fn: Async function applied to each item.
         items: Any iterable.
         concurrency: Maximum number of tasks running at once.
-        rate_limit: ``RateLimit`` object, or ops-per-second as a number.
+        rate_limit: ``RateLimit`` spec, ops-per-second as a number, or a
+            shared ``Limiter`` instance to draw from one budget across
+            multiple calls.
         task_timeout: Per-task timeout in seconds (each individual task).
         on_progress: ``callback(completed, total)`` after each task.
             When ``items`` has no known length and ``batch_size`` is set,
@@ -112,11 +90,15 @@ async def async_parallel_map[R](
             unsized iterables (for example generators) are consumed lazily
             one batch at a time.
         retry: ``Retry`` object for per-item retry with backoff.
+        checkpoint: Path to a checkpoint file (created if missing, SQLite).
+            Completed item results are stored there; rerunning the same
+            call resumes — cached items load from disk, failed and unseen
+            items execute. Items and results must be picklable; a result
+            that cannot be pickled is reported as that item's failure.
 
     Returns:
         ``ParallelResult`` — same container as the sync API.
     """
-    rate_limit = _coerce_rate_limit(rate_limit)
     if batch_size is not None and batch_size < 1:
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if concurrency < 1:
@@ -127,46 +109,67 @@ async def async_parallel_map[R](
         return ParallelResult([])
     results = plan.results
     semaphore = asyncio.Semaphore(concurrency)
-    limiter = _AsyncTokenBucket(rate_limit) if rate_limit else None
+    limiter = _as_limiter(rate_limit)
     completed = 0
+
+    store = _CheckpointStore(checkpoint) if checkpoint is not None else None
+    fingerprints: dict[int, bytes] = {}
 
     async def _run(i: int, item: Any) -> None:
         nonlocal completed
         async with semaphore:
             if limiter:
-                await limiter.wait()
+                await limiter.wait_async()
             try:
                 if retry is not None:
                     result = await _async_run_with_retry(
-                        fn, item, retry, task_timeout=task_timeout
+                        fn, item, retry, task_timeout=task_timeout, limiter=limiter
                     )
                 elif task_timeout is not None:
                     result = await asyncio.wait_for(fn(item), timeout=task_timeout)
                 else:
                     result = await fn(item)
                 results[i] = result
+                if store is not None:
+                    store.put(i, fingerprints.pop(i), result)
             except Exception as exc:
                 results[i] = _Failure(exc)
             completed += 1
             if on_progress:
                 on_progress(completed, _progress_total(plan.total, results))
 
-    for batch in plan.batches:
-        if batch_size is not None:
-            results.extend([_PENDING] * len(batch))
-        async with asyncio.TaskGroup() as tg:
-            for i, item in batch:
-                tg.create_task(_run(i, item))
+    try:
+        for batch in plan.batches:
+            if batch_size is not None:
+                results.extend([_PENDING] * len(batch))
+            async with asyncio.TaskGroup() as tg:
+                for i, item in batch:
+                    if store is not None:
+                        fp = _CheckpointStore.fingerprint(item)
+                        cached = store.get(i, fp)
+                        if cached is not None:
+                            results[i] = cached[0]
+                            completed += 1
+                            if on_progress:
+                                on_progress(
+                                    completed, _progress_total(plan.total, results)
+                                )
+                            continue
+                        fingerprints[i] = fp
+                    tg.create_task(_run(i, item))
+    finally:
+        if store is not None:
+            store.close()
 
     return ParallelResult(results)
 
 
 async def async_parallel_starmap[R](
-    fn: Callable[..., Any],
+    fn: Callable[..., Awaitable[R]],
     items: Iterable[tuple[Any, ...]],
     *,
     concurrency: int = 4,
-    rate_limit: RateLimit | float | None = None,
+    rate_limit: Limiter | RateLimit | float | None = None,
     task_timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
@@ -174,7 +177,7 @@ async def async_parallel_starmap[R](
 ) -> ParallelResult[R]:
     """Like ``async_parallel_map`` but unpacks each item as ``fn(*args)``."""
 
-    async def _unpack(args: tuple[Any, ...]) -> Any:
+    async def _unpack(args: tuple[Any, ...]) -> R:
         return await fn(*args)
 
     return await async_parallel_map(
@@ -189,20 +192,19 @@ async def async_parallel_starmap[R](
     )
 
 
-async def async_parallel_iter(
-    fn: Callable[..., Any],
-    items: Iterable[Any],
+async def async_parallel_iter[T, R](
+    fn: Callable[[T], Awaitable[R]],
+    items: Iterable[T],
     *,
     concurrency: int = 4,
-    rate_limit: RateLimit | float | None = None,
+    rate_limit: Limiter | RateLimit | float | None = None,
     task_timeout: float | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
-) -> AsyncIterator[ItemResult[Any]]:
+) -> AsyncIterator[ItemResult[R]]:
     """Execute async *fn* over *items*, yielding ``ItemResult`` in
     completion order. Constant memory — results are not accumulated.
     """
-    rate_limit = _coerce_rate_limit(rate_limit)
     if batch_size is not None and batch_size < 1:
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if concurrency < 1:
@@ -221,17 +223,17 @@ async def async_parallel_iter(
         batches = _iter_batches(items, batch_size)
 
     semaphore = asyncio.Semaphore(concurrency)
-    limiter = _AsyncTokenBucket(rate_limit) if rate_limit else None
+    limiter = _as_limiter(rate_limit)
     queue: asyncio.Queue[ItemResult[Any] | None] = asyncio.Queue()
 
     async def _run(i: int, item: Any) -> None:
         async with semaphore:
             if limiter:
-                await limiter.wait()
+                await limiter.wait_async()
             try:
                 if retry is not None:
                     result = await _async_run_with_retry(
-                        fn, item, retry, task_timeout=task_timeout
+                        fn, item, retry, task_timeout=task_timeout, limiter=limiter
                     )
                 elif task_timeout is not None:
                     result = await asyncio.wait_for(fn(item), timeout=task_timeout)
@@ -266,154 +268,3 @@ async def async_parallel_iter(
         for t in active_tasks:
             with contextlib.suppress(asyncio.CancelledError):
                 await t
-
-
-# ---------------------------------------------------------------------------
-# @async_parallel decorator
-# ---------------------------------------------------------------------------
-
-
-class _BoundAsyncParallel:
-    """Bound version for async methods."""
-
-    __slots__ = ("_fn", "_defaults")
-
-    def __init__(self, fn: Callable[..., Any], defaults: dict[str, Any]) -> None:
-        self._fn = fn
-        self._defaults = defaults
-
-    async def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return await self._fn(*args, **kwargs)
-
-    async def map(
-        self,
-        items: Iterable[Any],
-        *,
-        concurrency: int | None = None,
-        rate_limit: RateLimit | float | None = None,
-        task_timeout: float | None = None,
-        on_progress: Callable[[int, int], None] | None = None,
-        batch_size: int | None = None,
-        retry: Retry | None = None,
-    ) -> ParallelResult[Any]:
-        return await async_parallel_map(
-            self._fn,
-            items,
-            **_merge_opts(
-                self._defaults,
-                concurrency=concurrency,
-                rate_limit=rate_limit,
-                task_timeout=task_timeout,
-                on_progress=on_progress,
-                batch_size=batch_size,
-                retry=retry,
-            ),
-        )
-
-    async def starmap(
-        self, items: Iterable[tuple[Any, ...]], **kwargs: Any
-    ) -> ParallelResult[Any]:
-        return await async_parallel_starmap(
-            self._fn, items, **_merge_opts(self._defaults, **kwargs)
-        )
-
-    async def stream(
-        self, items: Iterable[Any], **kwargs: Any
-    ) -> AsyncIterator[ItemResult[Any]]:
-        async for item in async_parallel_iter(
-            self._fn, items, **_merge_opts(self._defaults, **kwargs)
-        ):
-            yield item
-
-
-class _AsyncParallelFunc:
-    """Wrapper returned by ``@async_parallel``."""
-
-    def __init__(
-        self,
-        fn: Callable[..., Any],
-        *,
-        concurrency: int,
-        rate_limit: RateLimit | float | None,
-    ) -> None:
-        self.__wrapped__ = fn
-        self._defaults: dict[str, Any] = {"concurrency": concurrency}
-        if rate_limit is not None:
-            self._defaults["rate_limit"] = rate_limit
-        functools.update_wrapper(self, fn)
-
-    async def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        return await self.__wrapped__(*args, **kwargs)
-
-    def __get__(self, obj: Any, objtype: type | None = None) -> Any:
-        if obj is None:
-            return self
-        bound = functools.partial(self.__wrapped__, obj)
-        return _BoundAsyncParallel(bound, self._defaults)
-
-    async def map(
-        self,
-        items: Iterable[Any],
-        *,
-        concurrency: int | None = None,
-        rate_limit: RateLimit | float | None = None,
-        task_timeout: float | None = None,
-        on_progress: Callable[[int, int], None] | None = None,
-        batch_size: int | None = None,
-        retry: Retry | None = None,
-    ) -> ParallelResult[Any]:
-        return await async_parallel_map(
-            self.__wrapped__,
-            items,
-            **_merge_opts(
-                self._defaults,
-                concurrency=concurrency,
-                rate_limit=rate_limit,
-                task_timeout=task_timeout,
-                on_progress=on_progress,
-                batch_size=batch_size,
-                retry=retry,
-            ),
-        )
-
-    async def starmap(
-        self, items: Iterable[tuple[Any, ...]], **kwargs: Any
-    ) -> ParallelResult[Any]:
-        return await async_parallel_starmap(
-            self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs)
-        )
-
-    async def stream(
-        self, items: Iterable[Any], **kwargs: Any
-    ) -> AsyncIterator[ItemResult[Any]]:
-        async for item in async_parallel_iter(
-            self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs)
-        ):
-            yield item
-
-
-def async_parallel(
-    fn: Callable[..., Any] | None = None,
-    *,
-    concurrency: int = 4,
-    rate_limit: RateLimit | float | None = None,
-) -> Any:
-    """Decorator: adds ``.map()`` for async parallel execution.
-
-    Examples::
-
-        @async_parallel(concurrency=10)
-        async def fetch(url):
-            async with httpx.AsyncClient() as c:
-                return (await c.get(url)).json()
-
-        data   = await fetch("http://example.com")       # normal call
-        results = await fetch.map(["u1", "u2", "u3"])     # parallel
-    """
-
-    def decorator(fn: Callable[..., Any]) -> _AsyncParallelFunc:
-        return _AsyncParallelFunc(fn, concurrency=concurrency, rate_limit=rate_limit)
-
-    if fn is not None:
-        return decorator(fn)
-    return decorator

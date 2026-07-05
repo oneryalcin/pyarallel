@@ -3,16 +3,19 @@ revision = 3
 requires-python = ">=3.12"
 
 [options]
-exclude-newer = "2026-03-14T09:38:12.003914Z"
-exclude-newer-span = "P30D"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
+exclude-newer-span = "P5D"
 
 [options.exclude-newer-package]
 desia-logging = false
 html-snapshot = false
-desia = false
-desia-python-pptx = false
-xlsx2llm = false
+cli-to-py = false
+fastapi = false
 desia-db = false
+xlsx2llm = false
+anthropic = false
+desia-python-pptx = false
+desia = false
 
 [[package]]
 name = "babel"
@@ -811,7 +814,7 @@ wheels = [
 
 [[package]]
 name = "pyarallel"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "." }
 
 [package.dev-dependencies]

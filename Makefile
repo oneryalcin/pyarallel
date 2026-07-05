@@ -27,7 +27,7 @@ format:
 
 lint:
 	uv run ruff check .
-	uv run mypy pyarallel/
+	uv run mypy pyarallel/ tests/typing_assertions.py
 
 clean:
 	rm -rf build/

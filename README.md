@@ -2,9 +2,9 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/pyarallel)](https://pypi.org/project/pyarallel/) [![PyPI Downloads](https://static.pepy.tech/badge/pyarallel/month)](https://pepy.tech/project/pyarallel)
 
-Apply one function to many inputs — with rate limiting, retry, batching, and structured errors. Sync and async.
+The fan-out layer for rate-limited APIs. Apply one function to many inputs — with rate limiting, retry, batching, and structured errors. Sync and async.
 
-Pyarallel is for "fan out one function over N items" workloads: API calls, file processing, data crunching. Not DAGs, not queues, not distributed systems. Just `concurrent.futures` and `asyncio` with the common policies and result handling already built in.
+Pyarallel is for "fan out one function over N items" workloads against services that throttle you: LLM calls, embeddings, scraping, SaaS APIs — plus general file processing and data crunching. Everyone hand-rolls the same stack for this: a semaphore, tenacity, a rate limiter, ad-hoc 429 handling. Pyarallel is that stack as one coherent tool. Not DAGs, not queues, not distributed systems. Just `concurrent.futures` and `asyncio` with the policies and result handling already built in.
 
 **Zero dependencies. Python 3.12+.**
 
@@ -84,8 +84,11 @@ pip install pyarallel
 
 ## What You Get
 
-- **Rate limiting** — token bucket, per-second/minute/hour: `rate_limit=RateLimit(100, "minute")`
+- **Rate limiting** — token bucket with burst, per-second/minute/hour: `rate_limit=RateLimit(100, "minute", burst=20)`
+- **Shared quota** — one `Limiter` instance across calls and functions when the budget belongs to an API key: `rate_limit=Limiter(RateLimit(100, "minute"))`
 - **Retry with backoff** — per-item, exponential, jitter, exception filtering: `retry=Retry(attempts=3, on=(ConnectionError,))`
+- **Server-driven backoff** — honor 429 + `Retry-After`: `retry=Retry(retry_if=..., wait_from=...)`; the wait also pauses the shared limiter so one throttled task slows the whole pool
+- **Checkpoint/resume** — `checkpoint="run.ckpt"`: a crash at item 40,000 resumes instead of restarting from zero
 - **Batched execution** — lazy input consumption for generators, memory control: `batch_size=500`
 - **Streaming** — constant-memory processing via `parallel_iter` / `async_parallel_iter`
 - **Structured errors** — `ParallelResult` with `.ok`, `.successes()`, `.failures()`, `.raise_on_failure()`
@@ -215,8 +218,10 @@ Async mirrors: `async_parallel_map`, `async_parallel_starmap`, `async_parallel_i
 
 | Config | Example |
 |---|---|
-| `RateLimit(count, per)` | `RateLimit(100, "minute")` |
-| `Retry(attempts, backoff, on)` | `Retry(attempts=3, on=(ConnectionError,))` |
+| `RateLimit(count, per, burst)` | `RateLimit(100, "minute", burst=20)` |
+| `Limiter(rate_limit)` | shared budget: `Limiter(RateLimit(100, "minute"))` |
+| `Retry(attempts, backoff, on, retry_if, wait_from)` | `Retry(attempts=3, on=(ConnectionError,))` |
+| `checkpoint=` | resumable runs: `checkpoint="run.ckpt"` |
 
 Works with instance methods and static methods via `@parallel` decorator — see [full docs](https://oneryalcin.github.io/pyarallel/).
 
