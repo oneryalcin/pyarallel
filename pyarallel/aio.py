@@ -19,7 +19,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 from pathlib import Path
 from typing import Any, TypedDict
 
-from ._plan import (
+from ._run import (
     _mark_timeout_indices,
     _progress_total,
     _RunStop,
@@ -333,10 +333,14 @@ async def _async_collected_map(
         _report()
 
     async def _drive() -> None:
+        # Same lap as the sync driver (see core.py's DRIVER LOOP map):
+        # fill window → stop check → block → absorb → lap. Two laps are
+        # simpler here: the deadline gate lives in asyncio.timeout()
+        # around this whole call (plus the pre-check for timeout<=0),
+        # and there is no mid-fill sweep — task creation never blocks,
+        # limiter waits happen inside tasks, which are cancelled on
+        # abort before they can call the API.
         while True:
-            # No mid-fill absorption here (unlike the sync twin): task
-            # creation never blocks — limiter waits happen inside tasks,
-            # which are cancelled on abort before they can call the API.
             while not halt.stopped and len(in_flight) < window and _submit_next():
                 pass
             if halt.stopped or not in_flight:

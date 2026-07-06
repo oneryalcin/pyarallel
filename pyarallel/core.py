@@ -32,7 +32,8 @@ from concurrent.futures import (
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
-from ._plan import (
+from ._procexec import _call_resolved, _call_resolved_args, _resolve_process_target
+from ._run import (
     _mark_timeout_indices,
     _progress_total,
     _RunStop,
@@ -41,7 +42,6 @@ from ._plan import (
     _total_if_known,
     _validate_max_errors,
 )
-from ._procexec import _call_resolved, _call_resolved_args, _resolve_process_target
 from .checkpoint import _open_checkpoint
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
@@ -560,6 +560,25 @@ def _collected_map(
     # is fast and the sweep is only an O(window) scan per admission.
     sweep_mid_fill = max_errors is not None or bucket is not None
 
+    # THE DRIVER LOOP — one lap:
+    #
+    #   1. deadline gate   expired? stop before admitting anything
+    #                      (timeout=0 must run zero tasks)
+    #   2. fill window     _submit_next() pulls from the source: cache
+    #                      hits absorbed inline, pacing waits bounded by
+    #                      the deadline; the sweep absorbs completions
+    #                      between paced submissions
+    #   3. stop check      a stop raised during the fill (mid-fill abort,
+    #                      pacing timeout) must not reach the blocking wait
+    #   4. block           wait for one completion, bounded by the deadline
+    #   5. absorb, lap     classify results; the Nth failure stops the run
+    #
+    # The order is load-bearing: every place a stop reason can be set is
+    # followed by a stop check *before* the next blocking point, so no
+    # stop is ever delayed by a wait it no longer needs — that ordering
+    # is what the v0.5/v0.6 review races were about. The aftermath below
+    # the loop fills unresolved slots according to the stop reason and
+    # never touches the source again (no-drain).
     try:
         while True:
             # Deadline first — an already-expired timeout must not admit

@@ -1,8 +1,13 @@
-"""Shared input bookkeeping for the sync and async engines.
+"""Shared run bookkeeping for the sync and async engines.
 
-Sizing (``len`` without materializing), progress totals, and the
-timeout failure markers — small helpers both runtimes use so sized and
-unsized inputs flow through one contract.
+The pieces of a run that are identical across runtimes and carry no
+I/O: the stop state (``_RunStop`` — why a run ended, first writer
+wins), input sizing (``len`` without materializing), progress totals,
+and the timeout failure markers. Plain synchronous state; both engine
+files use it directly.
+
+(Previously ``_plan.py``, named for the batch-planning machinery the
+v0.6 engine unification deleted.)
 """
 
 from __future__ import annotations
