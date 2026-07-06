@@ -762,6 +762,69 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.5.0/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.5.0 Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.6-engine-unification/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Engine Unification Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.6-ledger-refactor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Ledger Refactor Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -880,7 +943,7 @@ copy-pasteable approach — not a toy example.</p>
 <p>Call an embedding API for thousands of texts with rate limiting and retry.
 Works with OpenAI, Cohere, HuggingFace Inference API, or any HTTP endpoint.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">openai</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">Retry</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">Limiter</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">Retry</span>
 
 <span class="n">client</span> <span class="o">=</span> <span class="n">openai</span><span class="o">.</span><span class="n">OpenAI</span><span class="p">()</span>
 
@@ -891,18 +954,51 @@ Works with OpenAI, Cohere, HuggingFace Inference API, or any HTTP endpoint.</p>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">embedding</span>
 
+<span class="k">def</span><span class="w"> </span><span class="nf">retry_after</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Honor the server&#39;s Retry-After header when present.&quot;&quot;&quot;</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;response&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">response</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">header</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;retry-after&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="p">)</span> <span class="k">if</span> <span class="n">header</span> <span class="k">else</span> <span class="kc">None</span>
+
 <span class="n">texts</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;document one&quot;</span><span class="p">,</span> <span class="s2">&quot;document two&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>  <span class="c1"># thousands of texts</span>
+
+<span class="c1"># One Limiter = one budget. Reuse it across every call that spends</span>
+<span class="c1"># this API key&#39;s quota.</span>
+<span class="n">limiter</span> <span class="o">=</span> <span class="n">Limiter</span><span class="p">(</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">,</span> <span class="n">burst</span><span class="o">=</span><span class="mi">20</span><span class="p">))</span>
 
 <span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
     <span class="n">embed</span><span class="p">,</span> <span class="n">texts</span><span class="p">,</span>
     <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-    <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">),</span>    <span class="c1"># stay under API limits</span>
-    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">backoff</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">openai</span><span class="o">.</span><span class="n">RateLimitError</span><span class="p">,</span> <span class="n">openai</span><span class="o">.</span><span class="n">APIConnectionError</span><span class="p">)),</span>
-    <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>                         <span class="c1"># don&#39;t submit all at once</span>
+    <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">,</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span>
+        <span class="n">attempts</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">backoff</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">openai</span><span class="o">.</span><span class="n">RateLimitError</span><span class="p">,</span> <span class="n">openai</span><span class="o">.</span><span class="n">APIConnectionError</span><span class="p">),</span>
+        <span class="n">wait_from</span><span class="o">=</span><span class="n">retry_after</span><span class="p">,</span>              <span class="c1"># a 429 pauses the WHOLE pool</span>
+    <span class="p">),</span>
+    <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>                         <span class="c1"># in-flight window (default 2 x workers)</span>
+    <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;embeddings.ckpt&quot;</span><span class="p">,</span>           <span class="c1"># crash at item 40k? rerun resumes</span>
 <span class="p">)</span>
 
 <span class="n">embeddings</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>  <span class="c1"># list of vectors, same order as texts</span>
 </code></pre></div>
+<p>What each piece buys you:</p>
+<ul>
+<li><strong>Shared <code>Limiter</code></strong> — the quota belongs to the API key, not this call.
+  Pass the same instance to other jobs against the same key and they draw
+  from one budget. Retries draw tokens too — a retry storm can't blow
+  through the limit.</li>
+<li><strong><code>wait_from</code></strong> — when the API returns 429 with <code>Retry-After</code>, that wait
+  replaces the backoff <em>and</em> pauses the shared limiter, so one throttled
+  task slows the whole pool instead of every worker discovering the limit
+  separately.</li>
+<li><strong><code>checkpoint=</code></strong> — every completed embedding is persisted (SQLite).
+  If the run dies at item 40,000, rerunning the same line executes only
+  the remainder. Delete the file when inputs or model change semantics
+  beyond what the built-in guards catch.</li>
+</ul>
 <p>Async version with <code>httpx</code> for higher throughput:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">Retry</span>

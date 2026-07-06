@@ -1,0 +1,2423 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="Mehmet Oner Yalcin">
+      
+      
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/development/plans/v0.5.0/">
+      
+      
+        <link rel="prev" href="../../roadmap/">
+      
+      
+        <link rel="next" href="../v0.6-engine-unification/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.50">
+    
+    
+      
+        <title>v0.5.0 Plan - Pyarallel</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.a40c8224.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#v050-plan-structural-quality" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Pyarallel
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              v0.5.0 Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Pyarallel
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Getting Started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick Start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    User Guide
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/real-world-patterns/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Real-World Patterns
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/advanced-features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Advanced Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/best-practices/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Best Practices
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    API Reference
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/core/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/async/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Async
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/rate-limiting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Rate Limiting
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Development
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Development
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../devx-principles/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DevX Principles
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Roadmap
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    v0.5.0 Plan
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    v0.5.0 Plan
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#theme" class="md-nav__link">
+    <span class="md-ellipsis">
+      Theme
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-order-and-rationale" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase order and rationale
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-1-sliding-window-streaming-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 1 — Sliding-window streaming engine
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 1 — Sliding-window streaming engine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#problem-from-the-v04-adversarial-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      Problem (from the v0.4 adversarial review)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      Design
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#behavior-changes-to-document-loudly" class="md-nav__link">
+    <span class="md-ellipsis">
+      Behavior changes to document loudly
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edge-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Edge cases
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-2-orderedtrue-and-streaming-progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 2 — ordered=True and streaming progress
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 2 — ordered=True and streaming progress">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#orderedtrue" class="md-nav__link">
+    <span class="md-ellipsis">
+      ordered=True
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#on_progress-for-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      on_progress for streaming
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-3-max_errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 3 — max_errors
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 3 — max_errors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      API
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Semantics
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edge-cases_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Edge cases
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-4-result-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 4 — Result metadata
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 4 — Result metadata">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itemresultattempts-and-itemresultduration" class="md-nav__link">
+    <span class="md-ellipsis">
+      ItemResult.attempts and ItemResult.duration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parallelresultok_values" class="md-nav__link">
+    <span class="md-ellipsis">
+      ParallelResult.ok_values()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-5-checkpoint_key" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 5 — checkpoint_key=
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 5 — checkpoint_key=">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#problem-deferred-from-v04-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      Problem (deferred from v0.4 review)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      API
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantics_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Semantics
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-migration-one-rule-no-contradictions-review-amendment" class="md-nav__link">
+    <span class="md-ellipsis">
+      Schema migration — one rule, no contradictions (review amendment)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-6-parity-batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 6 — Parity batch
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 6 — Parity batch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-sequentialtrue-sync-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.1 sequential=True (sync only)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-async-timeout-total-wall-clock-parity" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.2 Async timeout= (total wall-clock parity)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-context-variable-propagation-sync-thread-executor" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.3 Context variable propagation (sync thread executor)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-worker_init" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.4 worker_init=
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-max_tasks_per_worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.5 max_tasks_per_worker=
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#surface-accounting-owed-to-the-v04-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      Surface accounting (owed to the v0.4 review)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-7-decorator-signature-dedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 7 — Decorator signature dedup
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 7 — Decorator signature dedup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#problem-deferred-from-v04-review_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Problem (deferred from v0.4 review)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-unpacktypeddict-not-a-config-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      Design — Unpack[TypedDict], not a config object
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-8-docs-roadmap-release-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 8 — Docs, roadmap, release gate
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acceptance-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      Acceptance criteria
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicitly-out-of-scope-for-v05" class="md-nav__link">
+    <span class="md-ellipsis">
+      Explicitly out of scope for v0.5
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-amendments-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      Review amendments log
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Risks
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.6-engine-unification/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Engine Unification Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.6-ledger-refactor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Ledger Refactor Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#theme" class="md-nav__link">
+    <span class="md-ellipsis">
+      Theme
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-order-and-rationale" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase order and rationale
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-1-sliding-window-streaming-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 1 — Sliding-window streaming engine
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 1 — Sliding-window streaming engine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#problem-from-the-v04-adversarial-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      Problem (from the v0.4 adversarial review)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      Design
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#behavior-changes-to-document-loudly" class="md-nav__link">
+    <span class="md-ellipsis">
+      Behavior changes to document loudly
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edge-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Edge cases
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-2-orderedtrue-and-streaming-progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 2 — ordered=True and streaming progress
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 2 — ordered=True and streaming progress">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#orderedtrue" class="md-nav__link">
+    <span class="md-ellipsis">
+      ordered=True
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#on_progress-for-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      on_progress for streaming
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-3-max_errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 3 — max_errors
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 3 — max_errors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#api" class="md-nav__link">
+    <span class="md-ellipsis">
+      API
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Semantics
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#edge-cases_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Edge cases
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-4-result-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 4 — Result metadata
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 4 — Result metadata">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#itemresultattempts-and-itemresultduration" class="md-nav__link">
+    <span class="md-ellipsis">
+      ItemResult.attempts and ItemResult.duration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#parallelresultok_values" class="md-nav__link">
+    <span class="md-ellipsis">
+      ParallelResult.ok_values()
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-5-checkpoint_key" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 5 — checkpoint_key=
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 5 — checkpoint_key=">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#problem-deferred-from-v04-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      Problem (deferred from v0.4 review)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      API
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semantics_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Semantics
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#schema-migration-one-rule-no-contradictions-review-amendment" class="md-nav__link">
+    <span class="md-ellipsis">
+      Schema migration — one rule, no contradictions (review amendment)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-6-parity-batch" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 6 — Parity batch
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 6 — Parity batch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-sequentialtrue-sync-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.1 sequential=True (sync only)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-async-timeout-total-wall-clock-parity" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.2 Async timeout= (total wall-clock parity)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-context-variable-propagation-sync-thread-executor" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.3 Context variable propagation (sync thread executor)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-worker_init" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.4 worker_init=
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-max_tasks_per_worker" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.5 max_tasks_per_worker=
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#surface-accounting-owed-to-the-v04-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      Surface accounting (owed to the v0.4 review)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-7-decorator-signature-dedup" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 7 — Decorator signature dedup
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Phase 7 — Decorator signature dedup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#problem-deferred-from-v04-review_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Problem (deferred from v0.4 review)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#design-unpacktypeddict-not-a-config-object" class="md-nav__link">
+    <span class="md-ellipsis">
+      Design — Unpack[TypedDict], not a config object
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tests
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phase-8-docs-roadmap-release-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 8 — Docs, roadmap, release gate
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acceptance-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      Acceptance criteria
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicitly-out-of-scope-for-v05" class="md-nav__link">
+    <span class="md-ellipsis">
+      Explicitly out of scope for v0.5
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-amendments-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      Review amendments log
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Risks
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="v050-plan-structural-quality">v0.5.0 Plan — Structural Quality<a class="headerlink" href="#v050-plan-structural-quality" title="Permanent link">&para;</a></h1>
+<p>Status: <strong>implemented</strong> (branch <code>v0.5-structural-quality</code>). This
+document is the implementation contract for v0.5.0: every feature
+carries its API design, semantics, edge cases, test plan, and the files
+it touches. Deviations during implementation are recorded in the review
+amendments log below, not silently absorbed.</p>
+<p>Read together with the <a href="../../roadmap/">Roadmap</a> and
+<a href="../../devx-principles/">DevX Principles</a>.</p>
+<h2 id="theme">Theme<a class="headerlink" href="#theme" title="Permanent link">&para;</a></h2>
+<p>v0.4 made pyarallel <em>correct</em> for the rate-limited-API niche (after two
+adversarial review cycles). v0.5 makes it <em>structurally sound</em>: streaming
+that is actually streaming, early abort on dead APIs, the metadata API
+jobs need for accounting, and the two debts deferred from the v0.4
+review (checkpoint keys that survive reordering; the four-fold decorator
+signature duplication).</p>
+<p><strong>Release note:</strong> v0.4.0 was never published to PyPI. v0.5.0 will be the
+first public release of the repositioned library and includes everything
+from both versions.</p>
+<h2 id="phase-order-and-rationale">Phase order and rationale<a class="headerlink" href="#phase-order-and-rationale" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Work</th>
+<th>Why this order</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Sliding-window streaming engine (sync + async)</td>
+<td>Biggest structural change; phases 2–3 build on the new engine</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>ordered=True</code> + <code>on_progress</code> for streaming</td>
+<td>Nearly free once the window engine exists</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>max_errors</code></td>
+<td>Touches the same collect loops the engine rewrite just settled</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Result metadata: <code>ItemResult.attempts</code>/<code>.duration</code>, <code>ParallelResult.ok_values()</code></td>
+<td>Independent; needs the retry wrapper contract change</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>checkpoint_key=</code></td>
+<td>Independent; schema version bump</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Parity batch: <code>sequential=</code>, async <code>timeout=</code>, contextvars, <code>worker_init=</code>, <code>max_tasks_per_worker=</code></td>
+<td>Small pass-throughs, safest near the end</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Decorator signature dedup via <code>Unpack[TypedDict]</code></td>
+<td>Last — do it once, after every signature above has settled</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Docs, roadmap refresh, version bump, review cycle</td>
+<td>Gate before merge</td>
+</tr>
+</tbody>
+</table>
+<p>Each phase lands as its own commit with regression tests, on a single
+<code>v0.5-structural-quality</code> branch. Two adversarial review cycles are part
+of the plan, not an afterthought: one after Phase 3 (the engine rewrite
+is the risk concentration), one before merge.</p>
+<hr />
+<h2 id="phase-1-sliding-window-streaming-engine">Phase 1 — Sliding-window streaming engine<a class="headerlink" href="#phase-1-sliding-window-streaming-engine" title="Permanent link">&para;</a></h2>
+<h3 id="problem-from-the-v04-adversarial-review">Problem (from the v0.4 adversarial review)<a class="headerlink" href="#problem-from-the-v04-adversarial-review" title="Permanent link">&para;</a></h3>
+<p><code>parallel_iter</code> / <code>async_parallel_iter</code> process in batches with a barrier:
+one straggler stalls the entire next batch. Worse, <strong>without</strong>
+<code>batch_size</code> the sync version materializes the whole input iterator and
+the async version builds a full list — the "constant memory" claim is
+only true with <code>batch_size</code> set.</p>
+<h3 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h3>
+<p>Replace the batch loop with a bounded in-flight window:</p>
+<ul>
+<li>Maintain at most <code>window</code> submitted-but-unyielded items.</li>
+<li>When any task completes, yield its result and submit the next input
+  item. No barriers; a straggler delays only itself (unordered mode).</li>
+<li>Input is consumed lazily, exactly <code>window</code> ahead of yields — true for
+  generators with <strong>no</strong> <code>batch_size</code> required.</li>
+</ul>
+<p><strong>Window size.</strong> No new parameter. <code>window = batch_size</code> when given
+(preserving <code>batch_size</code> as the memory-bound knob, now documented as
+"maximum items in flight"), else <code>2 × effective_workers</code>. The factor 2
+keeps workers saturated while the driver loop runs. <em>(Review amendment:)</em>
+<code>effective_workers</code> is <strong><code>workers</code> when the caller set it</strong>, else the
+stdlib default — <code>parallel_iter(..., workers=2)</code> must window at 4, not at
+the thread-pool default of 64:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_effective_workers</span><span class="p">(</span><span class="n">workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">executor</span><span class="p">:</span> <span class="n">ExecutorType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">workers</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">workers</span>
+    <span class="k">if</span> <span class="n">executor</span> <span class="o">==</span> <span class="s2">&quot;thread&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="ow">or</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="mi">4</span><span class="p">)</span>   <span class="c1"># ThreadPoolExecutor default</span>
+    <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="ow">or</span> <span class="mi">1</span>                       <span class="c1"># ProcessPoolExecutor default</span>
+</code></pre></div>
+<p><strong>Sync driver</strong> (<code>core.py</code>): <code>as_completed</code> cannot accept new futures, so
+the loop uses <code>concurrent.futures.wait(..., return_when=FIRST_COMPLETED)</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">in_flight</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Future</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">indexed</span> <span class="o">=</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">items_iterator</span><span class="p">)</span>
+<span class="c1"># prime the window (rate limiter consulted per submit, as today)</span>
+<span class="k">while</span> <span class="n">in_flight</span><span class="p">:</span>
+    <span class="n">done</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">wait</span><span class="p">(</span><span class="n">in_flight</span><span class="p">,</span> <span class="n">return_when</span><span class="o">=</span><span class="n">FIRST_COMPLETED</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">future</span> <span class="ow">in</span> <span class="n">done</span><span class="p">:</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">in_flight</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">future</span><span class="p">)</span>
+        <span class="k">yield</span> <span class="n">_item_result</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">future</span><span class="p">)</span>
+        <span class="n">submit_next_if_any</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Async driver</strong> (<code>aio.py</code>): same shape with <code>asyncio.wait(...,
+return_when=FIRST_COMPLETED)</code> over tasks; the internal queue and
+per-chunk accounting are deleted.</p>
+<p><strong>Cleanup contract (amended for honesty):</strong> caller breaking out of the
+loop closes the generator; <code>finally</code> stops submitting, cancels
+<strong>not-yet-started</strong> futures, and shuts the pool down without waiting.
+Sync tasks already running in a thread/process <strong>cannot be interrupted</strong>
+and finish in the background — only async tasks are truly cancelled.
+Docs and docstrings use exactly this wording; no "cancels in-flight"
+overclaim.</p>
+<h3 id="behavior-changes-to-document-loudly">Behavior changes to document loudly<a class="headerlink" href="#behavior-changes-to-document-loudly" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>batch_size</code> for the streaming APIs changes meaning from "chunk size
+  with a barrier between chunks" to "in-flight bound, no barrier".
+  Pre-1.0, no deprecation dance — changelog + docs state it plainly.</li>
+<li>Streaming without <code>batch_size</code> no longer materializes input. Strictly
+  better, still called out.</li>
+<li><code>parallel_map</code> batching is <strong>untouched</strong> in this phase — the collected
+  path keeps its existing plan/batch machinery.</li>
+</ul>
+<h3 id="edge-cases">Edge cases<a class="headerlink" href="#edge-cases" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Empty input → generator yields nothing, pool never does work.</li>
+<li><code>retry</code> / <code>rate_limit</code> / <code>task_timeout</code> (async) compose exactly as
+  today — they wrap the task fn, not the driver.</li>
+<li>Exception raised by <code>items</code> iterator mid-stream → propagate to the
+  caller after cancelling in-flight work (add a test; today's behavior
+  is accidental).</li>
+</ul>
+<h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Straggler does not stall: item 0 sleeps 0.5s, items 1–9 are fast →
+  first 9 yields arrive before item 0 (assert by receipt order + a
+  generous elapsed bound).</li>
+<li>Laziness: instrumented generator; after consuming 3 results, assert
+  the source advanced ≤ 3 + window.</li>
+<li>Early <code>break</code>: no <strong>new submissions</strong> after generator close, and
+  pending unstarted futures are cancelled; already-running work is
+  bounded by the window size (assert completed-after-break ≤ window).</li>
+<li>Empty input; retry composition; limiter composition; async mirrors of
+  all of the above.</li>
+</ul>
+<hr />
+<h2 id="phase-2-orderedtrue-and-streaming-progress">Phase 2 — <code>ordered=True</code> and streaming progress<a class="headerlink" href="#phase-2-orderedtrue-and-streaming-progress" title="Permanent link">&para;</a></h2>
+<h3 id="orderedtrue"><code>ordered=True</code><a class="headerlink" href="#orderedtrue" title="Permanent link">&para;</a></h3>
+<p>New keyword on <code>parallel_iter</code>, <code>async_parallel_iter</code>, <code>.stream()</code>:
+yield in <strong>input order</strong> instead of completion order.</p>
+<ul>
+<li>Implementation: reorder buffer on top of the Phase-1 driver.
+  <code>next_to_yield</code> counter + dict of completed-but-early results; on each
+  completion, drain the run of consecutive indices.</li>
+<li><strong>Memory bound (review amendment — the naive claim was false):</strong>
+  refilling on every completion is unbounded: with item 0 slow and
+  successors fast, each completion would admit new work while results
+  pile up behind index 0. The enforced invariant is</li>
+</ul>
+<div class="highlight"><pre><span></span><code>len(in_flight) + len(reorder_buffer) &lt;= window
+</code></pre></div>
+<p>Submission is gated on that sum, not on completions: after draining
+  yieldable results, submit only while the sum is below the window. When
+  a straggler blocks the buffer, admission stalls — that is the
+  backpressure working, not a bug. Invariant stated in the docstring.
+- Default stays <code>ordered=False</code> (completion order), matching today.</p>
+<h3 id="on_progress-for-streaming"><code>on_progress</code> for streaming<a class="headerlink" href="#on_progress-for-streaming" title="Permanent link">&para;</a></h3>
+<p>Same callback contract as <code>parallel_map</code>: <code>callback(done, total)</code> fired
+per completed item (before its yield); <code>total</code> is items seen so far for
+unsized inputs — same caveat, same wording in docs.</p>
+<h3 id="tests_1">Tests<a class="headerlink" href="#tests_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>ordered=True</code> with reversed completion times yields input order.</li>
+<li>Reorder buffer bound: slow-FIRST workload over a large input, assert
+  peak <code>in_flight + buffered</code> ≤ window (instrumented driver hook), and
+  that the source iterator advanced ≤ yields + window.</li>
+<li>Progress: final call is <code>(n, n)</code> for sized input; monotone <code>done</code>.</li>
+</ul>
+<hr />
+<h2 id="phase-3-max_errors">Phase 3 — <code>max_errors</code><a class="headerlink" href="#phase-3-max_errors" title="Permanent link">&para;</a></h2>
+<p>Stop paying for a dead API: abort after N failures, return partial results.</p>
+<h3 id="api">API<a class="headerlink" href="#api" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">parallel_map</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">max_errors</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>          <span class="c1"># sync map</span>
+<span class="k">await</span> <span class="n">async_parallel_map</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">max_errors</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">parallel_iter</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">max_errors</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>          <span class="c1"># streaming: stop yielding</span>
+</code></pre></div>
+<ul>
+<li><code>max_errors: int | None = None</code>; <code>None</code> = today's behavior. Validated
+  <code>&gt;= 1</code>.</li>
+<li>A "failure" is counted <strong>after</strong> retries are exhausted (a retried-then-
+  succeeded item is not a failure).</li>
+</ul>
+<h3 id="semantics">Semantics<a class="headerlink" href="#semantics" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Collected (map) — requires an admission change (review amendment):</strong>
+  today the non-batched collected path submits/creates <em>every</em> task
+  before observing a single completion, so "stop submitting at N
+  failures" would be a no-op for a 10k-item dead API. Therefore: <strong>when
+  <code>max_errors</code> is set, collected map admits work through the Phase-1
+  bounded window</strong> (window = <code>2 × effective_workers</code>; async uses the
+  same <code>asyncio.wait(FIRST_COMPLETED)</code> admission loop instead of
+  creating all tasks upfront). Without <code>max_errors</code>, submission behavior
+  is unchanged. On reaching the threshold: stop admitting, cancel
+  pending unstarted work, mark every not-completed slot with
+  <code>_Failure(Aborted(...))</code>, return the partial <code>ParallelResult</code> — mirror
+  of the <code>timeout=</code> machinery.</li>
+<li><strong>New exception type:</strong> <code>class Aborted(RuntimeError)</code> in <code>result.py</code>,
+  exported. Message: <code>"aborted after N failures (max_errors=N)"</code>.
+  Items that never ran are distinguishable from items that failed —
+  <code>isinstance(exc, Aborted)</code>.</li>
+<li><strong>Streaming:</strong> yield the failures that occurred, then end the stream
+  (no placeholder items for unseen input — the stream just stops).
+  Document that a consumer can detect abort by counting error items.</li>
+<li><strong>Async:</strong> children can't be reaped mid-<code>TaskGroup</code> without help — a
+  sentinel <code>_AbortRun</code> exception raised by the counting task cancels
+  siblings; caught with <code>except* _AbortRun</code>, then unfinished slots are
+  marked. This mirrors the <code>except* CheckpointError</code> pattern from v0.4.</li>
+</ul>
+<h3 id="edge-cases_1">Edge cases<a class="headerlink" href="#edge-cases_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>max_errors</code> larger than input size → never triggers.</li>
+<li>Interaction with <code>timeout=</code>: whichever fires first wins; both mark
+  their own distinguishable failure types.</li>
+<li>Interaction with <code>checkpoint=</code>: completed successes are already
+  persisted; the aborted/unrun items simply run next time. (This combo —
+  checkpoint + max_errors — is the "dead API overnight job" story; add
+  an integration test for exactly it.)</li>
+</ul>
+<h3 id="tests_2">Tests<a class="headerlink" href="#tests_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Sync/async map: first 10 items fail instantly, 10k total,
+  <code>max_errors=10</code> → wall time bounded, <code>failures()</code> contains ~10 real +
+  rest <code>Aborted</code>, <code>successes()</code> preserved for anything that finished.</li>
+<li><strong>Admission bound (the point of the feature):</strong> instrumented source
+  iterator proves total submissions ≤ abort-trigger point + window — a
+  dead API costs tens of calls, not thousands.</li>
+<li>Retries don't double-count; success-after-retry counts as success.</li>
+<li>Streaming stops; checkpoint+max_errors resume test.</li>
+</ul>
+<hr />
+<h2 id="phase-4-result-metadata">Phase 4 — Result metadata<a class="headerlink" href="#phase-4-result-metadata" title="Permanent link">&para;</a></h2>
+<h3 id="itemresultattempts-and-itemresultduration"><code>ItemResult.attempts</code> and <code>ItemResult.duration</code><a class="headerlink" href="#itemresultattempts-and-itemresultduration" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ItemResult</span><span class="p">[</span><span class="n">R</span><span class="p">]:</span>
+    <span class="n">index</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">value</span><span class="p">:</span> <span class="n">R</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">error</span><span class="p">:</span> <span class="ne">Exception</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">attempts</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>        <span class="c1"># attempts actually made (1 = no retry)</span>
+    <span class="n">duration</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>    <span class="c1"># seconds from first attempt to outcome, incl. backoff sleeps</span>
+</code></pre></div>
+<ul>
+<li><strong>Definition of <code>duration</code>:</strong> wall time inside the task wrapper — from
+  the start of attempt 1 to final success/failure, <em>including</em> retry
+  sleeps, <em>excluding</em> queue wait. That is the number you need for
+  latency accounting; state the definition in the docstring.</li>
+<li><strong>Plumbing:</strong> the engines wrap every task in a timing shim returning an
+  internal <code>_Outcome(value_or_failure, attempts, duration)</code> (a small
+  picklable dataclass — module-level, works under <code>executor="process"</code>).
+  <code>_run_with_retry</code> reports attempts through it instead of returning the
+  bare value. Streaming builds <code>ItemResult</code> from <code>_Outcome</code> directly.</li>
+<li><strong>Scope decision, explicit:</strong> collected <code>parallel_map</code> does <strong>not</strong>
+  grow a per-item metadata API in v0.5. <code>ParallelResult</code> stores raw
+  values; bolting metadata onto it means a parallel array or a wrapper
+  type — real surface for unproven demand. Revisit if users ask.
+  (Recorded so the next reviewer knows it was a choice, not an omission.)</li>
+</ul>
+<h3 id="parallelresultok_values"><code>ParallelResult.ok_values()</code><a class="headerlink" href="#parallelresultok_values" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ok_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">R</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Values of successful tasks only, in input order. Never raises.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">v</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">successes</span><span class="p">()]</span>
+</code></pre></div>
+<p>The most common partial-failure path (<code>[v for _, v in result.successes()]</code>)
+becomes one call. Update docs examples that currently spell out the
+comprehension.</p>
+<h3 id="tests_3">Tests<a class="headerlink" href="#tests_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>attempts/duration on streaming success and failure, with and without
+  retry; duration ≥ known backoff sleep; process-executor pickling of
+  <code>_Outcome</code>.</li>
+<li><code>ok_values()</code> on full success, partial failure, empty.</li>
+</ul>
+<hr />
+<h2 id="phase-5-checkpoint_key">Phase 5 — <code>checkpoint_key=</code><a class="headerlink" href="#phase-5-checkpoint_key" title="Permanent link">&para;</a></h2>
+<h3 id="problem-deferred-from-v04-review">Problem (deferred from v0.4 review)<a class="headerlink" href="#problem-deferred-from-v04-review" title="Permanent link">&para;</a></h3>
+<p>Checkpoint rows are keyed by position. Prepending one item to the input
+shifts every index; the fingerprint guard then forces a full recompute —
+safe, but the resume value evaporates exactly when jobs evolve.</p>
+<h3 id="api_1">API<a class="headerlink" href="#api_1" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">users</span><span class="p">,</span> <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;run.ckpt&quot;</span><span class="p">,</span>
+             <span class="n">checkpoint_key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">u</span><span class="p">:</span> <span class="n">u</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+</code></pre></div>
+<ul>
+<li><code>checkpoint_key: Callable[[T], str | int | bytes] | None = None</code> on
+  <code>parallel_map</code>, <code>async_parallel_map</code>, <code>.map()</code>. Requires <code>checkpoint=</code>
+  (setting it alone raises <code>ValueError</code>).</li>
+<li><code>None</code> keeps positional keying semantics (same behavior, new on-disk
+  encoding — see schema below).</li>
+</ul>
+<h3 id="semantics_1">Semantics<a class="headerlink" href="#semantics_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Row key becomes the user key. <strong>Encoding is type-tagged and reversible
+  (review amendment — plain TEXT normalization would collide <code>1</code>, <code>"1"</code>,
+  and <code>b"1"</code>):</strong> <code>i:&lt;decimal&gt;</code> for ints, <code>s:&lt;text&gt;</code> for strings,
+  <code>b:&lt;base64&gt;</code> for bytes. Positional mode writes <code>i:&lt;index&gt;</code>. The item
+  fingerprint check <strong>stays</strong>: key = which row, fingerprint = has the
+  payload changed. A changed item under the same key recomputes.</li>
+<li><strong>Duplicate keys are an error.</strong> Track keys seen during submit;
+  a duplicate raises <code>CheckpointError</code> naming the key — last-write-wins
+  silently corrupting resume is exactly what this library refuses to do.</li>
+<li><strong>Key function errors</strong> propagate at submit (fail loud, run aborts).</li>
+<li>The key function itself is <em>not</em> part of the task signature: changing
+  it changes the keys, which simply misses the cache — safe by
+  construction.</li>
+</ul>
+<h3 id="schema-migration-one-rule-no-contradictions-review-amendment">Schema migration — one rule, no contradictions (review amendment)<a class="headerlink" href="#schema-migration-one-rule-no-contradictions-review-amendment" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Schema v2: <code>results(key TEXT PRIMARY KEY, fingerprint BLOB, value
+  BLOB)</code> + <code>meta</code> rows <code>task_signature</code> and <code>schema_version = '2'</code>.</li>
+<li><strong>Any file without <code>schema_version = '2'</code> fails closed</strong> with a
+  <code>CheckpointError</code> instructing deletion — including v0.4-era positional
+  files. There is no "old positional files stay valid" path and no
+  silent migration: one rule. v0.4.0 was never released, so real-world
+  exposure is nil; the guard is for our own dogfooding files.</li>
+</ul>
+<h3 id="tests_4">Tests<a class="headerlink" href="#tests_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Prepend an item with <code>checkpoint_key</code> → only the new item runs.</li>
+<li>Reorder inputs → zero recompute.</li>
+<li>Duplicate key → <code>CheckpointError</code>; raising key fn → propagates.</li>
+<li>Cross-type non-collision: keys <code>1</code>, <code>"1"</code>, <code>b"1"</code> produce three
+  distinct rows.</li>
+<li>Changed payload under same key → that row recomputes.</li>
+<li>v0.4-format file (positional, no schema_version) → fail-closed error.</li>
+</ul>
+<hr />
+<h2 id="phase-6-parity-batch">Phase 6 — Parity batch<a class="headerlink" href="#phase-6-parity-batch" title="Permanent link">&para;</a></h2>
+<p>Five small items. Each is a pass-through or a bypass; none may disturb
+the engine loops beyond a parameter.</p>
+<h3 id="61-sequentialtrue-sync-only">6.1 <code>sequential=True</code> (sync only)<a class="headerlink" href="#61-sequentialtrue-sync-only" title="Permanent link">&para;</a></h3>
+<ul>
+<li>On <code>parallel_map</code>, <code>parallel_starmap</code>, <code>parallel_iter</code>, and sync
+  <code>.map()</code>/<code>.starmap()</code>/<code>.stream()</code>. Runs every item inline in the
+  calling thread: no pool, real stack traces, working breakpoints,
+  deterministic ordering.</li>
+<li>Honors <code>rate_limit</code>, <code>retry</code>, <code>checkpoint</code>, <code>on_progress</code>,
+  <code>max_errors</code>. <code>timeout=</code> is checked between items only (an in-flight
+  item cannot be interrupted — documented). <code>workers</code> is ignored with
+  <code>sequential=True</code>; passing both is allowed (no error) so a single env
+  flag can flip production code into debug mode.</li>
+<li>Async: not needed — <code>concurrency=1</code> already serializes; docs say so.</li>
+</ul>
+<h3 id="62-async-timeout-total-wall-clock-parity">6.2 Async <code>timeout=</code> (total wall-clock parity)<a class="headerlink" href="#62-async-timeout-total-wall-clock-parity" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>async_parallel_map(..., timeout=30.0)</code> wraps the batch loop in
+  <code>asyncio.timeout()</code>. On expiry: cancelled children raise
+  <code>CancelledError</code> (a <code>BaseException</code> — deliberately not caught by the
+  item <code>except Exception</code>), <code>_PENDING</code> slots become
+  <code>_Failure(TimeoutError(...))</code> via the existing <code>_mark_timeout_indices</code>
+  helpers, unseen lazy input appends timeout failures — exact mirror of
+  the sync contract, same failure text.</li>
+</ul>
+<h3 id="63-context-variable-propagation-sync-thread-executor">6.3 Context variable propagation (sync thread executor)<a class="headerlink" href="#63-context-variable-propagation-sync-thread-executor" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Capture location is the correctness pivot (review amendment):</strong>
+  <code>contextvars.copy_context()</code> is called <strong>in the submitting thread, once
+  per item, at submit time</strong> — <code>pool.submit(ctx.run, task_fn, item)</code>.
+  Calling it inside the worker would copy the worker's (empty) context
+  and change nothing. Per-item capture is also what makes concurrent
+  execution legal: a single <code>Context</code> cannot be entered twice at once,
+  and <code>Context</code> has no public <code>.copy()</code> — fresh capture per submit is
+  the mechanism. Cost: one HAMT copy per item, negligible.</li>
+<li><strong>Precedence vs <code>worker_init</code>:</strong> the initializer runs in the worker's
+  own context; contextvars it sets are invisible to tasks (which run
+  under the caller's captured context). Per-worker state belongs in
+  globals or thread-locals, not contextvars — documented.</li>
+<li><strong>Default on, no parameter.</strong> Today worker threads see an <em>empty</em>
+  context — correlation IDs silently vanish; propagation is strictly
+  more correct and matches what asyncio tasks already do. Writes inside
+  tasks stay isolated (they land in the copy) — document.</li>
+<li>Process executor: contexts don't pickle; skipped, documented.</li>
+</ul>
+<h3 id="64-worker_init">6.4 <code>worker_init=</code><a class="headerlink" href="#64-worker_init" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>worker_init: Callable[[], None] | None = None</code> → executor
+  <code>initializer=</code>. Thread and process (process requires picklable —
+  reuse the fail-fast pickle probe pattern from <code>Retry</code>).</li>
+<li>Use case in docs: open one DB connection / load one model per worker.</li>
+</ul>
+<h3 id="65-max_tasks_per_worker">6.5 <code>max_tasks_per_worker=</code><a class="headerlink" href="#65-max_tasks_per_worker" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>max_tasks_per_worker: int | None = None</code> → ProcessPoolExecutor
+  <code>max_tasks_per_child=</code>. With <code>executor="thread"</code> → <code>ValueError</code>
+  (explicit semantics beat silent ignore).</li>
+</ul>
+<h3 id="surface-accounting-owed-to-the-v04-review">Surface accounting (owed to the v0.4 review)<a class="headerlink" href="#surface-accounting-owed-to-the-v04-review" title="Permanent link">&para;</a></h3>
+<p><code>parallel_map</code> grows from 8 keywords to 13. That is the workhorse
+function of a policies library and each keyword is orthogonal, boolean-
+or-scalar, and independently documented — but the <em>maintenance</em> cost of
+wide signatures is exactly what Phase 7 pays down. No config object:
+explicit keywords remain the interface (DevX principle 2; a config
+object would be indirection without removing any concept).</p>
+<h3 id="tests_5">Tests<a class="headerlink" href="#tests_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>sequential=True</code>: breakpointability isn't testable, but determinism
+  is — ordering, single-thread identity (<code>threading.get_ident()</code> equal
+  across items), rate-limit pacing still applied, checkpoint works.</li>
+<li>Async timeout: partial results, slot marking, lazy-input remainder,
+  parity of failure text with sync.</li>
+<li>contextvars: a <code>ContextVar</code> set by the caller is visible in tasks
+  (thread executor); writes in tasks don't leak back; process executor
+  documented-skip test asserts no crash.</li>
+<li><code>worker_init</code>: initializer ran per worker (count via file/queue);
+  unpicklable init + process → fail-fast <code>ValueError</code>.</li>
+<li><code>max_tasks_per_worker</code>: accepted with process; <code>ValueError</code> with thread.</li>
+</ul>
+<hr />
+<h2 id="phase-7-decorator-signature-dedup">Phase 7 — Decorator signature dedup<a class="headerlink" href="#phase-7-decorator-signature-dedup" title="Permanent link">&para;</a></h2>
+<h3 id="problem-deferred-from-v04-review_1">Problem (deferred from v0.4 review)<a class="headerlink" href="#problem-deferred-from-v04-review_1" title="Permanent link">&para;</a></h3>
+<p><code>_BoundParallel.map</code>, <code>_ParallelFunc.map</code>, <code>_BoundAsyncParallel.map</code>,
+<code>_AsyncParallelFunc.map</code> hand-copy the same keyword list; a signature
+change touches five places. After Phases 3–6 add keywords, that cost
+compounds.</p>
+<h3 id="design-unpacktypeddict-not-a-config-object">Design — <code>Unpack[TypedDict]</code>, not a config object<a class="headerlink" href="#design-unpacktypeddict-not-a-config-object" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SyncMapOptions</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="n">workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">executor</span><span class="p">:</span> <span class="n">ExecutorType</span>
+    <span class="n">rate_limit</span><span class="p">:</span> <span class="n">Limiter</span> <span class="o">|</span> <span class="n">RateLimit</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">on_progress</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">retry</span><span class="p">:</span> <span class="n">Retry</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">checkpoint</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">checkpoint_key</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">max_errors</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">sequential</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="n">worker_init</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">max_tasks_per_worker</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_ParallelFunc</span><span class="p">[</span><span class="o">**</span><span class="n">P</span><span class="p">,</span> <span class="n">R</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">items</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="o">**</span><span class="n">opts</span><span class="p">:</span> <span class="n">Unpack</span><span class="p">[</span><span class="n">SyncMapOptions</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">ParallelResult</span><span class="p">[</span><span class="n">R</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">parallel_map</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="o">**</span><span class="n">_merge_opts</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_defaults</span><span class="p">,</span> <span class="o">**</span><span class="n">opts</span><span class="p">))</span>
+</code></pre></div>
+<ul>
+<li>One options TypedDict per engine (<code>SyncMapOptions</code>,
+  <code>AsyncMapOptions</code>, streaming variants), defined next to the engine
+  function — the engine's explicit signature remains the source of
+  truth; the TypedDicts are declared to match and <code>typing_assertions.py</code>
+  grows checks that keep them honest (<code>assert_type</code> on decorator calls
+  with each option).</li>
+<li>IDE autocomplete and mypy checking survive (<code>Unpack</code> is fully
+  supported by mypy ≥ 1.5); the four-fold copy collapses to one dict
+  type per engine.</li>
+<li><strong>Every override key keeps <code>| None</code> in the TypedDict (review
+  amendment):</strong> today's decorator methods accept an explicit <code>None</code>
+  meaning "inherit the decorator default" (<code>_merge_opts</code> skips <code>None</code>),
+  and existing call sites may pass it. Dropping <code>| None</code> would be a
+  mypy-visible regression. So <code>executor: ExecutorType | None</code>, etc. —
+  runtime semantics unchanged: absent key and explicit <code>None</code> both mean
+  "inherit". The known limitation that an explicit <code>None</code> cannot
+  <em>override</em> a non-None decorator default remains, unchanged and
+  documented.</li>
+</ul>
+<h3 id="tests_6">Tests<a class="headerlink" href="#tests_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Existing decorator tests already cover behavior; add mypy assertions
+  for each option key on <code>.map()</code>/<code>.stream()</code>, an explicit-<code>None</code>
+  inheritance assertion, and a negative
+  (<code># type: ignore[typeddict-unknown-key]</code>) proving typos are caught.</li>
+</ul>
+<hr />
+<h2 id="phase-8-docs-roadmap-release-gate">Phase 8 — Docs, roadmap, release gate<a class="headerlink" href="#phase-8-docs-roadmap-release-gate" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Docs per feature</strong> (not a trailing batch — each phase's commit
+  includes its docs): API reference tables, advanced-features sections
+  for <code>ordered</code>/<code>max_errors</code>/<code>sequential</code>/<code>checkpoint_key</code>,
+  best-practices additions ("checkpoint_key for evolving inputs",
+  "max_errors for overnight jobs"), quickstart untouched (already
+  teaser-dense).</li>
+<li><strong>Roadmap:</strong> move shipped items into Current, delete the v0.5 section,
+  re-examine v0.6 (free-threading CI, <code>executor="interpreter"</code>).</li>
+<li><strong>Version:</strong> 0.5.0 in <code>pyproject.toml</code> + <code>__init__.py</code>.</li>
+<li><strong>Examples directory:</strong> refresh <code>examples/*.py</code> to 0.5 idioms (it
+  still shows 0.3-era usage — flagged during the docs audit).</li>
+<li><strong>Review gate (hard requirement):</strong> the four-review cadence from v0.4
+  — Codex review + Codex adversarial + one independent code reviewer +
+  one adversarial design reviewer — once after Phase 3, once before
+  merge. Findings triaged into: fix-now / plan-amendment / explicitly-
+  rejected-with-reason (recorded in this file).</li>
+<li><strong>Merge:</strong> single PR, merge commit to <code>main</code>, then tag <code>v0.5.0</code> and
+  publish (PyPI + <code>make docs-deploy</code>) as a separate, explicit decision.</li>
+</ul>
+<h2 id="acceptance-criteria">Acceptance criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h2>
+<ol>
+<li>All new behavior covered by regression tests written against the
+   <em>review findings style</em>: each test names the failure it prevents.</li>
+<li><code>pytest</code> green, <code>ruff</code> clean, <code>mypy --strict</code> clean (package + typing
+   assertions), <code>mkdocs build --strict</code> clean.</li>
+<li>No timing-flaky tests: fake clocks for limiter/backoff logic; real-
+   time tests use ≥ 0.2s margins and appear only where wall-clock is the
+   contract.</li>
+<li>The streaming rewrite passes a dedicated stress check (e.g. 10k items,
+   window 32, random 0–5ms sleeps, straggler injection) run locally
+   before review — not committed as a test, recorded in the PR body.
+   Bound claims are <em>measured</em>, not asserted: peak
+   <code>in_flight + reorder_buffer</code>, source-iterator advancement, and
+   <code>max_errors</code> admission counts all have instrumented tests.</li>
+<li>Both review cycles complete; no unresolved high-severity findings.</li>
+</ol>
+<h2 id="explicitly-out-of-scope-for-v05">Explicitly out of scope for v0.5<a class="headerlink" href="#explicitly-out-of-scope-for-v05" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Cut</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Per-item metadata on collected <code>ParallelResult</code></td>
+<td>Real surface, unproven demand — revisit on request</td>
+</tr>
+<tr>
+<td>Config/options object on the public API</td>
+<td>Explicit keywords are the interface; Phase 7 solves the duplication without indirection</td>
+</tr>
+<tr>
+<td>Checkpoint for starmap / streaming</td>
+<td>Starmap items embed the callable (thread path) — needs its own design; streaming resume is a different contract</td>
+</tr>
+<tr>
+<td><code>.then()</code>, circuit breaker, shared kwargs</td>
+<td>Roadmap "Not Planned" — unchanged</td>
+</tr>
+<tr>
+<td>Free-threaded CI, <code>executor="interpreter"</code></td>
+<td>v0.6</td>
+</tr>
+<tr>
+<td>Comparison page, recipes, write-up</td>
+<td>Distribution tier, after release</td>
+</tr>
+</tbody>
+</table>
+<h2 id="review-amendments-log">Review amendments log<a class="headerlink" href="#review-amendments-log" title="Permanent link">&para;</a></h2>
+<p><strong>Round 1 — Codex adversarial review of this plan (pre-implementation,
+2026-07-05).</strong> Seven findings, all accepted and folded into the phases
+above: (1) ordered-mode memory bound restated as an enforced
+<code>in_flight + buffer ≤ window</code> admission invariant — the original
+refill-on-completion proof was false; (2) <code>max_errors</code> on collected map
+requires windowed admission, otherwise eager submission defeats the
+feature; (3) sync cancel-on-break reworded to best-effort (running
+thread/process tasks cannot be interrupted); (4) checkpoint schema:
+type-tagged reversible key encoding + single fail-closed rule for all
+pre-v2 files, resolving the positional-files contradiction; (5)
+contextvars capture pinned to the submitting thread per item, with
+<code>worker_init</code> precedence defined; (6) TypedDict options keep <code>| None</code>
+to preserve explicit-None inheritance typing; (7) streaming window
+honors an explicit <code>workers=</code> cap.</p>
+<p><strong>Round 2 — mid-plan four-review cycle after Phase 3 (Codex review,
+Codex adversarial, Opus code reviewer, Sonnet adversarial design
+reviewer; 2026-07-06).</strong> Opus: no critical/major correctness findings
+across 300+ randomized stress trials per engine. Triage:</p>
+<p><em>Fixed:</em> (1) windowed collected path admitted work under an
+already-expired <code>timeout</code> — deadline now checked before admission
+[Codex P2]; (2) abort/timeout aftermath drained unsized sources —
+source is never touched post-stop; sized inputs fill by count, unsized
+return a shorter, documented result [Codex adversarial high]; (3) sync
+driver blocked in rate-limit waits while filling the window — collected
+engine absorbs completions between paced submissions, streaming engine
+peeks done futures in <code>_admit</code> [Codex adversarial medium]; (4) a
+<code>CheckpointError</code> escaping the sync windowed engine drained the window
+while the async twin cancelled — exception-aware shutdown, and the
+poison-iterator case now surfaces promptly [Opus minor / Sonnet major];
+(5) <code>ParallelResult</code> refuses construction around a leaked <code>_PENDING</code>
+[Opus minor]; (6) async cancel-on-break docs were false for a bare
+<code>break</code> — docs now prescribe <code>contextlib.aclosing</code> [Sonnet major];
+(7) <code>batch_size</code> acting as the admission window when <code>max_errors</code> is
+set is now documented as a coupling, not left silent [Sonnet major].</p>
+<p><em>Contract decisions, documented + tested rather than redesigned:</em>
+ordered+<code>max_errors</code> delivers the ending failure in input order; a task
+that never completes therefore blocks the ordered stream — inherent to
+uncancellable threads and identical to every other sync call; escape
+hatches (in-function timeouts, async <code>task_timeout</code>, unordered mode)
+documented, and a regression test proves <code>task_timeout</code> unblocks the
+async case [Sonnet critical → triaged]. Completed-but-unyielded
+successes behind the ending failure are discarded — documented [Sonnet
+minor]. Async engines deliberately have no mid-fill peek: filling never
+blocks and abort cancels limiter-queued tasks; asymmetry commented in
+code and cost-bound tested [Sonnet drift note].</p>
+<p><em>Accepted, not acted on:</em> checkpoint cached-prefix scan does not
+re-check the <code>timeout</code> deadline mid-scan (local sqlite reads only, no
+remote cost); collected-map barrier vs windowed unification deferred —
+candidate for v0.6.</p>
+<p><strong>Round 3 — final pre-merge four-review gate (Codex review, Codex
+adversarial, Opus code reviewer, Sonnet design reviewer; 2026-07-06).</strong>
+Opus: no unresolved high-severity findings, merge not blocked — every
+cross-feature composition (checkpoint_key+max_errors resume,
+CheckpointError through the async timeout wrapper, ordered+max_errors
+delivery, <code>_PENDING</code> leak-freedom) verified empirically; all six
+TypedDict surfaces match their engine signatures exactly. Triage:</p>
+<p><em>Fixed:</em> (1) sync <code>timeout=</code> was bypassed while the driver blocked in
+<code>bucket.wait()</code> — <code>Limiter.wait()</code> gained a deadline-aware <code>timeout=</code>
+that gives up (consuming nothing) when the predicted grant falls past
+the budget, threaded through the plain, windowed, and sequential
+engines; regression tests pin all three [Codex adversarial high];
+(2) async <code>timeout=0</code> created tasks before <code>asyncio.timeout</code> could
+cancel (first-suspension-point gap) — both async paths pre-check the
+expired deadline and admit no work, mirroring sync [Codex P2 / Sonnet
+moderate]; (3) <code>sequential=True</code> ran pool validation, so a
+process-configured call with a local <code>worker_init</code> broke the one-flag
+debug promise — validation skipped when the pool is never built
+[Codex P2 / Sonnet minor]; (4) corrupted or non-SQLite checkpoint files
+leaked raw <code>sqlite3</code> exceptions — every unusable file now fails closed
+with <code>CheckpointError</code>, and an empty <code>meta</code> alongside a foreign-shaped
+<code>results</code> table is refused rather than adopted [Sonnet moderate +
+minor]; (5) the roadmap claimed CI-enforced typing with no CI in the
+repo — a GitHub Actions workflow (ruff, mypy --strict, pytest, mkdocs
+--strict on 3.12/3.13) now makes the claim true [Sonnet moderate];
+(6) stale <code>uv.lock</code> regenerated; <code>sequential</code> docstring states
+<code>executor=</code> is ignored too [Opus low].</p>
+<p><em>Recorded as by-design:</em> <code>max_errors</code> may admit up to one extra window
+past the trigger (the documented bound); <code>_RunCheckpoint._rows</code> retains
+entries for failed items until the call returns (bounded by input
+size); the per-run duplicate-key set is intentionally per-run.</p>
+<h2 id="risks">Risks<a class="headerlink" href="#risks" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Streaming rewrite regresses subtle behavior (cancel-on-break, retry composition)</td>
+<td>It is Phase 1 — maximum soak time on the branch; mid-plan review cycle targets it specifically</td>
+</tr>
+<tr>
+<td><code>batch_size</code> semantic change surprises an existing streaming user</td>
+<td>Pre-1.0 + ~zero installed base; changelog + docstring + docs all state it</td>
+</tr>
+<tr>
+<td>contextvars-by-default changes observable behavior</td>
+<td>Strictly-more-correct argument documented; if review disagrees, demote to opt-in parameter — decision point recorded here</td>
+</tr>
+<tr>
+<td>Async <code>max_errors</code> abort machinery fights <code>TaskGroup</code> semantics</td>
+<td>Pattern already proven by <code>except* CheckpointError</code>; prototype in a throwaway script before committing to the design</td>
+</tr>
+<tr>
+<td>Signature width (13 kwargs) draws the same review criticism again</td>
+<td>Surface accounting section above is the pre-written answer; Phase 7 removes the duplication cost</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.60a45f97.min.js"></script>
+      
+    
+  </body>
+</html>

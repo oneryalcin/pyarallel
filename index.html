@@ -736,6 +736,69 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="development/plans/v0.5.0/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.5.0 Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="development/plans/v0.6-engine-unification/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Engine Unification Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="development/plans/v0.6-ledger-refactor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Ledger Refactor Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -824,9 +887,9 @@
 
 
 <h1 id="pyarallel">Pyarallel<a class="headerlink" href="#pyarallel" title="Permanent link">&para;</a></h1>
-<p>Simple, explicit parallel execution for Python.</p>
+<p>The fan-out layer for rate-limited APIs. Simple, explicit parallel execution for Python.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Pyarallel wraps Python's <code>concurrent.futures</code> and <code>asyncio.TaskGroup</code> with better ergonomics: structured error handling, rate limiting, progress callbacks, and async support.</p>
+<p>Pyarallel is for "apply one function to many inputs" workloads against services that throttle you — LLM calls, embeddings, scraping, SaaS APIs — as well as general parallel processing. It wraps Python's <code>concurrent.futures</code> and <code>asyncio</code> with the policies that workload actually needs: rate limiting, per-item retry, structured error handling, and progress callbacks. Sync and async, zero dependencies.</p>
 <p><strong>Design principles:</strong></p>
 <ul>
 <li><strong>Explicit over implicit</strong> — <code>.map()</code> for parallel, normal calls stay normal</li>

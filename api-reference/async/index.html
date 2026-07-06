@@ -822,6 +822,69 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.5.0/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.5.0 Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.6-engine-unification/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Engine Unification Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.6-ledger-refactor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Ledger Refactor Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -994,7 +1057,7 @@
 
 
 <h1 id="api-reference-async">API Reference: Async<a class="headerlink" href="#api-reference-async" title="Permanent link">&para;</a></h1>
-<p>Pyarallel provides async-native parallel execution using <code>asyncio.TaskGroup</code> for structured concurrency and <code>asyncio.Semaphore</code> for concurrency control.</p>
+<p>Pyarallel provides async-native parallel execution: a windowed engine driven by <code>asyncio.wait</code> with <code>asyncio.Semaphore</code> for concurrency control — in-flight tasks are cancelled and awaited on errors and timeouts, so nothing is left running on the loop.</p>
 <h2 id="async_parallel_map"><code>async_parallel_map</code><a class="headerlink" href="#async_parallel_map" title="Permanent link">&para;</a></h2>
 <p>Execute an async function over items concurrently.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel_map</span>
@@ -1004,11 +1067,15 @@
     <span class="n">items</span><span class="p">,</span>                           <span class="c1"># Any iterable</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">concurrency</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>                   <span class="c1"># Max concurrent tasks</span>
-    <span class="n">rate_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># RateLimit or ops/second</span>
-    <span class="n">task_timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                    <span class="c1"># Per-task timeout in seconds</span>
+    <span class="n">rate_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># RateLimit spec, shared Limiter, or ops/second</span>
+    <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                    <span class="c1"># Total wall-clock timeout (mirror of sync)</span>
+    <span class="n">task_timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>               <span class="c1"># Per-task timeout in seconds</span>
     <span class="n">on_progress</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># callback(completed, total)</span>
     <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Lazy batch consumption for unsized iterables</span>
     <span class="n">retry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                      <span class="c1"># Retry(attempts=3, backoff=1.0)</span>
+    <span class="n">checkpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Path to a resume file (SQLite)</span>
+    <span class="n">checkpoint_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>             <span class="c1"># Stable per-item identity for resume</span>
+    <span class="n">max_errors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Abort after N failures</span>
 <span class="p">)</span>
 </code></pre></div>
 <p><strong>Returns:</strong> <code>ParallelResult[R]</code></p>
@@ -1043,9 +1110,15 @@
 </tr>
 <tr>
 <td><code>rate_limit</code></td>
-<td><code>RateLimit \| float \| None</code></td>
+<td><code>Limiter \| RateLimit \| float \| None</code></td>
 <td><code>None</code></td>
-<td>Rate limiting</td>
+<td>Rate limiting. Pass a shared <code>Limiter</code> to draw from one budget across calls</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td><code>float \| None</code></td>
+<td><code>None</code></td>
+<td><strong>Total</strong> wall-clock timeout — mirror of the sync <code>timeout</code>. Unfinished tasks are cancelled, <code>result.timed_out</code> is set; sized slots are marked <code>TimeoutError</code>, unsized inputs return a shorter result (the source is never drained)</td>
 </tr>
 <tr>
 <td><code>task_timeout</code></td>
@@ -1057,19 +1130,37 @@
 <td><code>on_progress</code></td>
 <td><code>Callable[[int, int], None] \| None</code></td>
 <td><code>None</code></td>
-<td>Progress callback. For unsized iterables with batching, <code>total</code> is items seen so far</td>
+<td>Progress callback. For unsized iterables, <code>total</code> is items seen so far</td>
 </tr>
 <tr>
 <td><code>batch_size</code></td>
 <td><code>int \| None</code></td>
 <td><code>None</code></td>
-<td>Process items in chunks. With unsized iterables, input is consumed lazily one batch at a time</td>
+<td>Admission window: max tasks created but unresolved (default <code>2 × concurrency</code>). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily</td>
 </tr>
 <tr>
 <td><code>retry</code></td>
 <td><code>Retry \| None</code></td>
 <td><code>None</code></td>
 <td>Per-item retry with backoff</td>
+</tr>
+<tr>
+<td><code>checkpoint</code></td>
+<td><code>str \| Path \| None</code></td>
+<td><code>None</code></td>
+<td>Checkpoint file for resumable runs — completed items load from disk on rerun</td>
+</tr>
+<tr>
+<td><code>checkpoint_key</code></td>
+<td><code>Callable[[T], str \| int \| bytes] \| None</code></td>
+<td><code>None</code></td>
+<td>Stable per-item identity — see the <a href="../core/#checkpoint-resume">sync docs</a></td>
+</tr>
+<tr>
+<td><code>max_errors</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>Abort after this many failures (counted after retries). Windowed admission makes the abort cheap; unrun items are marked <code>Aborted</code>, <code>result.aborted</code> is set — see the <a href="../core/#early-abort-with-max_errors">sync docs</a></td>
 </tr>
 </tbody>
 </table>
@@ -1079,8 +1170,12 @@
 <p>Pre-v1, Pyarallel keeps these names intentionally different. If you're moving from sync to async, translate <code>workers=</code> to <code>concurrency=</code> rather than expecting them to be interchangeable.</p>
 <h3 id="other-differences-from-sync">Other Differences from Sync<a class="headerlink" href="#other-differences-from-sync" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>task_timeout</code> is <strong>per-task</strong> (via <code>asyncio.wait_for</code>), not total wall-clock like sync <code>timeout</code></li>
-<li>Uses <code>asyncio.TaskGroup</code> for structured concurrency — proper cleanup on errors</li>
+<li>Both timeouts exist here: <code>timeout</code> is total wall-clock (same contract
+  as sync), <code>task_timeout</code> is per-task via <code>asyncio.wait_for</code> — the sync
+  API deliberately has no per-task timeout (threads can't be cancelled)</li>
+<li>On errors and timeouts, in-flight tasks are cancelled and awaited —
+  proper cleanup, nothing left running on the loop</li>
+<li>No <code>sequential=</code> — <code>concurrency=1</code> already serializes</li>
 </ul>
 <h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
@@ -1103,10 +1198,10 @@
 <h3 id="notes-on-progress-and-unsized-iterables">Notes on Progress and Unsized Iterables<a class="headerlink" href="#notes-on-progress-and-unsized-iterables" title="Permanent link">&para;</a></h3>
 <p>When <code>items</code> has a known length, <code>on_progress(done, total)</code> reports the final
 total.</p>
-<p>When <code>items</code> is unsized (for example a generator) and <code>batch_size</code> is set,
-Pyarallel keeps input consumption lazy instead of materializing the full input
-up front. In that mode, <code>total</code> is the number of items discovered so far, not a
-guaranteed final total.</p>
+<p>When <code>items</code> is unsized (for example a generator), input consumption is
+lazy — one window ahead, never materialized — and <code>total</code> is the number
+of items <em>admitted</em> so far, growing as the run progresses: a percentage
+over it is meaningless. Pass a sized input for a real total.</p>
 <hr />
 <h2 id="async_parallel_starmap"><code>async_parallel_starmap</code><a class="headerlink" href="#async_parallel_starmap" title="Permanent link">&para;</a></h2>
 <p>Like <code>async_parallel_map</code> but unpacks each item as <code>fn(*args)</code>.</p>
@@ -1120,7 +1215,10 @@ guaranteed final total.</p>
 <p>Takes the same options as <code>async_parallel_map</code>. Also available as <code>.starmap()</code> on <code>@async_parallel</code> decorated functions.</p>
 <hr />
 <h2 id="async_parallel_iter"><code>async_parallel_iter</code><a class="headerlink" href="#async_parallel_iter" title="Permanent link">&para;</a></h2>
-<p>Async streaming — yields <code>ItemResult</code> in completion order. Constant memory.</p>
+<p>Async streaming — yields <code>ItemResult</code> in completion order. A bounded
+window of tasks is in flight at any moment (default <code>2 × concurrency</code>,
+override with <code>batch_size</code>): memory stays constant, input is consumed
+lazily, and a slow item delays only itself.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel_iter</span>
 
 <span class="k">async</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">async_parallel_iter</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">concurrency</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
@@ -1129,11 +1227,33 @@ guaranteed final total.</p>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">log_error</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Changed in v0.5 (streaming) and v0.6 (everywhere)</p>
+<p><code>batch_size</code> is an <strong>in-flight bound</strong>, not a chunk size — one
+meaning across every API since v0.6: there are no barriers, and
+input is never materialized.</p>
+</div>
+<p>Takes the same <code>ordered=</code> and <code>on_progress=</code> options as <code>parallel_iter</code>:
+<code>ordered=True</code> yields in input order with a reorder buffer counted
+inside the window; <code>on_progress(done, total)</code> fires per completed item.</p>
+<p>To stop early, close the generator — unlike sync generators, a bare
+<code>break</code> does <strong>not</strong> finalize an async generator promptly (Python defers
+it to event-loop shutdown, so tasks keep running). Wrap the stream in
+<code>contextlib.aclosing</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">aclosing</span>
+
+<span class="k">async</span> <span class="k">with</span> <span class="n">aclosing</span><span class="p">(</span><span class="n">async_parallel_iter</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">))</span> <span class="k">as</span> <span class="n">stream</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">stream</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">enough</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
+            <span class="k">break</span>   <span class="c1"># aclosing cancels in-flight tasks right here</span>
+</code></pre></div>
+<p>Async tasks, unlike threads, are genuinely cancellable — once the
+generator is closed, in-flight work stops.</p>
 <p>Also available as <code>.stream()</code> on <code>@async_parallel</code> decorated functions:</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@async_parallel</span><span class="p">(</span><span class="n">concurrency</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span> <span class="o">...</span>
 
-<span class="k">async</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">fetch</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+<span class="k">async</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">fetch</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="n">urls</span><span class="p">):</span>
     <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
         <span class="k">await</span> <span class="n">db</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
@@ -1164,7 +1284,7 @@ guaranteed final total.</p>
 </tr>
 <tr>
 <td><code>rate_limit</code></td>
-<td><code>RateLimit \| float \| None</code></td>
+<td><code>Limiter \| RateLimit \| float \| None</code></td>
 <td><code>None</code></td>
 <td>Default rate limiting</td>
 </tr>

@@ -1,0 +1,1718 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="Mehmet Oner Yalcin">
+      
+      
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/development/plans/v0.6-engine-unification/">
+      
+      
+        <link rel="prev" href="../v0.5.0/">
+      
+      
+        <link rel="next" href="../v0.6-ledger-refactor/">
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.50">
+    
+    
+      
+        <title>v0.6 Engine Unification Plan - Pyarallel</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.a40c8224.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#v06-plan-collected-map-engine-unification" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Pyarallel
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              v0.6 Engine Unification Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Pyarallel
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Getting Started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting Started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Installation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick Start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    User Guide
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            User Guide
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/real-world-patterns/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Real-World Patterns
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/advanced-features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Advanced Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/best-practices/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Best Practices
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    API Reference
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/core/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/async/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Async
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/rate-limiting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Rate Limiting
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Development
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Development
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../devx-principles/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    DevX Principles
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Roadmap
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.5.0/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.5.0 Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    v0.6 Engine Unification Plan
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Engine Unification Plan
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#theme" class="md-nav__link">
+    <span class="md-ellipsis">
+      Theme
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-state-what-exists-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      Current state (what exists today)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      Design
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contract-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contract decisions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavior-changes-to-document-loudly" class="md-nav__link">
+    <span class="md-ellipsis">
+      Behavior changes to document loudly
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#edge-cases-and-their-required-outcomes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Edge cases (and their required outcomes)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks-and-how-the-plan-retires-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      Risks and how the plan retires them
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      Test plan
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phases
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicitly-out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      Explicitly out of scope
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-amendments-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      Review amendments log
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Review amendments log">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#round-1-pre-implementation-plan-review-2026-07-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      Round 1 — pre-implementation plan review (2026-07-06)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-results-benchmark-2026-07-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 1 results — benchmark (2026-07-06)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#round-2-pre-merge-review-of-the-branch-2026-07-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      Round 2 — pre-merge review of the branch (2026-07-06)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.6-ledger-refactor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Ledger Refactor Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#theme" class="md-nav__link">
+    <span class="md-ellipsis">
+      Theme
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-state-what-exists-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      Current state (what exists today)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#design" class="md-nav__link">
+    <span class="md-ellipsis">
+      Design
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contract-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Contract decisions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behavior-changes-to-document-loudly" class="md-nav__link">
+    <span class="md-ellipsis">
+      Behavior changes to document loudly
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#edge-cases-and-their-required-outcomes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Edge cases (and their required outcomes)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks-and-how-the-plan-retires-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      Risks and how the plan retires them
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      Test plan
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phases
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicitly-out-of-scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      Explicitly out of scope
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-amendments-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      Review amendments log
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Review amendments log">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#round-1-pre-implementation-plan-review-2026-07-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      Round 1 — pre-implementation plan review (2026-07-06)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-results-benchmark-2026-07-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 1 results — benchmark (2026-07-06)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#round-2-pre-merge-review-of-the-branch-2026-07-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      Round 2 — pre-merge review of the branch (2026-07-06)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="v06-plan-collected-map-engine-unification">v0.6 Plan — Collected-Map Engine Unification<a class="headerlink" href="#v06-plan-collected-map-engine-unification" title="Permanent link">&para;</a></h1>
+<p>Status: <strong>amended after Round 1 review — ready to implement</strong>. This
+document is the implementation contract for the first v0.6 work item:
+every design decision carries its rationale, behavior changes, edge
+cases, and test plan. Deviations during implementation are recorded in
+the review amendments log below, not silently absorbed.</p>
+<p>Read together with the <a href="../../roadmap/">Roadmap</a>,
+<a href="../../devx-principles/">DevX Principles</a>, and the
+<a href="../v0.5.0/">v0.5.0 Plan</a> (whose design review produced this item).</p>
+<h2 id="theme">Theme<a class="headerlink" href="#theme" title="Permanent link">&para;</a></h2>
+<p>v0.5 shipped the sliding-window engine for streaming and for
+<code>max_errors</code> collected maps, but left the <em>plain</em> collected path on the
+old chunk-and-barrier machinery. The result is the coupling the v0.5
+design review flagged: <code>batch_size</code> means "chunk with a barrier" on
+<code>parallel_map(...)</code> and "in-flight window" the moment you add
+<code>max_errors</code> or switch to <code>.stream()</code>. One keyword, two meanings,
+switched by an unrelated option.</p>
+<p>This plan deletes the barrier engine. After it, <strong>every</strong> non-sequential
+execution path in the library — collected and streaming, sync and async
+— runs through one windowed engine, and <code>batch_size</code> means exactly one
+thing everywhere: <em>the maximum number of items admitted but not yet
+resolved</em>.</p>
+<p>This is a deletion-shaped refactor: no new API parameters, ~150 lines of
+engine code and a planning module removed. The one surface addition is
+<code>ParallelResult.timed_out</code>/<code>.aborted</code> (D7) — required so the no-drain
+policy cannot silently truncate results.</p>
+<h2 id="current-state-what-exists-today">Current state (what exists today)<a class="headerlink" href="#current-state-what-exists-today" title="Permanent link">&para;</a></h2>
+<p>Per runtime there are three collected engines:</p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th>Selected by</th>
+<th>Semantics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>barrier path (inline in <code>parallel_map</code> / <code>async_parallel_map</code>)</td>
+<td>default</td>
+<td><code>_plan_collected_map</code> chunks input; all futures per chunk submitted upfront; barrier between chunks</td>
+</tr>
+<tr>
+<td><code>_collected_map_windowed</code> / <code>_async_collected_map_windowed</code></td>
+<td><code>max_errors=</code></td>
+<td>bounded admission window, lazy input, no-drain aftermath</td>
+</tr>
+<tr>
+<td><code>_sequential_collected_map</code></td>
+<td><code>sequential=True</code></td>
+<td>inline in caller thread (mostly untouched by this plan; gains D7 status)</td>
+</tr>
+</tbody>
+</table>
+<p>The barrier path also retains three pre-v0.5 behaviors the windowed
+engine deliberately fixed:</p>
+<ol>
+<li><strong>Upfront materialization</strong>: <code>batch_size=None</code> runs <code>list(items)</code> —
+   a 1M-item generator becomes 1M futures in memory at once.</li>
+<li><strong>Drain-on-timeout</strong>: unsized input + <code>batch_size</code> + timeout expiry
+   drains the remaining source to append failure placeholders
+   (<code>_append_timeout_failures</code>) — the exact "never touch the source
+   after a stop" violation the v0.5 review banned from the windowed
+   engine (poison/infinite/blocking iterators).</li>
+<li><strong>Barrier stalls</strong>: one straggler in chunk N delays every item of
+   chunk N+1.</li>
+</ol>
+<p>Additionally, sync <code>parallel_starmap</code>'s non-process path materializes
+its input <em>before</em> delegating (<code>packed = [(fn, args) for args in
+items]</code>) — so no engine change alone can make starmap lazy. <em>(Round 1
+finding; fixed by this plan, see D6.)</em></p>
+<h2 id="design">Design<a class="headerlink" href="#design" title="Permanent link">&para;</a></h2>
+<p>Generalize the two windowed engines to accept <code>max_errors: int | None</code>
+and route <strong>all</strong> non-sequential collected calls through them:</p>
+<ul>
+<li><code>_collected_map_windowed</code> → renamed <code>_collected_map</code>; the abort
+  branch (<code>failures &gt;= max_errors</code>) guards on <code>max_errors is not None</code>.</li>
+<li><code>_async_collected_map_windowed</code> → renamed <code>_async_collected_map</code>;
+  same guard.</li>
+<li><code>parallel_map</code> body: validate → <code>sequential</code> branch → <code>_collected_map</code>.
+  The ~100-line inline barrier loop is deleted.</li>
+<li><code>async_parallel_map</code> body: validate → <code>timeout &lt;= 0</code> pre-check stays
+  in the engine (already there) → <code>_async_collected_map</code>. The
+  <code>_consume</code>/TaskGroup barrier loop is deleted.</li>
+<li><code>parallel_starmap</code> non-process path: replace input packing with a
+  module-level <code>_apply_star(fn, args)</code> + <code>functools.partial(_apply_star,
+  fn)</code> passed straight to <code>parallel_map</code> with <code>items</code> untouched — the
+  shape the async starmap and the sync process branch already have.
+  Sized-ness and laziness are preserved; the pickling constraint is
+  unchanged (the packed tuples carried <code>fn</code> too).</li>
+</ul>
+<p>Deleted from <code>_plan.py</code>: <code>_CollectedMapPlan</code>, <code>_plan_collected_map</code>,
+<code>_make_chunks</code>, <code>_iter_batches_from_iterator</code>,
+<code>_append_timeout_failures</code>. Retained: <code>_validate_max_errors</code>,
+<code>_total_if_known</code>, <code>_progress_total</code>, <code>_timeout_failure</code>,
+<code>_mark_timeout_indices</code>. <em>(Round 1 verified: the delete list has no
+other users; every kept helper has live uses.)</em></p>
+<p><strong>Window size</strong>: <code>batch_size</code> when given, else
+<code>2 × _effective_workers(workers, executor)</code> sync / <code>2 × concurrency</code>
+async — <strong>everywhere, including sized unconstrained inputs.</strong> Resolved
+by Phase 1 data (see amendments log): the small window passed the R1
+gate on all cases, and the pre-designed fallback (window = <code>total</code> for
+sized inputs) was <em>refuted</em> — <code>wait()</code> re-registers waiters across the
+whole in-flight set per wake, so a total-sized window is O(N²) and
+measured 4–7× slower on threads and 72× on processes. The small window
+is not a compromise; it is what keeps the driver loop cheap.</p>
+<p><strong>Mid-fill absorb sweep</strong> (sync): the zero-timeout <code>wait()</code> after each
+paced submission exists so a dead API stops admission mid-fill under
+<code>max_errors</code>, and to keep <code>on_progress</code> timely while a rate limiter
+stretches the fill over wall-clock seconds. Both purposes are inactive
+without <code>max_errors</code> and without a limiter, so the sweep is <strong>gated</strong>:
+<code>if max_errors is not None or bucket is not None:</code>. One boolean, not a
+second engine; removes an unconditional O(window) scan per admission
+from the hot path. <em>(Round 1 amendment — the draft kept it
+unconditional.)</em></p>
+<p><strong>Streaming engines, decorators, TypedDicts, checkpoint, limiter:
+untouched.</strong> The public signatures of every entry point are
+byte-identical. The streaming and collected admission loops stay
+separate — their control flow genuinely differs (yield-driven vs
+return-at-end, reorder buffer only in streaming); a shared abstraction
+would be the premature kind.</p>
+<h2 id="contract-decisions">Contract decisions<a class="headerlink" href="#contract-decisions" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>D1 — <code>batch_size</code> = admission window, everywhere.</strong> The
+  chunk-with-barrier semantics are removed from the library. The
+  <code>parallel_map</code> docstring caveat "with <code>max_errors</code> set, <code>batch_size</code>
+  becomes the admission window" is deleted because it is now
+  unconditional.</li>
+<li><strong>D2 — collected maps consume input lazily, always.</strong> Exactly one
+  window ahead, <code>batch_size</code> or not. <code>parallel_map(fn, generator)</code> no
+  longer materializes the generator. (Results are still O(n) — it is a
+  collected map.) Docs carry the atomicity callout: if
+  no-side-effects-before-input-validation matters, materialize the
+  input yourself.</li>
+<li><strong>D3 — no-drain everywhere.</strong> On timeout or abort, the source is
+  never touched again: sized inputs get one failure placeholder per
+  unseen item (by count), unsized inputs return a shorter result. This
+  extends the v0.5 windowed policy to the plain path and deletes the
+  drain behavior. <em>Behavior change,</em> documented below. D7 is the
+  companion: truncation is never silent.</li>
+<li><strong>D4 — <code>on_progress</code> total for unsized inputs = items seen so far.</strong>
+  Previously the plain path materialized unsized input, so <code>total</code> was
+  the true final count; now it grows as the source is consumed — the
+  same contract streaming and <code>max_errors</code> paths already have.
+  <em>Behavior change,</em> documented below. Docs say plainly: a progress bar
+  over a generator reads <code>n/n</code> (100%) on every tick; pass a sized input
+  for a real total.</li>
+<li><strong>D5 — exception propagation gets simpler, and the changelog says
+  so.</strong> <code>CheckpointError</code>: the async barrier path needed <code>except*</code> to
+  unwrap the TaskGroup's ExceptionGroup; the windowed engine has no
+  TaskGroup, so it already escapes plain — the unwrap block is deleted,
+  the observable contract (<code>except CheckpointError</code> works, cause
+  preserved) unchanged and still tested. <em>Also changed, deliberately:</em>
+  a non-CheckpointError escaping from <code>on_progress</code>/<code>store.lookup</code> on
+  the async plain path was ExceptionGroup-wrapped (raised inside a
+  TaskGroup child) and now propagates plain; on the sync plain path an
+  escaping exception previously hit <code>pool.shutdown(wait=True)</code> (drain)
+  and now cancels via the <code>sys.exc_info()</code> check. Both are
+  strictly-better behaviors from the windowed engine; both go in the
+  changelog rather than being asserted away as "unchanged".</li>
+<li><strong>D6 — starmap surfaces keep their signatures, and sync starmap
+  joins the contract.</strong> No new starmap parameters
+  (<code>max_errors</code>/<code>checkpoint</code> remain out of scope). But the sync
+  non-process delegation is rewritten (see Design) so D1–D4 genuinely
+  hold for <code>parallel_starmap</code> and <code>.starmap()</code> — the draft's "unchanged,
+  inherits the engine" claim was false while the packing list-comp
+  stood. <em>(Round 1 amendment.)</em></li>
+<li><strong>D7 — <code>ParallelResult</code> carries run status: <code>timed_out</code> and
+  <code>aborted</code> (read-only bools, default False).</strong> Without this, the
+  no-drain policy has a silent-truncation hole: a timeout that fires
+  while the admission window happens to be empty, on an unsized input,
+  returns only successes — <code>ok=True</code>, indistinguishable from "the
+  generator simply ended". Set by all three collected engines
+  (windowed sync/async and sequential) from their existing
+  <code>timed_out</code>/<code>aborted</code> locals; constructor takes them as optional
+  keywords (existing <code>ParallelResult(entries)</code> call sites and tests
+  unaffected). Streaming is untouched — its consumer sees every yielded
+  item and the documented end-of-stream contract. <em>(Round 1 amendment;
+  the one scope addition of this plan.)</em></li>
+</ul>
+<h2 id="behavior-changes-to-document-loudly">Behavior changes to document loudly<a class="headerlink" href="#behavior-changes-to-document-loudly" title="Permanent link">&para;</a></h2>
+<p>Pre-1.0, no deprecation dance — changelog and docs state these plainly:</p>
+<ol>
+<li><code>parallel_map</code>/<code>async_parallel_map</code> with <code>batch_size</code> no longer
+   pause at chunk boundaries. Strictly faster; only timing-sensitive
+   code could notice.</li>
+<li>Unsized input + <code>timeout</code> expiry returns a result covering only the
+   items actually pulled from the source (previously: source drained to
+   append failures). Sized inputs are unaffected — still one failure
+   entry per item. <code>result.timed_out</code> (D7) is the reliable signal.</li>
+<li>Unsized input without <code>batch_size</code> is no longer materialized;
+   <code>on_progress</code> <code>total</code> reports items seen so far instead of the final
+   count.</li>
+<li>Source-iterator errors surface mid-run instead of upfront, and the
+   stop contract differs by runtime: <strong>sync</strong> stops admission, cancels
+   queued futures, and propagates promptly — tasks already running
+   cannot be interrupted and may complete, <em>side effects included</em>, in
+   the background (documented loudly in the docstring, with the
+   <code>list(items)</code>-first mitigation); <strong>async</strong> cancels and awaits
+   in-flight tasks. <em>(Round 2: Codex demonstrated the background
+   mutations and proposed settle-before-raise; the fix was implemented,
+   then rejected — it collides with the v0.5-mandated no-hang contract
+   (<code>test_poison_source_with_slow_tasks_raises_promptly</code>): one hung
+   task would block the source error from ever surfacing. Promptness +
+   loud documentation is the deliberate trade.)</em></li>
+<li>The default, no-kwargs <code>parallel_map(fn, sized_list)</code> moves from
+   eager upfront submission to windowed admission. Phase 1 measured it:
+   parity on the library's niche (1ms tasks: 0.94×), 1.27–1.74× on
+   degenerate no-op/µs-scale tasks — within the R1 budget, and the
+   measured numbers still include the mid-fill sweep this plan gates
+   off.</li>
+<li>Exception-shape changes from D5: plain (not ExceptionGroup-wrapped)
+   propagation of callback errors on the async path; cancel-not-drain
+   pool shutdown on sync escape.</li>
+</ol>
+<h2 id="edge-cases-and-their-required-outcomes">Edge cases (and their required outcomes)<a class="headerlink" href="#edge-cases-and-their-required-outcomes" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Empty input</strong> → <code>ParallelResult([])</code>, no task ever submitted. Note:
+  the windowed engine opens the checkpoint store (creating the file)
+  and constructs the pool before discovering emptiness, where the
+  barrier path returned first — accepted as an intended minor
+  difference (an empty file that validates on reuse beats a special
+  case).</li>
+<li><strong><code>timeout=0</code> / already-expired deadline</strong> → zero tasks run, sync and
+  async. Sync: deadline check precedes admission. Async: the <code>timeout
+  &lt;= 0</code> pre-check precedes <code>_drive()</code> (asyncio.timeout alone cancels
+  only at the first suspension point). Sized inputs: fully marked by
+  count; <code>timed_out=True</code> either way. Both already tested for the
+  <code>max_errors</code> path; tests extend to the plain path.</li>
+<li><strong>Timeout with an empty in-flight window (unsized input)</strong> → result
+  contains no TimeoutError entries (nothing was in flight) but
+  <code>timed_out=True</code> — the D7 case.</li>
+<li><strong><code>timeout=</code> vs rate-limit pacing</strong> → deadline-aware
+  <code>Limiter.wait(timeout=)</code> already threaded through the windowed
+  engine; the plain path inherits it. The v0.5 repro (rate 1/s,
+  <code>timeout=0.1</code> taking 2s) must stay fixed with <code>max_errors</code> unset.</li>
+<li><strong>Checkpoint write failure (<code>store.put</code> raises)</strong> → engine stops
+  cold: <code>sys.exc_info()</code> check in the sync <code>finally</code> cancels instead of
+  draining; async cancels in-flight tasks. Plain <code>CheckpointError</code>
+  reaches the caller in both runtimes.</li>
+<li><strong>Cached (checkpointed) items during admission</strong> → looked up at admit
+  time, filling slots without occupying window capacity; a fully-cached
+  run submits nothing. (Existing windowed behavior, now on the plain
+  path.)</li>
+<li><strong><code>batch_size=1</code></strong> → serial admission, window of one. Results
+  identical, order preserved in the results list (positional slots).</li>
+<li><strong>Lazy starmap</strong> → <code>parallel_starmap(fn, generator_of_tuples)</code> now
+  consumes one window ahead; sized tuple lists keep their <code>total</code>.</li>
+</ul>
+<h2 id="risks-and-how-the-plan-retires-them">Risks and how the plan retires them<a class="headerlink" href="#risks-and-how-the-plan-retires-them" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>R1 — micro-task throughput.</strong> The mechanism, named: upfront
+  submission registers each future's completion handling once
+  (<code>as_completed</code> for the batch's lifetime) and the pool queue feeds
+  workers with no driver involvement; the windowed driver calls
+  <code>wait()</code> per completion batch, which re-registers waiters across the
+  whole in-flight set — O(N·window) waiter churn vs O(N) for many tiny
+  tasks. <em>Retirement:</em> throwaway benchmark <strong>before</strong> the engine switch
+  is committed — (a) 100k no-op items, (b) 100k <code>sleep(0.001)</code> items,
+  (c) 100k cheap-real-function items (dict transform) on a sized list
+  with default kwargs — the most common call shape; thread executor,
+  plus a process-pool spot check. Target: parity on (b) and (c); no
+  worse than ~2× on (a), which is outside the library's niche. If
+  breached: absorb in batches per wake (already the shape) and/or the
+  sized-input window-scaling fallback from Design — decided on data,
+  recorded here. <strong>Outcome: gate passed on all cases; the
+  window-scaling fallback refuted. Numbers in the amendments log
+  (Phase 1 results).</strong></li>
+<li><strong>R2 — tests encoding barrier behavior.</strong> One existing test pins the
+  drain-on-timeout contract and <strong>must change</strong>:
+  <code>tests/test_parity.py::TestAsyncTotalTimeout::test_lazy_input_remainder_marked</code>
+  (generator + <code>batch_size=2</code> + <code>timeout=0.3</code>, asserts <code>len(result) ==
+  6</code> from post-timeout source draining). It is rewritten to the
+  no-drain contract: shorter result, <code>timed_out=True</code>, source
+  consumption stopped. <em>(Round 1 correction — the draft claimed no such
+  test existed.)</em> <code>test_batch.py</code> asserts in-flight caps, lazy
+  consumption, totals, and error isolation — all window-compatible. Any
+  further test whose assertion must change is listed in the amendments
+  log with its reason.</li>
+<li><strong>R3 — async structural change.</strong> The plain async path swaps
+  TaskGroup for manual task bookkeeping (create/cancel/await-suppress in
+  <code>finally</code>). The windowed engine has carried exactly this shape since
+  v0.5 with its cancellation tested; parity tests (below) extend
+  coverage to the plain path.</li>
+<li><strong>R4 — silent semantic drift.</strong> The plain path inherits ~40 existing
+  plain-<code>parallel_map</code>/<code>async_parallel_map</code> tests untouched (results,
+  ordering, errors, progress, checkpoint, timeout on sized inputs).
+  They run against the new engine unmodified — that suite is the
+  primary regression net.</li>
+</ul>
+<h2 id="test-plan">Test plan<a class="headerlink" href="#test-plan" title="Permanent link">&para;</a></h2>
+<p>New tests, each naming the production bug it prevents:</p>
+<ul>
+<li>plain collected map source-lead bound (sync + async): no <code>max_errors</code>,
+  generator input — source never more than <code>window</code> ahead of
+  completions. <em>Prevents: silent return of upfront materialization.</em></li>
+<li><code>batch_size=None</code> does not materialize: workers blocked, produced
+  count stays ≤ default window. <em>Prevents: regression to
+  <code>list(items)</code>.</em></li>
+<li>timeout + unsized input (sync + async): result shorter,
+  <code>timed_out=True</code>, source consumption stops at the stop. <em>Prevents:
+  drain-on-timeout returning; silent truncation.</em></li>
+<li>timeout + sized input on the plain path: every slot filled by count,
+  <code>timed_out=True</code>. <em>Prevents: <code>_PENDING</code> leak through the constructor
+  guard.</em></li>
+<li><code>timeout=0</code> plain path, sync + async: zero tasks run. <em>Prevents: the
+  asyncio.timeout first-suspension gap reopening on the plain path.</em></li>
+<li>D7 status: <code>timed_out</code>/<code>aborted</code> set by windowed sync, windowed
+  async, and sequential engines; both default False on a clean run and
+  on manual construction. <em>Prevents: the empty-window unsized-timeout
+  result masquerading as complete.</em></li>
+<li>source iterator raises mid-run: exception propagates, sync cancels
+  queued futures / async cancels tasks, no hang. <em>Prevents: a wedged
+  pool on poison input.</em> (Assertions match the per-runtime contract in
+  behavior change 4 — no sync assertion may require interrupting a
+  running thread.)</li>
+<li>deadline-beats-pacing on the plain path (port of the v0.5 repro
+  without <code>max_errors</code>). <em>Prevents: the bypassed-timeout bug returning
+  through the routing change.</em></li>
+<li>starmap laziness (sync): generator of tuples, blocked workers,
+  bounded consumption; sized tuple list keeps exact progress total.
+  <em>Prevents: the packing list-comp returning.</em></li>
+<li>benchmark script (throwaway, not committed as a test) — results
+  recorded in the amendments log.</li>
+</ul>
+<p>Removed/updated tests are individually justified in the amendments log
+(<code>test_lazy_input_remainder_marked</code> already listed under R2).</p>
+<h2 id="phases">Phases<a class="headerlink" href="#phases" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Work</th>
+<th>Commit gate</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Benchmark harness; baseline numbers on the barrier path; window-default decision for sized unconstrained inputs</td>
+<td>numbers + decision recorded below</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Sync unification: generalize <code>_collected_map</code>, route <code>parallel_map</code>, delete barrier loop; lazy starmap delegation; D7 on <code>ParallelResult</code> (all engines); gated mid-fill sweep; new sync tests</td>
+<td>full suite green; benchmark within target</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Async unification: generalize <code>_async_collected_map</code>, route <code>async_parallel_map</code>, delete <code>_consume</code>/<code>except*</code> unwrap; rewrite <code>test_lazy_input_remainder_marked</code>; new async tests</td>
+<td>full suite green</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Delete dead <code>_plan.py</code> machinery; docs sweep — docstrings (incl. <code>core.py</code> "total … when batch_size is set" qualifier, <code>aio.py</code> drain sentence), <code>docs/api-reference/core.md</code> (the "not the chunked meaning of the plain collected path" passage becomes false), <code>docs/api-reference/async.md</code>, <code>docs/getting-started/quickstart.md</code>, <code>docs/user-guide/advanced-features.md</code>, <code>best-practices.md</code>, <code>real-world-patterns.md</code>, <code>README.md</code>, roadmap</td>
+<td><code>mkdocs --strict</code>, examples run, grep for barrier/chunk prose comes back clean</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Review cycle (four-review: Codex, Codex adversarial, code review, adversarial design review) + merge gates</td>
+<td>all findings triaged here</td>
+</tr>
+</tbody>
+</table>
+<p>Each phase is its own commit on a <code>v0.6-engine-unification</code> branch.
+Gates before merge: <code>uv run pytest -q</code>, <code>uv run ruff check</code> + <code>format
+--check</code>, <code>uv run mypy pyarallel tests/typing_assertions.py</code>,
+<code>uv run mkdocs build --strict</code>, all examples run.</p>
+<h2 id="explicitly-out-of-scope">Explicitly out of scope<a class="headerlink" href="#explicitly-out-of-scope" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Free-threaded CI and <code>executor="interpreter"</code> (separate v0.6 items).</li>
+<li><code>max_errors</code>/<code>checkpoint</code> parameters on the starmap surfaces.</li>
+<li>Any change to streaming, decorator, limiter, or checkpoint code.</li>
+<li>Version bump / release (v0.5.0 is still unpublished; versioning is a
+  release-time decision).</li>
+</ul>
+<hr />
+<h2 id="review-amendments-log">Review amendments log<a class="headerlink" href="#review-amendments-log" title="Permanent link">&para;</a></h2>
+<h3 id="round-1-pre-implementation-plan-review-2026-07-06">Round 1 — pre-implementation plan review (2026-07-06)<a class="headerlink" href="#round-1-pre-implementation-plan-review-2026-07-06" title="Permanent link">&para;</a></h3>
+<p>Reviewers: Codex adversarial (working tree), independent fact-check
+review (Opus), adversarial design review (Sonnet). Verdicts:
+needs-attention / not implementable as written / proceed with
+amendments. All dispositions below are reflected in the body above.</p>
+<p><strong>Fixed in plan:</strong></p>
+<ol>
+<li><em>(Codex high / design-review-adjacent)</em> Sync <code>parallel_starmap</code>
+   materializes input via <code>packed = [(fn, args) for args in items]</code>
+   before the engine sees it — D6's "unchanged, inherits the engine"
+   was false for a public surface. → Lazy delegation via module-level
+   <code>_apply_star</code> partial; D6 rewritten; starmap laziness tests added.</li>
+<li><em>(Codex high)</em> "In-flight work is cancelled" on source error is
+   impossible for sync threads. → Behavior change 4 split by runtime,
+   matching the v0.5 honesty wording; test assertions constrained
+   accordingly.</li>
+<li><em>(Codex medium + fact-check high)</em> R2's "no existing test pins
+   unsized-timeout drain" was false:
+   <code>test_parity.py::test_lazy_input_remainder_marked</code> asserts
+   <code>len(result) == 6</code> from post-timeout draining. → R2 corrected; test
+   listed for rewrite in Phase 3.</li>
+<li><em>(Design review high)</em> Silent-truncation hole: timeout firing on an
+   empty in-flight window with unsized input returns only successes,
+   <code>ok=True</code>. → D7 added: <code>ParallelResult.timed_out</code>/<code>.aborted</code>, set by
+   all three collected engines; edge case and tests added. The one
+   scope addition of the plan.</li>
+<li><em>(Design review high)</em> The eager→windowed shift for the default
+   no-kwargs sized call was an unnamed behavior change buried in
+   "window size unchanged". → Named as behavior change 5; Phase 1
+   benchmark gains the cheap-real-function sized-list case; sized-input
+   window-scaling fallback (window = total, same engine) pre-designed,
+   decided on Phase 1 data.</li>
+<li><em>(Design review medium)</em> Unconditional mid-fill absorb sweep is a
+   hot-path tax whose purposes (mid-fill abort, paced progress) are
+   inactive without <code>max_errors</code>/limiter. → Gated on
+   <code>max_errors is not None or bucket is not None</code>.</li>
+<li><em>(Fact-check medium)</em> D5's "observable contract unchanged"
+   understated real changes: callback exceptions on the async plain
+   path lose their ExceptionGroup wrapper; sync escape switches
+   drain→cancel shutdown. → D5 rewritten to name both; changelog item 6
+   added.</li>
+<li><em>(Fact-check medium)</em> Phase 4 doc list missed
+   <code>docs/api-reference/core.md</code> (whose <code>max_errors</code>-vs-plain-path
+   passage becomes actively false), <code>api-reference/async.md</code>, and
+   <code>getting-started/quickstart.md</code>, plus two load-bearing docstring
+   sentences. → Phase 4 list expanded with the specific passages; gate
+   extended with a barrier/chunk-prose grep.</li>
+<li><em>(Fact-check low)</em> Empty input + <code>checkpoint=</code> now creates the
+   checkpoint file (windowed engine opens the store before discovering
+   emptiness; barrier path returned first). → Recorded as intended in
+   edge cases.</li>
+<li><em>(Design review low ×2)</em> D4 progress-bar reads 100% throughout on
+    generators; D2 moves source-failure timing after side effects may
+    have fired. → Both get explicit docs callouts (D2/D4 text).</li>
+<li><em>(Design review low)</em> R1 named neither the mechanism nor why 2× —
+    → R1 rewritten: waiter-re-registration churn named, third benchmark
+    case added.</li>
+</ol>
+<p><strong>Accepted, no action:</strong></p>
+<ul>
+<li><em>(Design review)</em> Benchmark-first sequencing, four-review Phase 5
+  proportionality, keeping streaming/collected loops separate, and the
+  breaking-change set being one conceptual fix plus its entailed
+  consequences — all endorsed as-is.</li>
+<li><em>(Fact-check)</em> Delete/keep helper lists verified clean;
+  cached-items-don't-occupy-window verified; no starmap or progress
+  test depends on barrier timing; sized-input timeout and <code>timeout=0</code>
+  tests remain green under the windowed path.</li>
+</ul>
+<h3 id="phase-1-results-benchmark-2026-07-06">Phase 1 results — benchmark (2026-07-06)<a class="headerlink" href="#phase-1-results-benchmark-2026-07-06" title="Permanent link">&para;</a></h3>
+<p>Environment: darwin arm64, 10 cores, Python 3.12.8; default thread
+workers = 14 → default window 28. Method: the windowed engine measured
+via the existing <code>max_errors=10**9</code> routing (never triggers);
+<code>window=total</code> simulated with <code>batch_size=len(items)</code> on top. Median of
+3 runs (2 for process). The windowed numbers include the mid-fill
+absorb sweep that Phase 2 gates off — they are the pessimistic bound.</p>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>eager (barrier)</th>
+<th>windowed 2×workers</th>
+<th>windowed window=total</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(a) no-op ×100k, thread</td>
+<td>1021 ms</td>
+<td>1772 ms (<strong>1.74×</strong>)</td>
+<td>5595 ms (5.5×)</td>
+</tr>
+<tr>
+<td>(b) sleep(1ms) ×20k, thread</td>
+<td>1923 ms</td>
+<td>1811 ms (<strong>0.94×</strong>)</td>
+<td>12967 ms (6.7×)</td>
+</tr>
+<tr>
+<td>(c) dict transform ×100k, thread</td>
+<td>1364 ms</td>
+<td>1823 ms (<strong>1.34×</strong>)</td>
+<td>5722 ms (4.2×)</td>
+</tr>
+<tr>
+<td>(a′) no-op ×10k, process, workers=4</td>
+<td>839 ms</td>
+<td>1063 ms (<strong>1.27×</strong>)</td>
+<td>60459 ms (72×)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>R1 gate: passed.</strong> Parity (actually faster) on the 1ms niche
+workload; 1.27–1.74× on degenerate micro-tasks, inside the ≤2× budget.</p>
+<p><strong>Window-default decision: keep <code>2 × workers</code> everywhere; the
+window=total fallback is rejected — refuted by its own benchmark.</strong>
+Mechanism: <code>concurrent.futures.wait()</code> re-registers a waiter on every
+in-flight future per wake, and the (currently ungated) mid-fill sweep
+scans the in-flight set per admission — with window = N both go
+O(N²). The small window is what keeps the driver loop cheap; it is the
+design, not a compromise. The 72× process-pool number is the same
+effect amplified by pickling every pending work item into the pool
+upfront.</p>
+<h3 id="round-2-pre-merge-review-of-the-branch-2026-07-06">Round 2 — pre-merge review of the branch (2026-07-06)<a class="headerlink" href="#round-2-pre-merge-review-of-the-branch-2026-07-06" title="Permanent link">&para;</a></h3>
+<p>Reviewers: Codex review, Codex adversarial, independent code review
+(Opus), adversarial design review (Sonnet) — all against the full
+branch diff. Verdicts: needs-attention ×2 / merge-ready /
+merge-with-amendments. All Round-1 amendments were independently
+verified as implemented (letter and spirit).</p>
+<p><strong>Fixed:</strong></p>
+<ol>
+<li><em>(Codex adversarial high — reproduced: 275ms elapsed on a 50ms
+   timeout, ok=True)</em> Cached checkpoint hits bypass <code>timeout=</code>: the
+   cached-admission loop pulls from the source and runs lookups without
+   ever reaching a wait, so a checkpoint-heavy run overruns the
+   deadline and reports a clean success. → Deadline check at the top of
+   <code>_submit_next</code> in both engines (async gets a monotonic mirror of the
+   <code>asyncio.timeout</code> deadline, which cannot preempt synchronous code);
+   regression tests with a slow <code>checkpoint_key</code> on both runtimes.</li>
+<li><em>(Codex adversarial high — reproduced: exception at 0ms, side
+   effects landing 300ms later; fix attempted, then REJECTED)</em> Sync
+   driver-side errors (source, checkpoint write, progress callback)
+   return while admitted tasks keep mutating state in the background.
+   The proposed settle-before-raise shutdown was implemented and
+   immediately failed the v0.5-mandated regression test
+   <code>test_poison_source_with_slow_tasks_raises_promptly</code> — the two
+   reviews demand opposite contracts. Resolution: promptness stands
+   (one hung task must not block the error from ever surfacing, and
+   every other stop in the library is cancel-and-return); the
+   background-completion hazard is now documented loudly in the
+   <code>parallel_map</code> docstring with the <code>list(items)</code>-first mitigation,
+   and recorded as behavior change 4 + a changelog entry.</li>
+<li><em>(Codex review P2)</em> A <code>TimeoutError</code> raised by the source iterable
+   itself was repackaged as deadline expiry by the async engine's broad
+   <code>except TimeoutError</code> (AssertionError with <code>timeout=None</code>, fabricated
+   timed-out result otherwise). → Handler scoped to real expiry via
+   <code>asyncio.timeout</code>'s <code>scope.expired()</code>; propagation test for both
+   timeout=None and timeout-set.</li>
+<li><em>(Design review medium + code review low — same finding)</em> With
+   <code>timeout=</code> and <code>max_errors=</code> both live, a mid-fill abort fell
+   through to the blocking wait: the abort was delayed by a task
+   completion, and a deadline expiry in that window set both flags and
+   marked would-be-<code>Aborted</code> slots as <code>TimeoutError</code>. → Early
+   <code>break</code> on abort after the admit loop; flags made exclusive at
+   construction in both engines (<code>aborted and not timed_out</code> — first
+   stop reason wins, also covering the async timeout-salvage flip);
+   documented in <code>ParallelResult</code>; exclusivity test added.</li>
+<li><em>(Design review medium)</em> <code>ParallelResult.__repr__</code> hid
+   <code>timed_out</code>/<code>aborted</code> — the all-successes truncation printed
+   identically to a complete run. → Flags appear in the repr; tests.</li>
+<li><em>(Design review high)</em> Stale <code>asyncio.TaskGroup</code> claims on the two
+   most-read pages (<code>api-reference/async.md</code> intro, <code>docs/index.md</code>)
+   and stale roadmap Current-section lines ("chunking for collected
+   maps", "via asyncio.TaskGroup"). → All rewritten.</li>
+<li><em>(Design review high)</em> No user-facing changelog for the named
+   behavior changes — they lived only in this plan. → <code>CHANGELOG.md</code>
+   created (Unreleased v0.6 section, plus 0.5.0/0.4.0 records).</li>
+<li><em>(Code review low)</em> The freshly-written "progress bar reads 100% on
+   every tick" claim was false — <code>total</code> counts items <em>admitted</em> (one
+   window ahead), so the ratio hovers below 100% and is non-monotonic.
+   → Reworded at all four sites (both docstrings, advanced-features,
+   async.md); D4's rationale stands corrected here.</li>
+</ol>
+<p><strong>Accepted, no action:</strong></p>
+<ul>
+<li><em>(Design review low)</em> <code>_plan.py</code> could fold into <code>result.py</code> — kept
+  as-is: it is genuinely shared bookkeeping between the two runtime
+  modules; folding saves a file, not complexity.</li>
+<li><em>(Design review low)</em> Duplicated sync/async docstring prose —
+  inherent to the intentionally separate surfaces (DevX principle 2).</li>
+<li>Streaming keeps cancel-and-return on generator close and source
+  errors (consumer-driven stops; promptness is the documented
+  contract there).</li>
+<li>The abort/deadline race fixed in (4) could not be pinned with a
+  deterministic test (needs a mid-fill completion racing a deadline);
+  the exclusivity guarantee is enforced structurally at construction
+  and asserted by the timeout+max_errors engine tests.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.60a45f97.min.js"></script>
+      
+    
+  </body>
+</html>

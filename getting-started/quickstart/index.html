@@ -403,9 +403,27 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#batching" class="md-nav__link">
+  <a href="#shared-quota-and-429s" class="md-nav__link">
     <span class="md-ellipsis">
-      Batching
+      Shared Quota and 429s
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resumable-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resumable Runs
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-admission-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      The Admission Window
     </span>
   </a>
   
@@ -783,6 +801,69 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.5.0/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.5.0 Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.6-engine-unification/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Engine Unification Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.6-ledger-refactor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Ledger Refactor Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -862,9 +943,27 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#batching" class="md-nav__link">
+  <a href="#shared-quota-and-429s" class="md-nav__link">
     <span class="md-ellipsis">
-      Batching
+      Shared Quota and 429s
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resumable-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Resumable Runs
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-admission-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      The Admission Window
     </span>
   </a>
   
@@ -949,7 +1048,14 @@
 
 <span class="c1"># Parallel call — returns ParallelResult</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">([</span><span class="s2">&quot;http://a.com&quot;</span><span class="p">,</span> <span class="s2">&quot;http://b.com&quot;</span><span class="p">])</span>
+
+<span class="c1"># Decorator args are defaults — any call can override them</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>
 </code></pre></div>
+<p>It works on instance and static methods too (descriptor protocol), and
+the async twin <code>@async_parallel</code> follows the same pattern — see the
+<a href="../../api-reference/core/#parallel">API reference</a> for both. Plain
+<code>parallel_map(scraper.fetch, urls)</code> with a bound method also just works.</p>
 <h2 id="cpu-bound-work">CPU-Bound Work<a class="headerlink" href="#cpu-bound-work" title="Permanent link">&para;</a></h2>
 <p>Use <code>executor="process"</code> for CPU-intensive tasks:</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">crunch</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
@@ -983,14 +1089,36 @@
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
                        <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="ne">ConnectionError</span><span class="p">,</span> <span class="ne">TimeoutError</span><span class="p">)))</span>
 </code></pre></div>
-<h2 id="batching">Batching<a class="headerlink" href="#batching" title="Permanent link">&para;</a></h2>
-<p>Control memory for large datasets — process in chunks:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Without batching: 500K futures in memory at once</span>
-<span class="c1"># With batching: only 500 at a time</span>
+<h2 id="shared-quota-and-429s">Shared Quota and 429s<a class="headerlink" href="#shared-quota-and-429s" title="Permanent link">&para;</a></h2>
+<p>When several calls spend one API key's budget, share a <code>Limiter</code> — and let
+<code>Retry-After</code> drive the backoff:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">Limiter</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">Retry</span>
+
+<span class="n">limiter</span> <span class="o">=</span> <span class="n">Limiter</span><span class="p">(</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+    <span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span>
+    <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">,</span>   <span class="c1"># same instance across calls = one budget</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">attempts</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">wait_from</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="s2">&quot;retry_after&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)),</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>See <a href="../../user-guide/advanced-features/#shared-rate-limits-and-burst">Advanced Features</a>.</p>
+<h2 id="resumable-runs">Resumable Runs<a class="headerlink" href="#resumable-runs" title="Permanent link">&para;</a></h2>
+<p>Long job? One argument makes it crash-safe:</p>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">embed</span><span class="p">,</span> <span class="n">chunks</span><span class="p">,</span> <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;run.ckpt&quot;</span><span class="p">)</span>
+<span class="c1"># rerun the same line after a crash — completed items load from disk</span>
+</code></pre></div>
+<p>See <a href="../../user-guide/advanced-features/#checkpoint-resume">Checkpoint / Resume</a>.</p>
+<h2 id="the-admission-window">The Admission Window<a class="headerlink" href="#the-admission-window" title="Permanent link">&para;</a></h2>
+<p>Memory is bounded by default: at most <code>2 × workers</code> items are submitted
+but unresolved at any moment, and input — generators included — is
+consumed lazily, one window ahead. <code>batch_size</code> overrides the window
+when you want more lookahead:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Up to 500 items in flight instead of the default 2 x workers</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">huge_list</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
 </code></pre></div>
-<p>For unsized iterables such as generators, <code>batch_size</code> also keeps input
-consumption lazy one batch at a time.</p>
+<p>There are no chunks and no barriers — a slow item never stalls the
+items behind it.</p>
 <h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
 <p>Errors are never silently lost. <code>ParallelResult</code> gives you structured access:</p>
 <div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>

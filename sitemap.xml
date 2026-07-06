@@ -2,50 +2,62 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/api-reference/async/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/api-reference/core/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/api-reference/rate-limiting/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/CONTRIBUTING/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/devx-principles/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/roadmap/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/development/plans/v0.5.0/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/development/plans/v0.6-engine-unification/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/development/plans/v0.6-ledger-refactor/</loc>
+         <lastmod>2026-07-06</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/getting-started/installation/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/getting-started/quickstart/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/user-guide/advanced-features/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/user-guide/best-practices/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/user-guide/real-world-patterns/</loc>
-         <lastmod>2026-04-13</lastmod>
+         <lastmod>2026-07-06</lastmod>
     </url>
 </urlset>

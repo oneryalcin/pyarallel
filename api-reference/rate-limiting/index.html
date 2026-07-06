@@ -588,22 +588,22 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Basic Usage">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#with-ratelimit-object" class="md-nav__link">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sharing-one-budget-limiter" class="md-nav__link">
     <span class="md-ellipsis">
-      With RateLimit Object
+      Sharing One Budget: Limiter
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Sharing One Budget: Limiter">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#shorthand-ops-per-second" class="md-nav__link">
+  <a href="#server-mandated-holds-pause" class="md-nav__link">
     <span class="md-ellipsis">
-      Shorthand (ops per second)
+      Server-Mandated Holds: pause()
     </span>
   </a>
   
@@ -618,24 +618,6 @@
   <a href="#how-it-works" class="md-nav__link">
     <span class="md-ellipsis">
       How It Works
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#with-the-decorator" class="md-nav__link">
-    <span class="md-ellipsis">
-      With the Decorator
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#tips" class="md-nav__link">
-    <span class="md-ellipsis">
-      Tips
     </span>
   </a>
   
@@ -762,6 +744,69 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.5.0/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.5.0 Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.6-engine-unification/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Engine Unification Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.6-ledger-refactor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    v0.6 Ledger Refactor Plan
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -802,22 +847,22 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Basic Usage">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#with-ratelimit-object" class="md-nav__link">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sharing-one-budget-limiter" class="md-nav__link">
     <span class="md-ellipsis">
-      With RateLimit Object
+      Sharing One Budget: Limiter
     </span>
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Sharing One Budget: Limiter">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#shorthand-ops-per-second" class="md-nav__link">
+  <a href="#server-mandated-holds-pause" class="md-nav__link">
     <span class="md-ellipsis">
-      Shorthand (ops per second)
+      Server-Mandated Holds: pause()
     </span>
   </a>
   
@@ -832,24 +877,6 @@
   <a href="#how-it-works" class="md-nav__link">
     <span class="md-ellipsis">
       How It Works
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#with-the-decorator" class="md-nav__link">
-    <span class="md-ellipsis">
-      With the Decorator
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#tips" class="md-nav__link">
-    <span class="md-ellipsis">
-      Tips
     </span>
   </a>
   
@@ -874,50 +901,78 @@
 
 
 <h1 id="rate-limiting">Rate Limiting<a class="headerlink" href="#rate-limiting" title="Permanent link">&para;</a></h1>
-<p>Pyarallel includes a token-bucket rate limiter for controlling execution rates.</p>
+<p>Pyarallel separates rate limiting into a <strong>spec</strong> and a <strong>runtime</strong>:</p>
+<ul>
+<li><code>RateLimit(count, per, burst)</code> — the immutable spec. Passing it (or a plain
+  number) to an entry point creates a private limiter for that call.</li>
+<li><code>Limiter(rate_limit)</code> — the shareable runtime. Pass the same instance to
+  multiple calls and functions to draw from <strong>one budget</strong> — the right model
+  when a quota belongs to an API key rather than to a single operation.</li>
+</ul>
 <h2 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h2>
-<h3 id="with-ratelimit-object">With <code>RateLimit</code> Object<a class="headerlink" href="#with-ratelimit-object" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span>
 
-<span class="c1"># 100 operations per minute</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
-                       <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>  <span class="c1"># shorthand: 10/second</span>
 
-<span class="c1"># 1000 per hour</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span>
-                       <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">1000</span><span class="p">,</span> <span class="s2">&quot;hour&quot;</span><span class="p">))</span>
+<span class="c1"># burst: how many calls may fire immediately before the sustained rate</span>
+<span class="c1"># applies. Default 1 = smooth, even pacing (safest against secondary</span>
+<span class="c1"># per-second limits); raise it when the quota genuinely allows bursts.</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span>
+                       <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">,</span> <span class="n">burst</span><span class="o">=</span><span class="mi">20</span><span class="p">))</span>
 </code></pre></div>
-<h3 id="shorthand-ops-per-second">Shorthand (ops per second)<a class="headerlink" href="#shorthand-ops-per-second" title="Permanent link">&para;</a></h3>
-<p>Pass a number for simple per-second limits:</p>
-<div class="highlight"><pre><span></span><code><span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>  <span class="c1"># 10 per second</span>
+<p>The <code>RateLimit</code> parameter table lives in the
+<a href="../core/#ratelimit">core reference</a>.</p>
+<h2 id="sharing-one-budget-limiter">Sharing One Budget: <code>Limiter</code><a class="headerlink" href="#sharing-one-budget-limiter" title="Permanent link">&para;</a></h2>
+<p>Real quotas are per API key, not per call. A <code>RateLimit</code> passed directly
+creates a fresh limiter each call — two concurrent maps would each think
+they own the full quota. Share a <code>Limiter</code> instead:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">Limiter</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">parallel_map</span>
+
+<span class="n">limiter</span> <span class="o">=</span> <span class="n">Limiter</span><span class="p">(</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
+
+<span class="n">users</span>  <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch_user</span><span class="p">,</span>  <span class="n">user_ids</span><span class="p">,</span>  <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">)</span>
+<span class="n">orders</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch_order</span><span class="p">,</span> <span class="n">order_ids</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">)</span>  <span class="c1"># same quota</span>
 </code></pre></div>
+<p>One <code>Limiter</code> instance may be used from many threads <strong>and</strong> event loops at
+once — the same object works across <code>parallel_map</code> and <code>async_parallel_map</code>
+concurrently.</p>
+<h3 id="server-mandated-holds-pause">Server-Mandated Holds: <code>pause()</code><a class="headerlink" href="#server-mandated-holds-pause" title="Permanent link">&para;</a></h3>
+<p><code>Limiter.pause(seconds)</code> holds all slots until the deadline passes — including
+callers already sleeping toward a slot, who re-check on wake and honor the
+hold. You rarely call it yourself — <code>Retry(wait_from=...)</code> calls it
+automatically when a task hits a 429 (see <a href="../core/">Retry</a>), so one task's
+throttle signal slows the whole pool. Concurrent pauses don't stack; the
+furthest deadline wins. The pause also empties the bucket: traffic resumes
+with one call at the deadline and the rest at the refill pace, never a burst
+into a server that just said stop.</p>
 <h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
-<p>Rate limiting uses a <strong>token bucket</strong> algorithm:</p>
+<p>Rate limiting uses a <strong>token bucket</strong> with commit-at-grant acquisition:</p>
 <ol>
-<li>Each operation claims a time-slot</li>
-<li>Slots are spaced at <code>1 / rate_per_second</code> intervals</li>
-<li>If a slot is in the future, the caller sleeps until that slot</li>
-<li>Thread-safe — the lock is held only for bookkeeping, never during sleep</li>
+<li>The bucket holds up to <code>burst</code> tokens and refills at the spec's rate</li>
+<li>A caller consumes a token only at the moment it is granted; a caller
+   that gives up while waiting (timeout, cancellation) consumes nothing —
+   abandoned waits never leak capacity</li>
+<li>Sleeping callers re-check shared state when they wake, so a <code>pause()</code>
+   issued mid-sleep is honored, never bypassed</li>
+<li>Refill is capped at <code>burst</code> — idle time never accumulates more than one
+   burst of credit</li>
+<li>Thread-safe and event-loop-safe — the lock is held only for bookkeeping,
+   never while sleeping. Waiters are not queued FIFO; under heavy contention
+   grant order is not guaranteed, only the aggregate rate</li>
+<li>With <code>retry=</code>, every retry attempt draws a fresh token — retries are API
+   calls too and never bypass the limiter (exception: <code>executor="process"</code>
+   workers can't share the parent's limiter, so their retries pace only by
+   backoff)</li>
 </ol>
-<p>For the async API, an equivalent <code>asyncio.Lock</code>-based bucket is used with <code>asyncio.sleep</code>.</p>
-<h2 id="with-the-decorator">With the Decorator<a class="headerlink" href="#with-the-decorator" title="Permanent link">&para;</a></h2>
-<p>Set a default rate limit, override per-call:</p>
-<div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">call_api</span><span class="p">(</span><span class="n">item_id</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">api</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">item_id</span><span class="p">)</span>
-
-<span class="c1"># Uses default rate limit</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">call_api</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
-
-<span class="c1"># Override for this call</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">call_api</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">ids</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">500</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
-</code></pre></div>
-<h2 id="tips">Tips<a class="headerlink" href="#tips" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Leave buffer</strong> below actual API limits (use 90% of the limit)</li>
-<li><strong>Rate limiting is at submission time</strong> (sync) — items are submitted to the pool at the controlled rate</li>
-<li><strong>Rate limiting is at execution time</strong> (async) — tasks acquire the rate token inside the semaphore</li>
-</ul>
+<p>Two implementation notes worth knowing: rate limiting applies at
+<strong>submission time</strong> for sync (items enter the pool at the controlled
+rate) and at <strong>execution time</strong> for async (tasks acquire the token
+inside the semaphore). Decorated functions take <code>rate_limit=</code> as a
+default and per-call override like every other option.</p>
+<p>For guidance — headroom below the documented limit, when to share a
+<code>Limiter</code>, burst discipline — see
+<a href="../../user-guide/best-practices/#rate-limiting">Best Practices</a>.</p>
 
 
 
