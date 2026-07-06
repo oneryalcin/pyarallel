@@ -172,8 +172,19 @@ class TestAsyncTotalTimeout:
             assert isinstance(exc, TimeoutError)
             assert "did not complete within" in str(exc)  # sync parity text
 
-    async def test_lazy_input_remainder_marked(self):
+    async def test_lazy_input_timeout_returns_shorter_result(self):
+        """v0.6 no-drain contract (rewritten from the v0.5 drain
+        behavior): the source is never consumed after the deadline, so
+        an unsized input yields a shorter result with ``timed_out`` set
+        — not drained-and-appended placeholders."""
         import asyncio
+
+        produced = []
+
+        def items():
+            for i in range(1000):
+                produced.append(i)
+                yield i
 
         async def hang(x):
             await asyncio.sleep(10)
@@ -181,12 +192,14 @@ class TestAsyncTotalTimeout:
 
         result = await async_parallel_map(
             hang,
-            (i for i in range(6)),
+            items(),
             concurrency=2,
             batch_size=2,
             timeout=0.3,
         )
-        assert len(result) == 6  # unseen lazy input appended as failures
+        assert result.timed_out
+        assert len(result) < 1000  # no placeholder drain
+        assert len(produced) <= 4  # consumption stopped at the window
         assert all(isinstance(e, TimeoutError) for _, e in result.failures())
 
     async def test_timeout_with_max_errors_marks_timeout_not_aborted(self):
@@ -266,14 +279,19 @@ class TestContextvarPropagation:
             _request_id.reset(token)
 
     def test_process_executor_documented_skip_does_not_crash(self):
-        """Contexts don't pickle — process workers see the default value,
-        and nothing blows up."""
+        """Contexts don't pickle, so pyarallel makes no per-item
+        propagation promise for process workers — and nothing blows up.
+        What a worker actually sees is platform-dependent: fresh default
+        under spawn (macOS/Windows), the fork-time snapshot under fork
+        (Linux) — either way it is the OS start method talking, not
+        per-item propagation."""
         token = _request_id.set("not-propagated")
         try:
             result = parallel_map(
                 _read_request_id, range(2), workers=2, executor="process"
             )
-            assert list(result) == ["unset", "unset"]
+            assert result.ok
+            assert all(v in ("unset", "not-propagated") for v in result)
         finally:
             _request_id.reset(token)
 

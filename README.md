@@ -90,8 +90,9 @@ pip install pyarallel
 - **Server-driven backoff** — honor 429 + `Retry-After`: `retry=Retry(retry_if=..., wait_from=...)`; the wait also pauses the shared limiter so one throttled task slows the whole pool
 - **Checkpoint/resume** — `checkpoint="run.ckpt"`: a crash at item 40,000 resumes instead of restarting from zero; `checkpoint_key=lambda u: u.id` keys rows by identity so evolving inputs keep completed work
 - **Early abort** — `max_errors=10`: a dead API costs tens of calls, not thousands; unrun items are marked `Aborted`, partial results returned
-- **Streaming** — sliding-window `parallel_iter` / `async_parallel_iter`: bounded in-flight window, lazy input, no batch barriers, `ordered=True` for input-order yields, per-item `attempts`/`duration`
-- **Structured errors** — `ParallelResult` with `.ok`, `.ok_values()`, `.successes()`, `.failures()`, `.raise_on_failure()`
+- **One windowed engine** — every API (collected and streaming, sync and async) admits work through a bounded in-flight window: lazy input, generators never materialized, no batch barriers, a straggler never stalls the items behind it
+- **Streaming** — `parallel_iter` / `async_parallel_iter`: `ordered=True` for input-order yields, per-item `attempts`/`duration`
+- **Structured errors** — `ParallelResult` with `.ok`, `.ok_values()`, `.successes()`, `.failures()`, `.raise_on_failure()`, plus `.timed_out`/`.aborted` for how the run ended
 - **Timeouts** — total wall-clock on sync *and* async (`timeout=30.0`), per-task in async (`task_timeout=5.0`)
 - **Debug mode** — `sequential=True` runs inline: no pool, real stack traces, working breakpoints
 - **Progress callbacks** — `on_progress=lambda done, total: print(f"{done}/{total}")` on collected and streaming APIs

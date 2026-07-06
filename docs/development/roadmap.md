@@ -28,7 +28,7 @@ decisively better than hand-rolling for API fan-out?*
   in-flight window, lazy input, no batch barriers; `ordered=True` for
   input-order yields with a window-bounded reorder buffer
 - `@parallel` and `@async_parallel` decorators — preserve function signature *and types*; per-call options typed once per engine via `Unpack[TypedDict]`
-- Full async support via `asyncio.TaskGroup`
+- Full async support (`asyncio.wait`-driven windowed engine)
 - `ParallelResult` with structured error handling (`ExceptionGroup`), `ok_values()` for the partial-failure path
 - `ItemResult.attempts` / `.duration` — per-item accounting on the streaming APIs
 - `RateLimit` — token-bucket spec with `burst` capacity
@@ -39,7 +39,7 @@ decisively better than hand-rolling for API fan-out?*
 - `sequential=True` — debug mode: run inline, no pool, real stack traces
 - Contextvars propagate into thread workers (correlation IDs survive)
 - `worker_init=` / `max_tasks_per_worker=` — worker lifecycle control
-- `batch_size` — in-flight window for streaming; chunking for collected maps
+- `batch_size` — the in-flight admission window, one meaning across every API (v0.6)
 - Progress callbacks via `on_progress` (collected and streaming)
 - Timeout support (`timeout` total on sync *and* async, `task_timeout` async per-task)
 - Instance method support via descriptor protocol
@@ -171,12 +171,16 @@ positioned as the ergonomic layer over it. Cheap to verify, real story to tell.
 Python 3.14's `InterpreterPoolExecutor` (PEP 734) as a third executor —
 near-pass-through implementation, guarded by version check.
 
-### Collected-map engine unification
+### Collected-map engine unification *(done — on `v0.6-engine-unification`)*
 
-The plain collected path still batches with a barrier while the
-`max_errors` path admits through a window (documented coupling, flagged
-in the v0.5 design review). Unify collected maps onto the windowed
-engine so `batch_size` means one thing everywhere.
+The plain collected path batched with a barrier while the `max_errors`
+path admitted through a window (documented coupling, flagged in the
+v0.5 design review). Now unified: every non-sequential path runs
+through one windowed engine, `batch_size` means one thing everywhere
+(the in-flight admission window), input is always lazy, the source is
+never drained after a stop, and `ParallelResult.timed_out`/`.aborted`
+report how a run ended. Contract and review history:
+[v0.6 Engine Unification Plan](plans/v0.6-engine-unification.md).
 
 ---
 

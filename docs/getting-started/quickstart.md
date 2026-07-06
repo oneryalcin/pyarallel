@@ -119,18 +119,20 @@ result = parallel_map(embed, chunks, checkpoint="run.ckpt")
 
 See [Checkpoint / Resume](../user-guide/advanced-features.md#checkpoint-resume).
 
-## Batching
+## The Admission Window
 
-Control memory for large datasets — process in chunks:
+Memory is bounded by default: at most `2 × workers` items are submitted
+but unresolved at any moment, and input — generators included — is
+consumed lazily, one window ahead. `batch_size` overrides the window
+when you want more lookahead:
 
 ```python
-# Without batching: 500K futures in memory at once
-# With batching: only 500 at a time
+# Up to 500 items in flight instead of the default 2 x workers
 results = parallel_map(process, huge_list, workers=8, batch_size=500)
 ```
 
-For unsized iterables such as generators, `batch_size` also keeps input
-consumption lazy one batch at a time.
+There are no chunks and no barriers — a slow item never stalls the
+items behind it.
 
 ## Error Handling
 

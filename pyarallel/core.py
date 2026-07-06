@@ -18,16 +18,13 @@ from concurrent.futures import (
     Future,
     ProcessPoolExecutor,
     ThreadPoolExecutor,
-    as_completed,
     wait,
 )
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
 from ._plan import (
-    _append_timeout_failures,
     _mark_timeout_indices,
-    _plan_collected_map,
     _progress_total,
     _timeout_failure,
     _total_if_known,
@@ -315,15 +312,22 @@ def parallel_map[T, R](
         rate_limit: ``RateLimit`` spec, a plain number (ops per second), or
             a shared ``Limiter`` instance to draw from one budget across
             multiple calls.
-        timeout: Total wall-clock timeout in seconds for the whole operation.
+        timeout: Total wall-clock timeout in seconds for the whole
+            operation. On expiry the result's ``timed_out`` flag is set;
+            unfinished sized slots are marked with ``TimeoutError``,
+            while unsized inputs return a shorter result — the source is
+            never drained after a stop.
         on_progress: ``callback(completed, total)`` fired after each task.
-            When ``items`` has no known length and ``batch_size`` is set,
-            ``total`` is the number of items seen so far rather than the
-            final input size.
-        batch_size: Process items in chunks of this size. With ``batch_size``
-            set, unsized iterables (for example generators) are consumed
-            lazily one batch at a time. Without batching, all items are
-            submitted at once.
+            When ``items`` has no known length, ``total`` is the number
+            of items *admitted* so far (one window ahead of
+            completions) — it grows as the run progresses, so a
+            percentage over it is meaningless; pass a sized input for a
+            real total.
+        batch_size: The admission window — the maximum number of items
+            submitted but not yet resolved (default ``2 × workers``).
+            It is a memory/lookahead bound, not a chunk size: there are
+            no barriers, and input is consumed lazily, one window ahead,
+            so generators are never materialized.
         retry: ``Retry`` object for per-item retry with backoff.
         checkpoint: Path to a checkpoint file (created if missing, SQLite).
             Completed item results are stored there; rerunning the same
@@ -343,16 +347,14 @@ def parallel_map[T, R](
             check still applies (a changed payload under the same key
             recomputes).
         max_errors: Abort after this many failures (counted after retries
-            are exhausted). Work is then admitted through a bounded window
-            rather than submitted upfront, so a dead API costs tens of
-            calls, not thousands. Items that never ran are marked with
-            ``Aborted`` — distinguishable from real failures. The source
-            is never consumed after the stop: sized inputs get one
-            ``Aborted`` entry per unseen item, unsized inputs return a
-            result covering only the items actually pulled. Note that
-            with ``max_errors`` set, ``batch_size`` becomes the admission
-            window (no barrier between chunks) — the same meaning it has
-            for the streaming APIs.
+            are exhausted). Because admission is windowed, a dead API
+            costs the abort-trigger point plus one window of calls, not
+            thousands. Items that never ran are marked with ``Aborted``
+            — distinguishable from real failures — and the result's
+            ``aborted`` flag is set. The source is never consumed after
+            the stop: sized inputs get one ``Aborted`` entry per unseen
+            item, unsized inputs return a result covering only the items
+            actually pulled.
         sequential: Run every item inline in the calling thread — no
             pool, real stack traces, working breakpoints, deterministic
             order. Honors rate_limit, retry, checkpoint, on_progress, and
@@ -373,6 +375,14 @@ def parallel_map[T, R](
     tasks — each item runs under a fresh copy of the submitting thread's
     context, so correlation IDs survive and writes inside tasks stay
     isolated. Process workers are skipped (contexts don't pickle).
+
+    If the input iterable itself raises mid-run, the error propagates
+    promptly: queued work is cancelled, but tasks already running cannot
+    be interrupted and may complete — side effects included — in the
+    background. If you need no-work-after-error guarantees, materialize
+    the input first (``list(items)``) so source errors cannot happen
+    mid-run, or use ``async_parallel_map`` (async tasks are cancelled
+    and awaited).
 
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
@@ -400,127 +410,25 @@ def parallel_map[T, R](
             worker_init=worker_init,
         )
 
-    if max_errors is not None:
-        return _collected_map_windowed(
-            fn,
-            items,
-            workers=workers,
-            executor=executor,
-            rate_limit=rate_limit,
-            timeout=timeout,
-            on_progress=on_progress,
-            batch_size=batch_size,
-            retry=retry,
-            checkpoint=checkpoint,
-            checkpoint_key=checkpoint_key,
-            max_errors=max_errors,
-            worker_init=worker_init,
-            max_tasks_per_worker=max_tasks_per_worker,
-        )
-
-    bucket = _as_limiter(rate_limit)
-    task_fn = _build_task_fn(fn, executor, retry, bucket)
-    completed = 0
-    deadline = (time.monotonic() + timeout) if timeout is not None else None
-    timed_out = False
-
-    plan = _plan_collected_map(items, batch_size)
-    if plan.total == 0:
-        return ParallelResult([])
-    results = plan.results
-
-    store = (
-        _open_checkpoint(checkpoint, fn, checkpoint_key)
-        if checkpoint is not None
-        else None
+    return _collected_map(
+        fn,
+        items,
+        workers=workers,
+        executor=executor,
+        rate_limit=rate_limit,
+        timeout=timeout,
+        on_progress=on_progress,
+        batch_size=batch_size,
+        retry=retry,
+        checkpoint=checkpoint,
+        checkpoint_key=checkpoint_key,
+        max_errors=max_errors,
+        worker_init=worker_init,
+        max_tasks_per_worker=max_tasks_per_worker,
     )
-    pool = _make_pool(executor, workers, worker_init, max_tasks_per_worker)
-    try:
-        for batch in plan.batches:
-            if batch_size is not None:
-                results.extend([_PENDING] * len(batch))
-
-            chunk_timeout: float | None = None
-            if deadline is not None:
-                assert timeout is not None
-                chunk_timeout = max(0.0, deadline - time.monotonic())
-                if chunk_timeout <= 0:
-                    _mark_timeout_indices(
-                        results, (idx for idx, _item in batch), timeout
-                    )
-                    _append_timeout_failures(results, plan.remaining, timeout)
-                    if batch_size is None:
-                        _mark_timeout_indices(results, range(len(results)), timeout)
-                    timed_out = True
-                    break
-
-            futures: dict[Future[_Outcome], int] = {}
-            submit_timed_out = False
-            for idx, item in batch:
-                if store is not None:
-                    cached = store.lookup(idx, item)
-                    if cached is not None:
-                        results[idx] = cached[0]
-                        completed += 1
-                        if on_progress:
-                            on_progress(completed, _progress_total(plan.total, results))
-                        continue
-                if bucket is not None:
-                    budget: float | None = None
-                    if deadline is not None:
-                        budget = max(0.0, deadline - time.monotonic())
-                    if not bucket.wait(timeout=budget):
-                        # The next token cannot arrive inside the deadline:
-                        # timeout= wins over rate-limit pacing.
-                        submit_timed_out = True
-                        break
-                futures[_submit_task(pool, executor, task_fn, item)] = idx
-
-            try:
-                if submit_timed_out:
-                    raise TimeoutError
-                for future in as_completed(futures, timeout=chunk_timeout):
-                    idx = futures[future]
-                    try:
-                        outcome = future.result()
-                    except Exception as exc:
-                        # Infrastructure failure (broken pool, unpicklable
-                        # return) — task errors travel inside the outcome.
-                        results[idx] = _Failure(exc)
-                    else:
-                        if outcome.error is not None:
-                            results[idx] = _Failure(outcome.error)
-                        else:
-                            results[idx] = outcome.value
-                            # Outside the try: a checkpoint write failure
-                            # raises CheckpointError instead of mislabeling
-                            # a genuine success as an item failure.
-                            if store is not None:
-                                store.put(idx, results[idx])
-                    completed += 1
-                    if on_progress:
-                        on_progress(completed, _progress_total(plan.total, results))
-            except TimeoutError:
-                assert timeout is not None
-                timed_out = True
-                for f, _idx in futures.items():
-                    if not f.done():
-                        f.cancel()
-                _mark_timeout_indices(results, futures.values(), timeout)
-                # Batch items never submitted (deadline hit mid-pacing)
-                # must be marked too, or their slots would leak _PENDING.
-                _mark_timeout_indices(results, (idx for idx, _item in batch), timeout)
-                _append_timeout_failures(results, plan.remaining, timeout)
-                break
-    finally:
-        pool.shutdown(wait=not timed_out, cancel_futures=timed_out)
-        if store is not None:
-            store.close()
-
-    return ParallelResult(results)
 
 
-def _collected_map_windowed(
+def _collected_map(
     fn: Callable[..., Any],
     items: Iterable[Any],
     *,
@@ -533,17 +441,21 @@ def _collected_map_windowed(
     retry: Retry | None,
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
-    max_errors: int,
+    max_errors: int | None,
     worker_init: Callable[[], None] | None = None,
     max_tasks_per_worker: int | None = None,
 ) -> ParallelResult[Any]:
-    """Collected map with bounded admission — the ``max_errors`` engine.
+    """The collected-map engine: bounded admission through a window.
 
-    The plain collected path submits everything upfront; with
-    ``max_errors`` that would let a dead API burn thousands of calls
-    before the Nth failure is even observed. Admitting work through a
-    window caps the exposure: total submissions stay within the
-    abort-trigger point plus one window.
+    One engine for every non-sequential collected map. Input is
+    consumed lazily, at most ``window`` items are unresolved at any
+    moment, and the source is never touched after a stop. The window
+    is also what makes ``max_errors`` cheap: a dead API costs the
+    abort-trigger point plus one window, not thousands of upfront
+    submissions. Keeping the window small is deliberate —
+    ``wait()`` re-registers waiters across the in-flight set per
+    wake, so admission bounded by workers is what keeps the driver
+    loop O(n) (benchmarked in the v0.6 plan).
     """
     bucket = _as_limiter(rate_limit)
     task_fn = _build_task_fn(fn, executor, retry, bucket)
@@ -576,6 +488,12 @@ def _collected_map_windowed(
     def _submit_next() -> bool:
         nonlocal completed, timed_out
         while True:
+            # Cached checkpoint hits consume real time (lookup + key_fn)
+            # without ever reaching a wait — the deadline must bind here
+            # too, or a checkpoint-heavy run ignores timeout= entirely.
+            if deadline is not None and time.monotonic() >= deadline:
+                timed_out = True
+                return False
             try:
                 item = next(source)
             except StopIteration:
@@ -615,7 +533,7 @@ def _collected_map_windowed(
         if error is not None:
             results[idx] = _Failure(error)
             failures += 1
-            if failures >= max_errors:
+            if max_errors is not None and failures >= max_errors:
                 aborted = True
         else:
             results[idx] = outcome.value
@@ -625,6 +543,12 @@ def _collected_map_windowed(
                 store.put(idx, results[idx])
         completed += 1
         _report()
+
+    # The mid-fill absorb sweep exists so a dead API stops admission
+    # mid-fill (max_errors) and so progress stays timely while a rate
+    # limiter stretches the fill over seconds. Without either, filling
+    # is fast and the sweep is only an O(window) scan per admission.
+    sweep_mid_fill = max_errors is not None or bucket is not None
 
     try:
         while True:
@@ -636,13 +560,14 @@ def _collected_map_windowed(
             while not aborted and len(in_flight) < window:
                 if not _submit_next():
                     break
-                # Absorb whatever finished while we were pacing: with a
-                # rate limiter, filling the window can take whole seconds,
-                # and a dead API must stop admission mid-fill, not after.
-                done_now, _pending_now = wait(in_flight, timeout=0)
-                for future in done_now:
-                    _absorb(future, in_flight.pop(future))
-            if timed_out:
+                if sweep_mid_fill:
+                    done_now, _pending_now = wait(in_flight, timeout=0)
+                    for future in done_now:
+                        _absorb(future, in_flight.pop(future))
+            # A mid-fill abort must stop here — falling through to the
+            # blocking wait would delay the abort by a task completion
+            # (or repackage it as a timeout if the deadline fires first).
+            if timed_out or aborted:
                 break
             if not in_flight:
                 break
@@ -688,14 +613,21 @@ def _collected_map_windowed(
                     _Failure(Aborted(reason)) for _ in range(total - len(results))
                 )
     finally:
-        # An escaping exception (e.g. CheckpointError from store.put) must
-        # also stop the engine cold — cancel, don't drain the window.
+        # Every stop — timeout, abort, or an escaping driver error
+        # (source iterator, checkpoint write, progress callback) —
+        # cancels queued work and returns promptly. Running tasks cannot
+        # be interrupted and may complete in the background; waiting for
+        # them instead was tried and rejected (Round 2): a single hung
+        # task would block the error from ever surfacing.
         stopped = timed_out or aborted or sys.exc_info()[0] is not None
         pool.shutdown(wait=not stopped, cancel_futures=stopped)
         if store is not None:
             store.close()
 
-    return ParallelResult(results)
+    # First stop reason wins: the flags are exclusive by construction.
+    return ParallelResult(
+        results, timed_out=timed_out, aborted=aborted and not timed_out
+    )
 
 
 def _sequential_collected_map(
@@ -790,7 +722,7 @@ def _sequential_collected_map(
         if store is not None:
             store.close()
 
-    return ParallelResult(results)
+    return ParallelResult(results, timed_out=timed_out, aborted=aborted)
 
 
 def _sequential_iter(
@@ -825,9 +757,8 @@ def _sequential_iter(
                 return
 
 
-def _unpack_call(fn_and_args: tuple[Callable[..., Any], tuple[Any, ...]]) -> Any:
-    """Unpack and call fn(*args) — picklable for process executor."""
-    fn, args = fn_and_args
+def _apply_star(fn: Callable[..., Any], args: tuple[Any, ...]) -> Any:
+    """Call ``fn(*args)`` — module-level so the partial pickles iff *fn* does."""
     return fn(*args)
 
 
@@ -876,10 +807,13 @@ def parallel_starmap[R](
                 max_tasks_per_worker=max_tasks_per_worker,
             )
 
-    packed = [(fn, args) for args in items]
+    # Wrap fn instead of packing items: the input passes through
+    # untouched, so starmap keeps the engine contract — lazy
+    # consumption, sized-ness, no-drain. (The old packing list-comp
+    # materialized generators before the engine ever saw them.)
     return parallel_map(
-        _unpack_call,
-        packed,
+        functools.partial(_apply_star, fn),
+        items,
         workers=workers,
         executor=executor,
         rate_limit=rate_limit,

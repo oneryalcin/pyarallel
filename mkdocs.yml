@@ -36,6 +36,7 @@ nav:
     - DevX Principles: development/devx-principles.md
     - Roadmap: development/roadmap.md
     - v0.5.0 Plan: development/plans/v0.5.0.md
+    - v0.6 Engine Unification Plan: development/plans/v0.6-engine-unification.md
 
 markdown_extensions:
   - admonition

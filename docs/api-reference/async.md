@@ -1,6 +1,6 @@
 # API Reference: Async
 
-Pyarallel provides async-native parallel execution using `asyncio.TaskGroup` for structured concurrency and `asyncio.Semaphore` for concurrency control.
+Pyarallel provides async-native parallel execution: a windowed engine driven by `asyncio.wait` with `asyncio.Semaphore` for concurrency control — in-flight tasks are cancelled and awaited on errors and timeouts, so nothing is left running on the loop.
 
 ## `async_parallel_map`
 
@@ -36,14 +36,14 @@ results = await async_parallel_map(
 | `items` | `Iterable` | required | Any iterable |
 | `concurrency` | `int` | `4` | Maximum concurrent tasks |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting. Pass a shared `Limiter` to draw from one budget across calls |
-| `timeout` | `float \| None` | `None` | **Total** wall-clock timeout — mirror of the sync `timeout`. Unfinished tasks are cancelled; their slots are marked `TimeoutError` |
+| `timeout` | `float \| None` | `None` | **Total** wall-clock timeout — mirror of the sync `timeout`. Unfinished tasks are cancelled, `result.timed_out` is set; sized slots are marked `TimeoutError`, unsized inputs return a shorter result (the source is never drained) |
 | `task_timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
-| `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback. For unsized iterables with batching, `total` is items seen so far |
-| `batch_size` | `int \| None` | `None` | Process items in chunks. With unsized iterables, input is consumed lazily one batch at a time |
+| `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback. For unsized iterables, `total` is items seen so far |
+| `batch_size` | `int \| None` | `None` | Admission window: max tasks created but unresolved (default `2 × concurrency`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
 | `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — see the [sync docs](core.md#checkpoint-resume) |
-| `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Tasks are then created through a bounded window; unrun items are marked `Aborted` — see the [sync docs](core.md#early-abort-with-max_errors) |
+| `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Windowed admission makes the abort cheap; unrun items are marked `Aborted`, `result.aborted` is set — see the [sync docs](core.md#early-abort-with-max_errors) |
 
 ### Why `concurrency` instead of `workers`?
 
@@ -58,7 +58,8 @@ Pre-v1, Pyarallel keeps these names intentionally different. If you're moving fr
 - Both timeouts exist here: `timeout` is total wall-clock (same contract
   as sync), `task_timeout` is per-task via `asyncio.wait_for` — the sync
   API deliberately has no per-task timeout (threads can't be cancelled)
-- Uses `asyncio.TaskGroup` for structured concurrency — proper cleanup on errors
+- On errors and timeouts, in-flight tasks are cancelled and awaited —
+  proper cleanup, nothing left running on the loop
 - No `sequential=` — `concurrency=1` already serializes
 
 ### Examples
@@ -87,10 +88,10 @@ results = await async_parallel_map(
 When `items` has a known length, `on_progress(done, total)` reports the final
 total.
 
-When `items` is unsized (for example a generator) and `batch_size` is set,
-Pyarallel keeps input consumption lazy instead of materializing the full input
-up front. In that mode, `total` is the number of items discovered so far, not a
-guaranteed final total.
+When `items` is unsized (for example a generator), input consumption is
+lazy — one window ahead, never materialized — and `total` is the number
+of items *admitted* so far, growing as the run progresses: a percentage
+over it is meaningless. Pass a sized input for a real total.
 
 ---
 
@@ -128,9 +129,10 @@ async for item in async_parallel_iter(fetch, urls, concurrency=10):
         log_error(item.index, item.error)
 ```
 
-!!! note "Changed in v0.5"
-    `batch_size` is now an **in-flight bound**, not a chunk size — there
-    are no barriers between chunks, and input is never materialized.
+!!! note "Changed in v0.5 (streaming) and v0.6 (everywhere)"
+    `batch_size` is an **in-flight bound**, not a chunk size — one
+    meaning across every API since v0.6: there are no barriers, and
+    input is never materialized.
 
 Takes the same `ordered=` and `on_progress=` options as `parallel_iter`:
 `ordered=True` yields in input order with a reorder buffer counted

@@ -535,3 +535,84 @@ class TestCorruptFiles:
 
         with pytest.raises(CheckpointError, match="unrecognized"):
             parallel_map(_double, [1], checkpoint=path)
+
+
+class TestCheckpointTimeoutInterplay:
+    """Round 2 review (v0.6): cached hits consume real wall-clock time
+    (lookup + key_fn) without reaching a wait, so the deadline must bind
+    inside the cached-admission loop on both runtimes."""
+
+    def test_sync_cached_hits_respect_total_timeout(self, tmp_path):
+        """Prevents: a checkpoint-heavy run consuming the whole source
+        past timeout= and returning ok=True as if nothing happened."""
+        import time as _time
+
+        ckpt = str(tmp_path / "cached.ckpt")
+
+        def slow_key(item):
+            _time.sleep(0.03)
+            return str(item)
+
+        parallel_map(
+            _ckpt_double, range(6), workers=2, checkpoint=ckpt, checkpoint_key=slow_key
+        )
+
+        produced = []
+
+        def source():
+            for i in range(6):
+                produced.append(i)
+                yield i
+
+        result = parallel_map(
+            _ckpt_double,
+            source(),
+            workers=2,
+            checkpoint=ckpt,
+            checkpoint_key=slow_key,
+            timeout=0.05,
+        )
+        assert result.timed_out
+        assert len(produced) < 6  # source consumption stopped at the deadline
+
+    async def test_async_cached_hits_respect_total_timeout(self, tmp_path):
+        """Prevents: the same bypass on the async engine, where
+        asyncio.timeout() cannot preempt the synchronous cached loop."""
+        import time as _time
+
+        from pyarallel import async_parallel_map
+
+        ckpt = str(tmp_path / "cached_async.ckpt")
+
+        def slow_key(item):
+            _time.sleep(0.03)
+            return str(item)
+
+        async def double(x):
+            return x * 2
+
+        await async_parallel_map(
+            double, range(6), concurrency=2, checkpoint=ckpt, checkpoint_key=slow_key
+        )
+
+        produced = []
+
+        def source():
+            for i in range(6):
+                produced.append(i)
+                yield i
+
+        result = await async_parallel_map(
+            double,
+            source(),
+            concurrency=2,
+            checkpoint=ckpt,
+            checkpoint_key=slow_key,
+            timeout=0.05,
+        )
+        assert result.timed_out
+        assert len(produced) < 6
+
+
+def _ckpt_double(x):
+    return x * 2

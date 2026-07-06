@@ -1,7 +1,10 @@
-"""Tests for batch_size — controls memory by processing in chunks."""
+"""Tests for batch_size — the in-flight admission window (v0.6: one
+engine for all collected maps; there are no chunk barriers)."""
 
 import threading
 import time
+
+import pytest
 
 from pyarallel import RateLimit, parallel_map
 
@@ -161,6 +164,127 @@ class TestBatchWithOtherFeatures:
         assert len(result.failures()) == 10
 
 
+class TestUnifiedPlainPath:
+    """v0.6 engine unification: the plain collected path (no max_errors)
+    runs through the windowed engine. Each test names the regression it
+    prevents."""
+
+    def test_plain_map_does_not_materialize_generator(self):
+        """Prevents: silent return of upfront list(items) materialization.
+        No batch_size, workers=2 -> default window 4: with all workers
+        blocked, the source must not be consumed past the window."""
+        produced = []
+        started = threading.Event()
+        release = threading.Event()
+        holder = {}
+
+        def items():
+            for i in range(100):
+                produced.append(i)
+                yield i
+
+        def track(x):
+            if x == 1:
+                started.set()
+            release.wait(timeout=5)
+            return x
+
+        def run():
+            holder["result"] = parallel_map(track, items(), workers=2)
+
+        t = threading.Thread(target=run)
+        t.start()
+        assert started.wait(timeout=5)
+        time.sleep(0.2)  # give a broken engine time to over-consume
+        assert len(produced) <= 4  # window = 2 * workers
+        release.set()
+        t.join(timeout=10)
+        assert not t.is_alive()
+        assert list(holder["result"]) == list(range(100))
+
+    def test_timeout_on_unsized_input_returns_shorter_result_not_drain(self):
+        """Prevents: drain-on-timeout returning — the run must never pull
+        from the source after the deadline, so an unsized input yields a
+        shorter result with timed_out set, not appended placeholders."""
+        produced = []
+
+        def items():
+            for i in range(1000):
+                produced.append(i)
+                yield i
+
+        def slow(x):
+            time.sleep(10)
+            return x
+
+        result = parallel_map(slow, items(), workers=2, timeout=0.3)
+        assert result.timed_out
+        assert len(result) < 1000  # no placeholder drain
+        assert len(produced) <= 8  # source consumption stopped at the window
+
+    def test_timeout_zero_runs_nothing_on_plain_path(self):
+        """Prevents: an already-expired deadline admitting work (the
+        max_errors path had this guarantee; the plain path must too)."""
+        calls = []
+
+        result = parallel_map(calls.append, range(10), workers=4, timeout=0)
+        assert calls == []
+        assert result.timed_out
+        assert len(result.failures()) == 10  # sized: every slot marked
+
+    def test_source_error_propagates_without_hanging(self):
+        """Prevents: a wedged pool when the input iterator itself raises
+        mid-run (lazy consumption surfaces source errors mid-flight)."""
+
+        def poison():
+            yield 1
+            yield 2
+            raise ValueError("bad source")
+
+        with pytest.raises(ValueError, match="bad source"):
+            parallel_map(lambda x: x, poison(), workers=2)
+
+    async def test_async_source_timeout_error_propagates_as_input_error(self):
+        """Prevents: a TimeoutError raised by the source iterator being
+        repackaged as deadline expiry (AssertionError with timeout=None,
+        fabricated timed_out result with timeout set)."""
+        import pytest
+
+        from pyarallel import async_parallel_map
+
+        def timing_out_source():
+            yield 1
+            raise TimeoutError("upstream read timed out")
+
+        async def identity(x):
+            return x
+
+        with pytest.raises(TimeoutError, match="upstream read"):
+            await async_parallel_map(identity, timing_out_source(), concurrency=2)
+
+        with pytest.raises(TimeoutError, match="upstream read"):
+            await async_parallel_map(
+                identity, timing_out_source(), concurrency=2, timeout=30.0
+            )
+
+    def test_timeout_beats_rate_limit_pacing_on_plain_path(self):
+        """Prevents: the v0.5 bypassed-timeout bug returning via the
+        routing change — a driver blocked in limiter pacing must still
+        honor the total deadline (no max_errors set)."""
+        start = time.monotonic()
+        result = parallel_map(
+            lambda x: x,
+            range(5),
+            workers=2,
+            rate_limit=RateLimit(1, "second"),  # tokens 1s apart
+            timeout=0.2,
+        )
+        elapsed = time.monotonic() - start
+        assert elapsed < 1.0  # did not sleep through the pacing
+        assert result.timed_out
+        assert len(result) == 5  # sized: unrun slots marked, not dropped
+
+
 class TestAsyncBatch:
     async def test_async_batch_produces_correct_results(self):
         from pyarallel import async_parallel_map
@@ -194,6 +318,54 @@ class TestAsyncBatch:
 
         await async_parallel_map(track, range(20), concurrency=3, batch_size=5)
         assert max_concurrent <= 5  # batch_size caps in-flight tasks
+
+    async def test_async_plain_map_does_not_materialize_generator(self):
+        """Prevents: silent return of upfront materialization on the
+        async plain path (no batch_size, no max_errors) — window must
+        default to 2 x concurrency."""
+        import asyncio
+
+        from pyarallel import async_parallel_map
+
+        produced = []
+        release = asyncio.Event()
+
+        def items():
+            for i in range(100):
+                produced.append(i)
+                yield i
+
+        async def track(x):
+            await release.wait()
+            return x
+
+        async def run():
+            return await async_parallel_map(track, items(), concurrency=2)
+
+        task = asyncio.ensure_future(run())
+        await asyncio.sleep(0.2)  # give a broken engine time to over-consume
+        assert len(produced) <= 4  # window = 2 * concurrency
+        release.set()
+        result = await asyncio.wait_for(task, timeout=10)
+        assert list(result) == list(range(100))
+
+    async def test_async_source_error_propagates_without_hanging(self):
+        """Prevents: a wedged event loop when the input iterator raises
+        mid-run on the async plain path."""
+        import pytest
+
+        from pyarallel import async_parallel_map
+
+        def poison():
+            yield 1
+            yield 2
+            raise ValueError("bad source")
+
+        async def identity(x):
+            return x
+
+        with pytest.raises(ValueError, match="bad source"):
+            await async_parallel_map(identity, poison(), concurrency=2)
 
     async def test_async_batch_consumes_generator_lazily(self):
         import asyncio
