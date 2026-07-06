@@ -233,6 +233,8 @@ Works with instance methods and static methods via `@parallel` decorator — see
 
 [Full docs](https://oneryalcin.github.io/pyarallel/) — API reference, advanced features, best practices.
 
+Deciding whether pyarallel fits? [Comparison vs tenacity+ThreadPoolExecutor, aiometer, mpire, joblib](https://oneryalcin.github.io/pyarallel/getting-started/comparison/) — including when *not* to use it. Then [real-world patterns](https://oneryalcin.github.io/pyarallel/user-guide/real-world-patterns/): batch LLM calls, embeddings with resume, polite scraping.
+
 ## License
 
 MIT — see [LICENSE.md](LICENSE.md).

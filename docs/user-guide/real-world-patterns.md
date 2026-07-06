@@ -3,6 +3,73 @@
 Practical examples for common workloads. Each pattern shows a complete,
 copy-pasteable approach — not a toy example.
 
+## Batch LLM Calls
+
+Run thousands of chat-completion calls — classification, extraction,
+summarization — against a rate-limited LLM API. The problems are always
+the same: the provider throttles you (429s), individual calls fail
+randomly, calls are expensive enough that you never want to pay for one
+twice, and a dead API at 2 a.m. must not burn the quota retrying forever.
+
+```python
+import openai
+from pyarallel import parallel_map, Limiter, RateLimit, Retry
+
+client = openai.OpenAI()
+
+def classify(ticket):
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "Classify the support ticket: billing, bug, or feature."},
+            {"role": "user", "content": ticket},
+        ],
+    )
+    return response.choices[0].message.content
+
+def retry_after(exc):
+    """Honor the server's Retry-After header when present."""
+    response = getattr(exc, "response", None)
+    header = response.headers.get("retry-after") if response else None
+    return float(header) if header else None
+
+# One Limiter per API key — every job that spends this quota shares it.
+limiter = Limiter(RateLimit(450, "minute", burst=10))
+
+result = parallel_map(
+    classify, tickets,
+    workers=10,
+    rate_limit=limiter,
+    retry=Retry(
+        attempts=4,
+        backoff=2.0,
+        on=(openai.RateLimitError, openai.APIConnectionError, openai.InternalServerError),
+        wait_from=retry_after,          # a 429 pauses the WHOLE pool
+    ),
+    checkpoint="classify.ckpt",         # paid-for answers survive a crash
+    max_errors=20,                      # dead API → stop after 20 failures, not 20,000
+)
+
+for idx, label in result.successes():
+    save(tickets[idx], label)
+for idx, exc in result.failures():
+    log_failed(tickets[idx], exc)
+```
+
+Why each policy is there:
+
+- **`wait_from=retry_after`** — when the provider says `Retry-After: 30`,
+  that wait replaces the backoff *and* pauses the shared limiter. One
+  throttled call slows the whole pool; without it, all 10 workers
+  discover the 429 separately and the retry storm makes it worse.
+- **`checkpoint=`** — LLM calls cost real money. Completed answers are
+  persisted as they finish; a crash at item 8,000 of 10,000 resumes
+  with 2,000 calls, not 10,000. Inputs that evolve between runs? Key
+  rows by identity with `checkpoint_key=lambda t: t.id`.
+- **`max_errors=20`** — the overnight-job guard. If the API dies, the
+  run aborts after 20 post-retry failures and returns partial results;
+  the morning rerun resumes from the checkpoint.
+
 ## Batch Embedding Generation
 
 Call an embedding API for thousands of texts with rate limiting and retry.
@@ -286,3 +353,52 @@ for item in parallel_iter(transform, fetch_rows(), workers=8, batch_size=500):
     else:
         log_error(item.index, item.error)
 ```
+
+## CPU-Bound Fan-Out
+
+Same API, different executor. Resize a directory of images, parse a
+pile of PDFs, hash a million records — anything where the bottleneck is
+your CPU, not a remote service:
+
+```python
+from pathlib import Path
+from PIL import Image
+from pyarallel import parallel_map
+
+def make_thumbnail(path):
+    """Must be a module-level function — process workers re-import it."""
+    img = Image.open(path)
+    img.thumbnail((800, 600))
+    out = path.with_stem(path.stem + "_thumb")
+    img.save(out)
+    return str(out)
+
+paths = list(Path("photos").glob("*.jpg"))
+
+result = parallel_map(
+    make_thumbnail, paths,
+    executor="process",        # true parallelism — one Python per core
+    worker_init=None,          # or: load one model/connection per worker
+    max_tasks_per_worker=100,  # recycle workers (native-leak guard)
+)
+
+for idx, exc in result.failures():
+    print(f"failed: {paths[idx]} — {exc}")
+```
+
+Everything else composes unchanged: `retry=` for flaky items,
+`on_progress=` for a progress bar, `parallel_iter` when results
+shouldn't accumulate in memory, `sequential=True` to debug with real
+stack traces. `workers=None` defaults to one worker per core.
+
+Two variants worth knowing:
+
+- **Pure-Python CPU work on Python 3.14+**: `executor="interpreter"`
+  gives the same true parallelism with ~30 ms workers and no OS
+  processes — but C extensions like Pillow/numpy don't support
+  subinterpreters yet, so *this* recipe stays on `"process"`. See
+  [choosing the right executor](best-practices.md#interpreters-executorinterpreter-python-314).
+- **Heavy multiprocessing** (shared memory, per-worker state, CPU
+  pinning) is [mpire](https://pypi.org/project/mpire/)'s specialty —
+  see the [comparison](../getting-started/comparison.md#vs-mpire) for
+  where each tool wins.
