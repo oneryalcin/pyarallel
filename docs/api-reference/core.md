@@ -19,6 +19,11 @@ results = parallel_map(
     batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
     checkpoint=None,                 # Path to a resume file (SQLite)
+    checkpoint_key=None,             # Stable per-item identity for resume
+    max_errors=None,                 # Abort after N failures
+    sequential=False,                # Debug mode: run inline, no pool
+    worker_init=None,                # Run once per worker before tasks
+    max_tasks_per_worker=None,       # Recycle process workers (process only)
 )
 ```
 
@@ -38,6 +43,11 @@ results = parallel_map(
 | `batch_size` | `int \| None` | `None` | Process items in chunks of this size. With unsized iterables, input is consumed lazily one batch at a time |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
+| `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires `checkpoint=` |
+| `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Unrun items are marked `Aborted` |
+| `sequential` | `bool` | `False` | Run every item inline in the calling thread — no pool, real stack traces, working breakpoints. `workers` is ignored |
+| `worker_init` | `Callable[[], None] \| None` | `None` | Run once per worker before it takes tasks (one DB connection / model per worker). Must be picklable for `executor="process"` |
+| `max_tasks_per_worker` | `int \| None` | `None` | Recycle each process worker after N tasks (native-leak guard). Requires `executor="process"` |
 
 ### Examples
 
@@ -63,7 +73,91 @@ results = parallel_map(fetch, urls, workers=10, retry=Retry(attempts=3, backoff=
 
 # Resumable — crash at item 40k does not restart from zero
 results = parallel_map(embed, chunks, checkpoint="embeddings.ckpt")
+
+# Abort early — a dead API costs tens of calls, not thousands
+results = parallel_map(fetch, urls, workers=10, max_errors=10)
 ```
+
+### Debug Mode with `sequential=True`
+
+`sequential=True` runs every item inline in the calling thread: no pool,
+no futures — real stack traces, working breakpoints, deterministic input
+order. It honors `rate_limit`, `retry`, `checkpoint`, `on_progress`, and
+`max_errors`; `timeout` is checked between items only (an in-flight item
+cannot be interrupted). `workers` is ignored rather than rejected, so a
+single flag can flip production code into debug mode:
+
+```python
+results = parallel_map(fetch, urls, workers=10,
+                       sequential=os.environ.get("DEBUG") == "1")
+```
+
+The async API doesn't need it — `concurrency=1` already serializes.
+
+### Context Variables
+
+`contextvars` set by the caller are visible inside thread-executor tasks:
+each item runs under a fresh copy of the submitting thread's context, so
+correlation IDs and request-scoped state survive into workers (they used
+to silently vanish). Writes inside tasks land in the copy and never leak
+back to the caller. Process workers are skipped — contexts don't pickle.
+
+### Worker Lifecycle
+
+`worker_init=` runs once in each worker before it takes tasks — the
+place for one DB connection or one loaded model per worker instead of
+per item. With `executor="process"` it must be a module-level function
+(fail-fast `ValueError` otherwise). Note: the initializer's contextvars
+are invisible to tasks (tasks run under the caller's context) — use
+globals or thread-locals for per-worker state.
+
+`max_tasks_per_worker=` recycles each **process** worker after N tasks —
+the standard guard against native-library memory leaks. With
+`executor="thread"` it raises `ValueError` (explicit beats silent
+ignore).
+
+### Early Abort with `max_errors`
+
+With `max_errors=N`, the run stops once N items have failed (counted
+**after** retries are exhausted — an item that fails then succeeds on
+retry is a success). To make the abort actually cheap, work is admitted
+through a bounded window (`batch_size` if set, else `2 × workers`)
+instead of being submitted all upfront: total submissions stay within
+the abort point plus one window.
+
+On abort you still get a complete `ParallelResult` — one entry per input
+item. Finished work keeps its real result; items that never ran are
+marked with an `Aborted` exception, distinguishable from real failures:
+
+```python
+from pyarallel import Aborted
+
+result = parallel_map(fetch, urls, workers=10, max_errors=10)
+real = [(i, e) for i, e in result.failures() if not isinstance(e, Aborted)]
+unrun = [i for i, e in result.failures() if isinstance(e, Aborted)]
+```
+
+Composes with `timeout=` (whichever fires first wins, each marking its
+own failure type) and with `checkpoint=` — completed successes are
+already persisted, so the aborted job resumes exactly where it stopped.
+Streaming APIs take `max_errors` too: the stream simply ends after the
+Nth failure is yielded, with no placeholder items. In `ordered=True`
+mode the ending failure is still delivered in input order — admission
+has stopped, so the wait is bounded to the window in *items*, but not
+in time: a task that never completes blocks the ordered stream, exactly
+as it blocks every other sync call (threads cannot be cancelled). Put
+timeouts inside your function, or use the default unordered mode for
+the promptest abort on a dead API. Completed-but-unyielded successes
+behind the ending failure are discarded.
+
+Note: with `max_errors` set, `batch_size` acts as the admission window
+(no barrier between chunks) — the same meaning it has for the streaming
+APIs, not the chunked meaning of the plain collected path.
+
+The input source is **never consumed after the stop** — a blocking or
+infinite generator stays untouched. Sized inputs get one `Aborted`
+entry per unseen item (by count); unsized inputs return a result
+covering only the items actually pulled from the source.
 
 ### Checkpoint / Resume
 
@@ -87,10 +181,24 @@ Constraints, stated honestly:
   checkpointed aborts the run with `CheckpointError` — the alternative
   (mislabeling a successful item as failed, or continuing with a checkpoint
   that cannot resume) would lie to you.
-- **Rows are positional.** Reordering, prepending, or removing input items
-  shifts indices; the fingerprint check then forces every shifted item to
-  recompute. Resume is designed for *the same call, rerun* — not for
-  evolving input lists.
+- **Rows are positional by default.** Reordering, prepending, or removing
+  input items shifts indices; the fingerprint check then forces every
+  shifted item to recompute. Pass `checkpoint_key=` when inputs evolve:
+
+  ```python
+  parallel_map(fetch, users, checkpoint="run.ckpt",
+               checkpoint_key=lambda u: u.id)
+  ```
+
+  Rows are then keyed by identity — prepending an item runs only the new
+  item, reordering recomputes nothing. Keys must be unique per run
+  (duplicates raise `CheckpointError`); keys are type-tagged, so `1`,
+  `"1"`, and `b"1"` are three distinct rows; the fingerprint check still
+  applies — a changed payload under the same key recomputes. Changing the
+  key function just changes the keys (a cache miss, never a wrong hit).
+- **Checkpoint files are schema v2.** Files written by earlier versions
+  fail closed with a `CheckpointError` telling you to delete them — no
+  silent migration.
 - **One run per file at a time.** Failures are never checkpointed; a
   resumed run retries them. Sharing one file between concurrently running
   jobs is not supported.
@@ -211,12 +319,15 @@ add.starmap([(1, 2), (3, 4)])  # ParallelResult([3, 7])
 ## `parallel_iter`
 
 Streaming version of `parallel_map` — yields `ItemResult` in completion order.
-Results are **not accumulated in memory**.
+
+A bounded window of items is in flight at any moment: memory stays
+constant, input is consumed lazily (generators are never materialized),
+and a slow item delays only itself — items behind it keep streaming.
 
 ```python
 from pyarallel import parallel_iter
 
-for item in parallel_iter(fn, items, workers=4, batch_size=1000):
+for item in parallel_iter(fn, items, workers=4):
     if item.ok:
         db.save(item.value)
     else:
@@ -239,13 +350,49 @@ Same as `parallel_map` except no `timeout` or `on_progress` (results stream as t
 | `workers` | `int \| None` | `None` | Number of parallel workers (stdlib default when `None`) |
 | `executor` | `"thread" \| "process"` | `"thread"` | Thread pool or process pool |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting |
-| `batch_size` | `int \| None` | `None` | Process in chunks (controls memory) |
+| `batch_size` | `int \| None` | `None` | Maximum items in flight (default `2 × workers`) |
 | `retry` | `Retry \| None` | `None` | Per-item retry |
+| `ordered` | `bool` | `False` | Yield in input order instead of completion order |
+| `on_progress` | `Callable[[int, int], None] \| None` | `None` | `callback(done, total)` per completed item |
+
+!!! note "Changed in v0.5"
+    `batch_size` is now an **in-flight bound**, not a chunk size. Earlier
+    versions processed chunks with a barrier between them (one slow item
+    stalled the next chunk) and materialized the whole input when
+    `batch_size` was unset. Neither is true anymore — the default window
+    of `2 × workers` already gives constant memory; raise `batch_size`
+    only to increase lookahead.
 
 ### Yields
 
 `ItemResult[T]` — each item includes `.index`, `.ok`, `.value`, and `.error`.
-Results arrive in **completion order** (not input order).
+Results arrive in **completion order** by default; pass `ordered=True`
+for input order.
+
+### Ordered streaming
+
+With `ordered=True`, completed items that arrive early wait in a reorder
+buffer. The window bounds in-flight **plus** buffered items, so memory
+stays constant even when one slow item holds back the stream — admission
+stalls until it completes (that's backpressure, not a hang).
+
+```python
+for item in parallel_iter(fetch, urls, workers=8, ordered=True):
+    print(item.index)  # 0, 1, 2, ... regardless of completion order
+```
+
+### Progress
+
+`on_progress` fires per **completed** item, before its yield — same
+contract as `parallel_map`. For unsized inputs `total` is the number of
+items consumed from the source so far.
+
+### Stopping early
+
+Breaking out of the loop stops the engine: nothing new is submitted and
+not-yet-started tasks are cancelled. Tasks already running in a worker
+thread or process cannot be interrupted and finish in the background
+(at most one window's worth).
 
 Also available as `.stream()` on `@parallel` decorated functions:
 
@@ -253,7 +400,7 @@ Also available as `.stream()` on `@parallel` decorated functions:
 @parallel(workers=8)
 def process(item): ...
 
-for item in process.stream(huge_list, batch_size=1000):
+for item in process.stream(huge_list):
     if item.ok:
         db.save(item.value)
     else:
@@ -275,10 +422,19 @@ and `.stream()`.
 | `.ok` | `bool` | `True` when this item succeeded |
 | `.value` | `T \| None` | Result value for successful items. May legitimately be `None` |
 | `.error` | `Exception \| None` | Exception for failed items |
+| `.attempts` | `int` | Attempts actually made (`1` = no retry needed) |
+| `.duration` | `float` | Seconds from the start of the first attempt to the final outcome — **including** retry backoff sleeps, **excluding** queue wait |
 
 ### Invariant
 
 Exactly one of `.value` or `.error` is set. Success and failure are explicit.
+
+### Accounting example
+
+```python
+for item in parallel_iter(fetch, urls, workers=8, retry=Retry(attempts=3)):
+    metrics.observe(latency=item.duration, retries=item.attempts - 1)
+```
 
 ### Example
 
@@ -302,6 +458,7 @@ Container for parallel execution results. Behaves like a `list` when all tasks s
 |---|---|---|
 | `.ok` | `bool` | `True` if every task succeeded |
 | `.values()` | `list[R]` | All results in order. Raises `ExceptionGroup` on failure |
+| `.ok_values()` | `list[R]` | Values of successful tasks only, in input order. Never raises |
 | `.successes()` | `list[tuple[int, R]]` | `(index, value)` for each success |
 | `.failures()` | `list[tuple[int, Exception]]` | `(index, exception)` for each failure |
 | `.raise_on_failure()` | `None` | Raises `ExceptionGroup` if any task failed |
@@ -319,8 +476,7 @@ if result.ok:
     for value in result:
         print(value)
 else:
-    for idx, value in result.successes():
-        save(idx, value)
+    good = result.ok_values()          # just the values that succeeded
     for idx, error in result.failures():
         log(idx, error)
 ```

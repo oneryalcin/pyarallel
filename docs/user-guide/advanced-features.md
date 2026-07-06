@@ -246,12 +246,56 @@ Safety guards, stated honestly:
   changes. Bound methods and callable objects are rejected outright: their
   entire state is opaque.
 - A changed input at the same position is recomputed, never served stale.
-- Rows are positional: reordering or inserting inputs forces shifted items
-  to recompute. Resume is for *the same call, rerun*.
+- Rows are positional by default: reordering or inserting inputs forces
+  shifted items to recompute. For evolving inputs, key rows by identity:
+
+  ```python
+  result = parallel_map(fetch, users, checkpoint="run.ckpt",
+                        checkpoint_key=lambda u: u.id)
+  # next week: three new users prepended — only they run
+  ```
+
+  Duplicate keys raise `CheckpointError`; keys are type-tagged (`1` vs
+  `"1"` vs `b"1"` never collide); a changed payload under the same key
+  still recomputes.
+- Checkpoint files from pyarallel < 0.5 fail closed — delete and rerun.
 - Items and results must be picklable; a result that cannot be
   checkpointed aborts the run with `CheckpointError`.
 
 Available on `parallel_map`, `async_parallel_map`, and `.map()`.
+
+## Early Abort — `max_errors`
+
+Stop paying for a dead API. With `max_errors=N` the run aborts once N
+items have failed (counted after retries are exhausted) and returns
+partial results:
+
+```python
+from pyarallel import Aborted
+
+result = parallel_map(fetch, urls, workers=10, max_errors=10)
+
+if not result.ok:
+    real  = [(i, e) for i, e in result.failures() if not isinstance(e, Aborted)]
+    unrun = [i for i, e in result.failures() if isinstance(e, Aborted)]
+```
+
+Work is admitted through a bounded window when `max_errors` is set, so
+the abort is genuinely cheap — a 10k-item job against a dead API costs
+tens of calls, not thousands. Finished items keep their real results;
+never-run items are marked `Aborted`.
+
+The overnight-job combo is `max_errors` + `checkpoint`: the job aborts
+cheaply when the API dies, successes are already persisted, and the
+morning rerun resumes exactly where it stopped:
+
+```python
+result = parallel_map(fetch, users, workers=10,
+                      max_errors=10, checkpoint="nightly.ckpt")
+```
+
+Streaming APIs accept `max_errors` too — the stream ends after the Nth
+failure is yielded, with no placeholder items for unseen input.
 
 ## Batching
 
@@ -295,9 +339,8 @@ For large-scale processing where results shouldn't accumulate in memory, use `pa
 ```python
 from pyarallel import parallel_iter
 
-# Process 10M items — only one batch of results in memory at a time
-for item in parallel_iter(process, ten_million_items,
-                          workers=8, batch_size=1000):
+# Process 10M items — a bounded window in flight, everything else on disk
+for item in parallel_iter(process, ten_million_items, workers=8):
     if item.ok:
         db.save(item.value)
     else:
@@ -307,22 +350,33 @@ for item in parallel_iter(process, ten_million_items,
 @parallel(workers=8)
 def process(item): ...
 
-for item in process.stream(huge_list, batch_size=1000):
+for item in process.stream(huge_list):
     if item.ok:
         db.save(item.value)
     else:
         log_error(item.index, item.error)
 ```
 
+The engine keeps a bounded window of items in flight (default
+`2 × workers`; set `batch_size` to change it). Input is consumed lazily —
+generators are never materialized — and a slow item delays only itself:
+there are no batch barriers. Breaking out of the loop stops submission
+and cancels not-yet-started tasks; tasks already running in a worker
+finish in the background.
+
 Results arrive in **completion order** (fastest tasks first), not input order.
 Each `ItemResult` includes the original `.index` so you can match results to inputs.
+Pass `ordered=True` to yield in input order instead — early results wait in a
+reorder buffer that is counted inside the window, so memory stays bounded even
+behind a straggler. Streaming also takes `on_progress=` with the same contract
+as `parallel_map`.
 
 **When to use which:**
 
 | API | Memory | Use case |
 |---|---|---|
 | `.map()` / `parallel_map` | All results in memory | Results fit in memory, need `.ok`, `.failures()` |
-| `.stream()` / `parallel_iter` | Constant (one batch) | ETL, streaming to DB, 10M+ items |
+| `.stream()` / `parallel_iter` | Constant (one window) | ETL, streaming to DB, 10M+ items |
 
 ## Structured Error Handling
 
@@ -330,6 +384,9 @@ Each `ItemResult` includes the original `.index` so you can match results to inp
 
 ```python
 result = parallel_map(process, items, workers=4)
+
+# The common partial-failure path: keep what worked
+good = result.ok_values()          # values only, input order, never raises
 
 # Inspect successes and failures separately
 for idx, value in result.successes():

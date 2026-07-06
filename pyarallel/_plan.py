@@ -11,10 +11,7 @@ from dataclasses import dataclass
 from itertools import islice
 from typing import Any
 
-from .result import _Failure
-
-# Sentinel for "slot not yet filled" — distinct from a legitimate None return.
-_PENDING = object()
+from .result import _PENDING, _Failure
 
 
 @dataclass(slots=True)
@@ -25,6 +22,12 @@ class _CollectedMapPlan:
     total: int | None
     batches: Iterable[list[tuple[int, Any]]]
     remaining: Iterator[Any] | None = None
+
+
+def _validate_max_errors(max_errors: int | None) -> None:
+    """Shared max_errors validation for sync and async entry points."""
+    if max_errors is not None and max_errors < 1:
+        raise ValueError(f"max_errors must be >= 1, got {max_errors}")
 
 
 def _total_if_known(items: Iterable[Any]) -> int | None:
@@ -48,13 +51,6 @@ def _make_chunks(n: int, batch_size: int | None) -> list[range]:
             for start in range(0, n, batch_size)
         ]
     return [range(n)]
-
-
-def _iter_batches(
-    items: Iterable[Any], batch_size: int
-) -> Iterator[list[tuple[int, Any]]]:
-    """Yield indexed item batches lazily from *items*."""
-    yield from _iter_batches_from_iterator(iter(items), batch_size)
 
 
 def _iter_batches_from_iterator(

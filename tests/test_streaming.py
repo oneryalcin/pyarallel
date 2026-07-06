@@ -1,6 +1,9 @@
 """Tests for parallel_iter / .stream() — streaming results, constant memory."""
 
+import asyncio
 import time
+
+import pytest
 
 from pyarallel import RateLimit, Retry
 
@@ -192,6 +195,334 @@ class TestDecoratorStream:
         ]
 
 
+class TestSlidingWindow:
+    """v0.5 engine rewrite — each test names the v0.4 failure it prevents."""
+
+    def test_straggler_does_not_stall_the_stream(self):
+        """v0.4 batch barrier: one slow item blocked every later batch."""
+        from pyarallel import parallel_iter
+
+        def task(x):
+            time.sleep(0.5 if x == 0 else 0.01)
+            return x
+
+        start = time.monotonic()
+        order = [item.index for item in parallel_iter(task, range(10), workers=4)]
+        elapsed = time.monotonic() - start
+        assert order[-1] == 0  # straggler arrives last, others streamed past it
+        assert set(order[:9]) == set(range(1, 10))
+        assert elapsed < 1.5
+
+    def test_batch_size_is_an_in_flight_bound_not_a_barrier(self):
+        """v0.4: batch_size chunked with a barrier — items 2..5 could not
+        start until the whole first chunk (including the straggler) drained."""
+        from pyarallel import parallel_iter
+
+        def task(x):
+            time.sleep(0.4 if x == 0 else 0.01)
+            return x
+
+        order = [
+            item.index
+            for item in parallel_iter(task, range(6), workers=2, batch_size=2)
+        ]
+        assert order[-1] == 0  # the old barrier forced 0 before 2..5
+
+    def test_unbatched_input_is_not_materialized(self):
+        """v0.4 without batch_size pulled the whole iterator into memory.
+        The <= 8 bound also pins the review amendment: with workers=2 the
+        window is 4, not the thread pool's default of up to 64."""
+        from pyarallel import parallel_iter
+
+        advanced = 0
+
+        def source():
+            nonlocal advanced
+            for i in range(10_000):
+                advanced += 1
+                yield i
+
+        stream = parallel_iter(lambda x: x, source(), workers=2)
+        try:
+            for _ in range(3):
+                next(stream)
+            assert advanced <= 3 + 4 + 1  # yields + window (2 x workers) + slack
+        finally:
+            stream.close()
+
+    def test_break_stops_submissions_and_bounds_leftover_work(self):
+        """Cleanup contract: closing the generator stops the engine — no new
+        submissions, leftover running work bounded by the window."""
+        from pyarallel import parallel_iter
+
+        started = []
+
+        def slow(x):
+            started.append(x)
+            time.sleep(0.05)
+            return x
+
+        stream = parallel_iter(slow, range(100), workers=2, batch_size=4)
+        next(stream)
+        next(stream)
+        stream.close()
+        time.sleep(0.3)  # let anything already handed to the pool finish
+        after_close = len(started)
+        assert after_close <= 2 + 4  # yields + window
+        time.sleep(0.2)
+        assert len(started) == after_close  # engine is genuinely stopped
+
+    def test_items_iterator_error_propagates(self):
+        """An input generator raising mid-stream must surface to the caller,
+        not hang the driver or vanish."""
+        from pyarallel import parallel_iter
+
+        def poison():
+            yield 1
+            yield 2
+            raise RuntimeError("boom")
+
+        with pytest.raises(RuntimeError, match="boom"):
+            list(parallel_iter(lambda x: x, poison(), workers=2))
+
+
+class TestAsyncSlidingWindow:
+    """Async mirrors of the v0.5 engine contracts."""
+
+    async def test_straggler_does_not_stall_the_stream(self):
+        from pyarallel import async_parallel_iter
+
+        async def task(x):
+            await asyncio.sleep(0.5 if x == 0 else 0.01)
+            return x
+
+        start = time.monotonic()
+        order = []
+        async for item in async_parallel_iter(task, range(10), concurrency=4):
+            order.append(item.index)
+        elapsed = time.monotonic() - start
+        assert order[-1] == 0
+        assert set(order[:9]) == set(range(1, 10))
+        assert elapsed < 1.5
+
+    async def test_unbatched_input_is_not_materialized(self):
+        """v0.4 built list(items) whenever batch_size was None."""
+        from pyarallel import async_parallel_iter
+
+        advanced = 0
+
+        def source():
+            nonlocal advanced
+            for i in range(10_000):
+                advanced += 1
+                yield i
+
+        async def identity(x):
+            return x
+
+        stream = async_parallel_iter(identity, source(), concurrency=2)
+        try:
+            got = 0
+            async for _item in stream:
+                got += 1
+                if got == 3:
+                    break
+            assert advanced <= 3 + 4 + 1  # yields + window (2 x concurrency) + slack
+        finally:
+            await stream.aclose()
+
+    async def test_break_cancels_in_flight_tasks(self):
+        """Closing the async generator cancels running tasks — async tasks,
+        unlike threads, must be genuinely cancelled."""
+        from pyarallel import async_parallel_iter
+
+        started = []
+
+        async def slow(x):
+            started.append(x)
+            await asyncio.sleep(0.05)
+            return x
+
+        stream = async_parallel_iter(slow, range(100), concurrency=2)
+        async for _item in stream:
+            break
+        await stream.aclose()
+        after_close = len(started)
+        assert after_close <= 1 + 4  # yields + window
+        await asyncio.sleep(0.2)
+        assert len(started) == after_close
+
+    async def test_items_iterator_error_propagates(self):
+        from pyarallel import async_parallel_iter
+
+        def poison():
+            yield 1
+            yield 2
+            raise RuntimeError("boom")
+
+        async def identity(x):
+            return x
+
+        with pytest.raises(RuntimeError, match="boom"):
+            async for _item in async_parallel_iter(identity, poison(), concurrency=2):
+                pass
+
+
+class TestOrderedStreaming:
+    """ordered=True — input-order yields with a bounded reorder buffer."""
+
+    def test_ordered_yields_input_order_despite_reversed_completion(self):
+        from pyarallel import parallel_iter
+
+        def task(x):
+            time.sleep((5 - x) * 0.03)  # item 0 finishes last
+            return x * 10
+
+        results = list(parallel_iter(task, range(6), workers=6, ordered=True))
+        assert [item.index for item in results] == list(range(6))
+        assert [item.value for item in results] == [x * 10 for x in range(6)]
+
+    def test_ordered_reorder_buffer_is_bounded(self):
+        """The review finding: refill-on-completion admits unboundedly when
+        item 0 is slow and successors are fast. The invariant is measured,
+        not asserted: advanced - yielded == in_flight + buffered + 1 at
+        every source pull, and must never exceed the window."""
+        from pyarallel import parallel_iter
+
+        window = 8
+        advanced = 0
+        yielded = 0
+        peak = 0
+
+        def source():
+            nonlocal advanced, peak
+            for i in range(200):
+                advanced += 1
+                peak = max(peak, advanced - yielded)
+                yield i
+
+        def slow_first(x):
+            time.sleep(0.3 if x == 0 else 0.001)
+            return x
+
+        for item in parallel_iter(
+            slow_first, source(), workers=4, batch_size=window, ordered=True
+        ):
+            assert item.ok
+            yielded += 1
+
+        assert yielded == 200
+        assert peak <= window
+
+    def test_ordered_failures_keep_their_position(self):
+        from pyarallel import parallel_iter
+
+        def maybe_fail(x):
+            if x == 1:
+                raise ValueError("bad")
+            return x
+
+        results = list(parallel_iter(maybe_fail, range(4), workers=4, ordered=True))
+        assert [item.index for item in results] == [0, 1, 2, 3]
+        assert not results[1].ok
+        assert isinstance(results[1].error, ValueError)
+
+    async def test_async_ordered_yields_input_order(self):
+        from pyarallel import async_parallel_iter
+
+        async def task(x):
+            await asyncio.sleep((5 - x) * 0.03)
+            return x * 10
+
+        results = []
+        async for item in async_parallel_iter(
+            task, range(6), concurrency=6, ordered=True
+        ):
+            results.append(item)
+        assert [item.index for item in results] == list(range(6))
+        assert [item.value for item in results] == [x * 10 for x in range(6)]
+
+    async def test_async_ordered_reorder_buffer_is_bounded(self):
+        from pyarallel import async_parallel_iter
+
+        window = 8
+        advanced = 0
+        yielded = 0
+        peak = 0
+
+        def source():
+            nonlocal advanced, peak
+            for i in range(200):
+                advanced += 1
+                peak = max(peak, advanced - yielded)
+                yield i
+
+        async def slow_first(x):
+            await asyncio.sleep(0.3 if x == 0 else 0.001)
+            return x
+
+        async for item in async_parallel_iter(
+            slow_first, source(), concurrency=4, batch_size=window, ordered=True
+        ):
+            assert item.ok
+            yielded += 1
+
+        assert yielded == 200
+        assert peak <= window
+
+
+class TestStreamingProgress:
+    """on_progress for streaming — same contract as parallel_map."""
+
+    def test_progress_final_call_is_n_of_n_for_sized_input(self):
+        from pyarallel import parallel_iter
+
+        calls = []
+        list(
+            parallel_iter(
+                lambda x: x,
+                range(10),
+                workers=4,
+                on_progress=lambda done, total: calls.append((done, total)),
+            )
+        )
+        assert calls[-1] == (10, 10)
+        assert [done for done, _ in calls] == list(range(1, 11))  # monotone
+
+    def test_progress_total_grows_for_unsized_input(self):
+        from pyarallel import parallel_iter
+
+        calls = []
+        list(
+            parallel_iter(
+                lambda x: x,
+                (i for i in range(10)),
+                workers=2,
+                on_progress=lambda done, total: calls.append((done, total)),
+            )
+        )
+        assert len(calls) == 10
+        assert calls[-1][0] == 10
+        assert all(done <= total for done, total in calls)
+
+    async def test_async_progress_final_call_is_n_of_n(self):
+        from pyarallel import async_parallel_iter
+
+        async def identity(x):
+            return x
+
+        calls = []
+        async for _item in async_parallel_iter(
+            identity,
+            range(10),
+            concurrency=4,
+            on_progress=lambda done, total: calls.append((done, total)),
+        ):
+            pass
+        assert calls[-1] == (10, 10)
+        assert [done for done, _ in calls] == list(range(1, 11))
+
+
 class TestAsyncParallelIter:
     async def test_basic(self):
         from pyarallel import async_parallel_iter
@@ -232,9 +563,7 @@ class TestAsyncParallelIter:
         from pyarallel import async_parallel_iter
 
         results = []
-        async for item in async_parallel_iter(
-            _async_none, [1, 2, 3], concurrency=2
-        ):
+        async for item in async_parallel_iter(_async_none, [1, 2, 3], concurrency=2):
             results.append(item)
 
         results.sort(key=lambda item: item.index)

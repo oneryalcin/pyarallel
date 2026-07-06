@@ -15,11 +15,14 @@ results = await async_parallel_map(
     *,
     concurrency=4,                   # Max concurrent tasks
     rate_limit=None,                 # RateLimit spec, shared Limiter, or ops/second
-    task_timeout=None,                    # Per-task timeout in seconds
+    timeout=None,                    # Total wall-clock timeout (mirror of sync)
+    task_timeout=None,               # Per-task timeout in seconds
     on_progress=None,                # callback(completed, total)
     batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
     checkpoint=None,                 # Path to a resume file (SQLite)
+    checkpoint_key=None,             # Stable per-item identity for resume
+    max_errors=None,                 # Abort after N failures
 )
 ```
 
@@ -33,11 +36,14 @@ results = await async_parallel_map(
 | `items` | `Iterable` | required | Any iterable |
 | `concurrency` | `int` | `4` | Maximum concurrent tasks |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting. Pass a shared `Limiter` to draw from one budget across calls |
+| `timeout` | `float \| None` | `None` | **Total** wall-clock timeout — mirror of the sync `timeout`. Unfinished tasks are cancelled; their slots are marked `TimeoutError` |
 | `task_timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback. For unsized iterables with batching, `total` is items seen so far |
 | `batch_size` | `int \| None` | `None` | Process items in chunks. With unsized iterables, input is consumed lazily one batch at a time |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
+| `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — see the [sync docs](core.md#checkpoint-resume) |
+| `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Tasks are then created through a bounded window; unrun items are marked `Aborted` — see the [sync docs](core.md#early-abort-with-max_errors) |
 
 ### Why `concurrency` instead of `workers`?
 
@@ -49,8 +55,11 @@ Pre-v1, Pyarallel keeps these names intentionally different. If you're moving fr
 
 ### Other Differences from Sync
 
-- `task_timeout` is **per-task** (via `asyncio.wait_for`), not total wall-clock like sync `timeout`
+- Both timeouts exist here: `timeout` is total wall-clock (same contract
+  as sync), `task_timeout` is per-task via `asyncio.wait_for` — the sync
+  API deliberately has no per-task timeout (threads can't be cancelled)
 - Uses `asyncio.TaskGroup` for structured concurrency — proper cleanup on errors
+- No `sequential=` — `concurrency=1` already serializes
 
 ### Examples
 
@@ -104,7 +113,10 @@ Takes the same options as `async_parallel_map`. Also available as `.starmap()` o
 
 ## `async_parallel_iter`
 
-Async streaming — yields `ItemResult` in completion order. Constant memory.
+Async streaming — yields `ItemResult` in completion order. A bounded
+window of tasks is in flight at any moment (default `2 × concurrency`,
+override with `batch_size`): memory stays constant, input is consumed
+lazily, and a slow item delays only itself.
 
 ```python
 from pyarallel import async_parallel_iter
@@ -116,13 +128,38 @@ async for item in async_parallel_iter(fetch, urls, concurrency=10):
         log_error(item.index, item.error)
 ```
 
+!!! note "Changed in v0.5"
+    `batch_size` is now an **in-flight bound**, not a chunk size — there
+    are no barriers between chunks, and input is never materialized.
+
+Takes the same `ordered=` and `on_progress=` options as `parallel_iter`:
+`ordered=True` yields in input order with a reorder buffer counted
+inside the window; `on_progress(done, total)` fires per completed item.
+
+To stop early, close the generator — unlike sync generators, a bare
+`break` does **not** finalize an async generator promptly (Python defers
+it to event-loop shutdown, so tasks keep running). Wrap the stream in
+`contextlib.aclosing`:
+
+```python
+from contextlib import aclosing
+
+async with aclosing(async_parallel_iter(fetch, urls)) as stream:
+    async for item in stream:
+        if enough(item):
+            break   # aclosing cancels in-flight tasks right here
+```
+
+Async tasks, unlike threads, are genuinely cancellable — once the
+generator is closed, in-flight work stops.
+
 Also available as `.stream()` on `@async_parallel` decorated functions:
 
 ```python
 @async_parallel(concurrency=10)
 async def fetch(url): ...
 
-async for item in fetch.stream(urls, batch_size=1000):
+async for item in fetch.stream(urls):
     if item.ok:
         await db.save(item.value)
     else:

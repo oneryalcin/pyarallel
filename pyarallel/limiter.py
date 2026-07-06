@@ -90,12 +90,23 @@ class Limiter:
                 return 0.0
             return max((1.0 - self._tokens) / self._rate, _MIN_WAIT)
 
-    def wait(self) -> None:
-        """Block the calling thread until a token is granted."""
+    def wait(self, timeout: float | None = None) -> bool:
+        """Block the calling thread until a token is granted.
+
+        With *timeout*, give up once a grant cannot happen within the
+        budget — consuming nothing — and return ``False``. Token accrual
+        is deterministic (a ``pause()`` can only push it further out), so
+        a predicted wait beyond the budget returns immediately instead of
+        sleeping the budget away. This is what lets a driver honor a
+        total ``timeout=`` while pacing submissions.
+        """
+        deadline = (self._clock() + timeout) if timeout is not None else None
         while True:
             delay = self._try_acquire()
             if delay <= 0:
-                return
+                return True
+            if deadline is not None and self._clock() + delay > deadline:
+                return False
             time.sleep(delay)
 
     async def wait_async(self) -> None:

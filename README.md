@@ -88,14 +88,16 @@ pip install pyarallel
 - **Shared quota** — one `Limiter` instance across calls and functions when the budget belongs to an API key: `rate_limit=Limiter(RateLimit(100, "minute"))`
 - **Retry with backoff** — per-item, exponential, jitter, exception filtering: `retry=Retry(attempts=3, on=(ConnectionError,))`
 - **Server-driven backoff** — honor 429 + `Retry-After`: `retry=Retry(retry_if=..., wait_from=...)`; the wait also pauses the shared limiter so one throttled task slows the whole pool
-- **Checkpoint/resume** — `checkpoint="run.ckpt"`: a crash at item 40,000 resumes instead of restarting from zero
-- **Batched execution** — lazy input consumption for generators, memory control: `batch_size=500`
-- **Streaming** — constant-memory processing via `parallel_iter` / `async_parallel_iter`
-- **Structured errors** — `ParallelResult` with `.ok`, `.successes()`, `.failures()`, `.raise_on_failure()`
-- **Timeouts** — wall-clock for the whole operation (`timeout=30.0`) or per-task in async (`task_timeout=5.0`)
-- **Progress callbacks** — `on_progress=lambda done, total: print(f"{done}/{total}")`
-- **Process executor** — CPU-bound work: `executor="process"`
-- **Decorator API** — `@parallel` / `@async_parallel` with `.map()`, `.starmap()`, `.stream()`
+- **Checkpoint/resume** — `checkpoint="run.ckpt"`: a crash at item 40,000 resumes instead of restarting from zero; `checkpoint_key=lambda u: u.id` keys rows by identity so evolving inputs keep completed work
+- **Early abort** — `max_errors=10`: a dead API costs tens of calls, not thousands; unrun items are marked `Aborted`, partial results returned
+- **Streaming** — sliding-window `parallel_iter` / `async_parallel_iter`: bounded in-flight window, lazy input, no batch barriers, `ordered=True` for input-order yields, per-item `attempts`/`duration`
+- **Structured errors** — `ParallelResult` with `.ok`, `.ok_values()`, `.successes()`, `.failures()`, `.raise_on_failure()`
+- **Timeouts** — total wall-clock on sync *and* async (`timeout=30.0`), per-task in async (`task_timeout=5.0`)
+- **Debug mode** — `sequential=True` runs inline: no pool, real stack traces, working breakpoints
+- **Progress callbacks** — `on_progress=lambda done, total: print(f"{done}/{total}")` on collected and streaming APIs
+- **Process executor** — CPU-bound work: `executor="process"`, with `worker_init=` and `max_tasks_per_worker=`
+- **Contextvars propagation** — correlation IDs survive into thread workers
+- **Decorator API** — `@parallel` / `@async_parallel` with `.map()`, `.starmap()`, `.stream()` — fully typed via `Unpack[TypedDict]`
 
 ## Quick Start
 
