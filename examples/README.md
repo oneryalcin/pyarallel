@@ -58,6 +58,18 @@ Shows decorator defaults, per-call overrides, retry, rate limiting, and timeout 
 python examples/05_configuration.py
 ```
 
+### 06_resilient_api_jobs.py
+
+The v0.5 overnight-job toolkit: sliding-window streaming with
+`ordered=True` and per-item `attempts`/`duration`, `max_errors` early
+abort (a dead API costs tens of calls, not thousands), `checkpoint_key=`
+resume that survives evolving inputs, and the `sequential=True` debug
+flag.
+
+```bash
+python examples/06_resilient_api_jobs.py
+```
+
 ## Quick Reference
 
 ### Basic Pattern
@@ -83,6 +95,9 @@ many = process_item.map([1, 2, 3, 4, 5])
 | `rate_limit` | `@parallel(...)` or `.map(...)` | `rate_limit=10` or `RateLimit(100, "minute")` |
 | `retry` | `.map(...)` or `parallel_map(...)` | `retry=Retry(attempts=3)` |
 | `timeout` | `.map(...)` or `parallel_map(...)` | `timeout=30.0` |
+| `max_errors` | `.map(...)`, `.stream(...)`, or engine functions | `max_errors=10` |
+| `checkpoint` / `checkpoint_key` | `.map(...)` or `parallel_map(...)` | `checkpoint="run.ckpt", checkpoint_key=lambda u: u.id` |
+| `sequential` | sync `.map(...)` / `.stream(...)` | `sequential=True` (debug mode) |
 
 ## Running All Examples
 

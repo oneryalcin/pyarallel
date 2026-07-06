@@ -16,7 +16,7 @@ from .limiter import Limiter
 from .policies import RateLimit, Retry
 from .result import Aborted, ItemResult, ParallelResult
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __all__ = [
     "ParallelResult",
     "ItemResult",

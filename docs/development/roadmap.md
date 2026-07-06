@@ -20,21 +20,28 @@ The library stays general-purpose (`parallel_map` over anything), but every
 roadmap decision is judged against one question: *does this make pyarallel
 decisively better than hand-rolling for API fan-out?*
 
-## Current (v0.4.0)
+## Current (v0.5.0)
 
 - `parallel_map()` / `.map()` — explicit parallel execution over iterables
 - `parallel_starmap()` / `.starmap()` — multi-argument parallel execution
-- `parallel_iter()` / `.stream()` — streaming results in completion order, constant memory
-- `@parallel` and `@async_parallel` decorators — preserve function signature *and types* (generic over params and return)
+- `parallel_iter()` / `.stream()` — sliding-window streaming: bounded
+  in-flight window, lazy input, no batch barriers; `ordered=True` for
+  input-order yields with a window-bounded reorder buffer
+- `@parallel` and `@async_parallel` decorators — preserve function signature *and types*; per-call options typed once per engine via `Unpack[TypedDict]`
 - Full async support via `asyncio.TaskGroup`
-- `ParallelResult` with structured error handling (`ExceptionGroup`)
+- `ParallelResult` with structured error handling (`ExceptionGroup`), `ok_values()` for the partial-failure path
+- `ItemResult.attempts` / `.duration` — per-item accounting on the streaming APIs
 - `RateLimit` — token-bucket spec with `burst` capacity
 - `Limiter` — shareable rate-limit runtime: one budget across calls, functions, sync and async
 - `Retry` — per-item retry with backoff, jitter, exception filtering, `retry_if` predicate, and `wait_from` server-driven waits that pause the shared limiter
-- `checkpoint=` — resumable runs (SQLite-backed, stdlib only) on `parallel_map` / `async_parallel_map` / `.map()`
-- `batch_size` — process items in chunks to control memory
-- Progress callbacks via `on_progress`
-- Timeout support (`timeout` for sync total, `task_timeout` for async per-task)
+- `max_errors=` — abort cheaply once N items fail (windowed admission; unrun items marked `Aborted`)
+- `checkpoint=` — resumable runs (SQLite-backed, stdlib only); `checkpoint_key=` keys rows by item identity so evolving inputs keep completed work
+- `sequential=True` — debug mode: run inline, no pool, real stack traces
+- Contextvars propagate into thread workers (correlation IDs survive)
+- `worker_init=` / `max_tasks_per_worker=` — worker lifecycle control
+- `batch_size` — in-flight window for streaming; chunking for collected maps
+- Progress callbacks via `on_progress` (collected and streaming)
+- Timeout support (`timeout` total on sync *and* async, `task_timeout` async per-task)
 - Instance method support via descriptor protocol
 - `mypy --strict` clean, with typed-interface assertions in CI (`tests/typing_assertions.py`)
 
@@ -136,52 +143,18 @@ change and that's acceptable now.
 
 ---
 
-## v0.5 — Structural quality
+## v0.5 — Structural quality *(shipped in 0.5.0)*
 
-Detailed implementation contract: [v0.5.0 Plan](plans/v0.5.0.md).
-
-### Sliding-window streaming
-
-`parallel_iter` has a batch barrier: one straggler stalls the entire next
-batch, and *without* `batch_size` it materializes the whole input. Replace the
-batch loop with a bounded in-flight window — submit the next item as each
-completes. This makes streaming truly streaming by default, removes the
-barrier, and makes **`ordered=True`** (yield in input order) nearly free.
-
-### Result metadata
-
-`ItemResult` and failure entries gain `attempts` and `duration`. Cheap to
-record, and exactly what API jobs need for cost and latency accounting. Add
-`ParallelResult.ok_values()` — extracting successful values from a partial
-failure is currently `[v for _, v in result.successes()]`, which is clunky for
-the most common path.
-
-### `max_errors`
-
-Stop early after N failures instead of processing all items. When hitting a
-dead API, don't waste 10,000 calls when the first 10 all failed. Returns
-partial results. This is circuit-breaker-lite — we ship this *instead of* a
-separate circuit breaker abstraction.
-
-### Adversarial-review follow-ups (deferred from the v0.4 review)
-
-- **`checkpoint_key=`** — caller-supplied stable ID per item (e.g.
-  `lambda item: item.id`) so resume survives reordered or prepended
-  inputs. Positional keying is documented as a limitation until then.
-- **Decorator kwarg dedup** — the four wrapper classes hand-copy the same
-  parameter list; a signature change touches five places. Consolidate
-  without adding abstraction layers.
-
-### Parity and ergonomics (small, cheap, after the above)
-
-- **Sequential/testing mode** — `sequential=True` runs in the calling thread.
-  Deterministic debugging, working breakpoints, readable stack traces.
-- **`async_parallel_map` with `timeout=`** — total wall-clock parity with sync.
-- **Context variable propagation** — copy `contextvars.Context` into worker
-  threads so correlation IDs and request tracing survive.
-- **`on_progress` for streaming** — parity with `parallel_map`.
-- **Worker initializer** — `worker_init=` pass-through to executor `initializer=`.
-- **`max_tasks_per_worker`** — pass-through to `max_tasks_per_child=`.
+Implementation contract and review-amendment history:
+[v0.5.0 Plan](plans/v0.5.0.md). Delivered: sliding-window streaming with
+`ordered=True` and streaming `on_progress`; `max_errors` early abort
+with windowed admission; `ItemResult.attempts`/`.duration` and
+`ParallelResult.ok_values()`; `checkpoint_key=` with schema-v2
+type-tagged keys; `sequential=True`; async total `timeout=`;
+contextvars propagation; `worker_init=`; `max_tasks_per_worker=`;
+decorator signature dedup via `Unpack[TypedDict]`. Two four-review
+cycles (Codex ×2, independent code review, adversarial design review)
+ran during development; every finding is triaged in the plan document.
 
 ---
 
@@ -197,6 +170,13 @@ positioned as the ergonomic layer over it. Cheap to verify, real story to tell.
 
 Python 3.14's `InterpreterPoolExecutor` (PEP 734) as a third executor —
 near-pass-through implementation, guarded by version check.
+
+### Collected-map engine unification
+
+The plain collected path still batches with a barrier while the
+`max_errors` path admits through a window (documented coupling, flagged
+in the v0.5 design review). Unify collected maps onto the windowed
+engine so `batch_size` means one thing everywhere.
 
 ---
 

@@ -201,20 +201,44 @@ Rules of thumb:
 
 - One checkpoint file per (function, input list) pair. Don't share a file
   between different jobs — the function-identity guard will fail closed.
+- **Inputs that evolve between runs? Use `checkpoint_key`.** Positional
+  rows recompute everything after a prepend or reorder; identity-keyed
+  rows keep completed work:
+
+  ```python
+  results = parallel_map(fetch, users, checkpoint="run.ckpt",
+                         checkpoint_key=lambda u: u.id)
+  ```
 - Delete the file when you *want* a full recompute (a config change
-  hidden inside a captured client object, reordered inputs). Plain captured
+  hidden inside a captured client object). Plain captured
   config — a changed default, closure value, or partial argument — is
   caught automatically and fails closed.
 - Checkpointing requires picklable items and results; an unpicklable
   result stops the run with `CheckpointError` rather than pretending.
 
-## Testing
+## Overnight Jobs: Pair max_errors with checkpoint
 
-`parallel_map` with `workers=1` runs sequentially — deterministic for tests:
+The unattended-job failure mode is a dead API at 2 a.m.: without a
+guard, the job burns its whole quota failing. `max_errors` caps the
+cost, `checkpoint` preserves the successes, and the morning rerun
+resumes exactly where it stopped:
+
+```python
+result = parallel_map(fetch, users, workers=10,
+                      max_errors=10, checkpoint="nightly.ckpt")
+```
+
+## Testing and Debugging
+
+`sequential=True` runs every item inline in the calling thread — no
+pool, deterministic order, real stack traces, working breakpoints. It
+still honors rate limits, retry, and checkpointing, and `workers` is
+ignored rather than rejected, so one env flag flips production code
+into debug mode:
 
 ```python
 def test_processing():
-    result = parallel_map(process, [1, 2, 3], workers=1)
+    result = parallel_map(process, [1, 2, 3], sequential=True)
     assert list(result) == [expected_1, expected_2, expected_3]
 ```
 
