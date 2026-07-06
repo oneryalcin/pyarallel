@@ -57,6 +57,7 @@ class _BoundParallel[R]:
         batch_size: int | None = None,
         retry: Retry | None = None,
         checkpoint: str | Path | None = None,
+        checkpoint_key: Callable[[Any], str | int | bytes] | None = None,
         max_errors: int | None = None,
     ) -> ParallelResult[R]:
         """Run this function over *items* in parallel."""
@@ -73,6 +74,7 @@ class _BoundParallel[R]:
                 batch_size=batch_size,
                 retry=retry,
                 checkpoint=checkpoint,
+                checkpoint_key=checkpoint_key,
                 max_errors=max_errors,
             ),
         )
@@ -148,6 +150,7 @@ class _ParallelFunc[**P, R]:
         batch_size: int | None = None,
         retry: Retry | None = None,
         checkpoint: str | Path | None = None,
+        checkpoint_key: Callable[[Any], str | int | bytes] | None = None,
         max_errors: int | None = None,
     ) -> ParallelResult[R]:
         """Run this function over *items* in parallel."""
@@ -164,6 +167,7 @@ class _ParallelFunc[**P, R]:
                 batch_size=batch_size,
                 retry=retry,
                 checkpoint=checkpoint,
+                checkpoint_key=checkpoint_key,
                 max_errors=max_errors,
             ),
         )
@@ -271,6 +275,7 @@ class _BoundAsyncParallel[R]:
         batch_size: int | None = None,
         retry: Retry | None = None,
         checkpoint: str | Path | None = None,
+        checkpoint_key: Callable[[Any], str | int | bytes] | None = None,
         max_errors: int | None = None,
     ) -> ParallelResult[R]:
         return await async_parallel_map(
@@ -285,6 +290,7 @@ class _BoundAsyncParallel[R]:
                 batch_size=batch_size,
                 retry=retry,
                 checkpoint=checkpoint,
+                checkpoint_key=checkpoint_key,
                 max_errors=max_errors,
             ),
         )
@@ -351,6 +357,7 @@ class _AsyncParallelFunc[**P, R]:
         batch_size: int | None = None,
         retry: Retry | None = None,
         checkpoint: str | Path | None = None,
+        checkpoint_key: Callable[[Any], str | int | bytes] | None = None,
         max_errors: int | None = None,
     ) -> ParallelResult[R]:
         return await async_parallel_map(
@@ -365,6 +372,7 @@ class _AsyncParallelFunc[**P, R]:
                 batch_size=batch_size,
                 retry=retry,
                 checkpoint=checkpoint,
+                checkpoint_key=checkpoint_key,
                 max_errors=max_errors,
             ),
         )

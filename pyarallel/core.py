@@ -33,7 +33,7 @@ from ._plan import (
     _validate_max_errors,
 )
 from ._procexec import _call_resolved, _call_resolved_args, _resolve_process_target
-from .checkpoint import _CheckpointStore, _task_signature
+from .checkpoint import _open_checkpoint
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
 from .result import (
@@ -177,6 +177,7 @@ def parallel_map[T, R](
     batch_size: int | None = None,
     retry: Retry | None = None,
     checkpoint: str | Path | None = None,
+    checkpoint_key: Callable[[T], str | int | bytes] | None = None,
     max_errors: int | None = None,
 ) -> ParallelResult[R]:
     """Execute *fn* over *items* in parallel, returning ordered results.
@@ -213,8 +214,16 @@ def parallel_map[T, R](
             identity: resuming with a different function raises
             ``CheckpointError``. Items and results must be picklable; a
             result that cannot be checkpointed aborts the run with
-            ``CheckpointError``. Rows are positional — reordering or
-            inserting inputs forces shifted items to recompute.
+            ``CheckpointError``. Rows are positional by default —
+            reordering or inserting inputs forces shifted items to
+            recompute; pass ``checkpoint_key`` when inputs evolve.
+        checkpoint_key: Stable identity for each item (returns str, int,
+            or bytes) — checkpoint rows are then keyed by identity, not
+            position, so prepending or reordering inputs no longer
+            invalidates completed work. Requires ``checkpoint=``.
+            Duplicate keys raise ``CheckpointError``; the item fingerprint
+            check still applies (a changed payload under the same key
+            recomputes).
         max_errors: Abort after this many failures (counted after retries
             are exhausted). Work is then admitted through a bounded window
             rather than submitted upfront, so a dead API costs tens of
@@ -229,6 +238,8 @@ def parallel_map[T, R](
     """
     _validate_common(workers, executor, batch_size)
     _validate_max_errors(max_errors)
+    if checkpoint_key is not None and checkpoint is None:
+        raise ValueError("checkpoint_key requires checkpoint= to be set")
 
     if max_errors is not None:
         return _collected_map_windowed(
@@ -242,6 +253,7 @@ def parallel_map[T, R](
             batch_size=batch_size,
             retry=retry,
             checkpoint=checkpoint,
+            checkpoint_key=checkpoint_key,
             max_errors=max_errors,
         )
 
@@ -258,11 +270,10 @@ def parallel_map[T, R](
     results = plan.results
 
     store = (
-        _CheckpointStore(checkpoint, _task_signature(fn))
+        _open_checkpoint(checkpoint, fn, checkpoint_key)
         if checkpoint is not None
         else None
     )
-    fingerprints: dict[int, bytes] = {}
     pool = pool_cls(max_workers=workers)
     try:
         for batch in plan.batches:
@@ -286,15 +297,13 @@ def parallel_map[T, R](
             futures: dict[Future[_Outcome], int] = {}
             for idx, item in batch:
                 if store is not None:
-                    fp = _CheckpointStore.fingerprint(item)
-                    cached = store.get(idx, fp)
+                    cached = store.lookup(idx, item)
                     if cached is not None:
                         results[idx] = cached[0]
                         completed += 1
                         if on_progress:
                             on_progress(completed, _progress_total(plan.total, results))
                         continue
-                    fingerprints[idx] = fp
                 if bucket:
                     bucket.wait()
                 futures[pool.submit(task_fn, item)] = idx
@@ -317,7 +326,7 @@ def parallel_map[T, R](
                             # raises CheckpointError instead of mislabeling
                             # a genuine success as an item failure.
                             if store is not None:
-                                store.put(idx, fingerprints.pop(idx), results[idx])
+                                store.put(idx, results[idx])
                     completed += 1
                     if on_progress:
                         on_progress(completed, _progress_total(plan.total, results))
@@ -350,6 +359,7 @@ def _collected_map_windowed(
     batch_size: int | None,
     retry: Retry | None,
     checkpoint: str | Path | None,
+    checkpoint_key: Callable[[Any], str | int | bytes] | None,
     max_errors: int,
 ) -> ParallelResult[Any]:
     """Collected map with bounded admission — the ``max_errors`` engine.
@@ -372,7 +382,6 @@ def _collected_map_windowed(
     source = iter(items)
     results: list[Any] = []
     in_flight: dict[Future[_Outcome], int] = {}
-    fingerprints: dict[int, bytes] = {}
     completed = 0
     failures = 0
     aborted = False
@@ -380,7 +389,7 @@ def _collected_map_windowed(
     deadline = (time.monotonic() + timeout) if timeout is not None else None
 
     store = (
-        _CheckpointStore(checkpoint, _task_signature(fn))
+        _open_checkpoint(checkpoint, fn, checkpoint_key)
         if checkpoint is not None
         else None
     )
@@ -400,14 +409,12 @@ def _collected_map_windowed(
             idx = len(results)
             results.append(_PENDING)
             if store is not None:
-                fp = _CheckpointStore.fingerprint(item)
-                cached = store.get(idx, fp)
+                cached = store.lookup(idx, item)
                 if cached is not None:
                     results[idx] = cached[0]
                     completed += 1
                     _report()
                     continue  # cached — keep looking for work to admit
-                fingerprints[idx] = fp
             if bucket:
                 bucket.wait()
             in_flight[pool.submit(task_fn, item)] = idx
@@ -432,7 +439,7 @@ def _collected_map_windowed(
             # Outside the except: a checkpoint write failure raises
             # CheckpointError instead of mislabeling a success as a failure.
             if store is not None:
-                store.put(idx, fingerprints.pop(idx), results[idx])
+                store.put(idx, results[idx])
         completed += 1
         _report()
 

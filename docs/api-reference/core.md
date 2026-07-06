@@ -19,6 +19,7 @@ results = parallel_map(
     batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
     checkpoint=None,                 # Path to a resume file (SQLite)
+    checkpoint_key=None,             # Stable per-item identity for resume
     max_errors=None,                 # Abort after N failures
 )
 ```
@@ -39,6 +40,7 @@ results = parallel_map(
 | `batch_size` | `int \| None` | `None` | Process items in chunks of this size. With unsized iterables, input is consumed lazily one batch at a time |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
+| `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires `checkpoint=` |
 | `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Unrun items are marked `Aborted` |
 
 ### Examples
@@ -126,10 +128,24 @@ Constraints, stated honestly:
   checkpointed aborts the run with `CheckpointError` — the alternative
   (mislabeling a successful item as failed, or continuing with a checkpoint
   that cannot resume) would lie to you.
-- **Rows are positional.** Reordering, prepending, or removing input items
-  shifts indices; the fingerprint check then forces every shifted item to
-  recompute. Resume is designed for *the same call, rerun* — not for
-  evolving input lists.
+- **Rows are positional by default.** Reordering, prepending, or removing
+  input items shifts indices; the fingerprint check then forces every
+  shifted item to recompute. Pass `checkpoint_key=` when inputs evolve:
+
+  ```python
+  parallel_map(fetch, users, checkpoint="run.ckpt",
+               checkpoint_key=lambda u: u.id)
+  ```
+
+  Rows are then keyed by identity — prepending an item runs only the new
+  item, reordering recomputes nothing. Keys must be unique per run
+  (duplicates raise `CheckpointError`); keys are type-tagged, so `1`,
+  `"1"`, and `b"1"` are three distinct rows; the fingerprint check still
+  applies — a changed payload under the same key recomputes. Changing the
+  key function just changes the keys (a cache miss, never a wrong hit).
+- **Checkpoint files are schema v2.** Files written by earlier versions
+  fail closed with a `CheckpointError` telling you to delete them — no
+  silent migration.
 - **One run per file at a time.** Failures are never checkpointed; a
   resumed run retries them. Sharing one file between concurrently running
   jobs is not supported.

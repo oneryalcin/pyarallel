@@ -85,7 +85,7 @@ class TestResume:
         def work(x):
             return lambda: x  # lambdas can't be pickled
 
-        with pytest.raises(CheckpointError, match="item 0"):
+        with pytest.raises(CheckpointError, match="i:0"):
             parallel_map(work, [1], checkpoint=ckpt)
 
     def test_progress_counts_cached_items(self, tmp_path):
@@ -296,7 +296,216 @@ class TestAsyncCheckpointErrorContract:
         async def work(x):
             return lambda: x  # unpicklable
 
-        with pytest.raises(CheckpointError, match="item 0") as excinfo:
+        with pytest.raises(CheckpointError, match="i:0") as excinfo:
             await async_parallel_map(work, [1], checkpoint=tmp_path / "run.ckpt")
         assert not isinstance(excinfo.value, BaseExceptionGroup)
         assert excinfo.value.__cause__ is not None  # pickle error chain kept
+
+
+class TestCheckpointKey:
+    """checkpoint_key= — identity-keyed rows that survive input evolution."""
+
+    def test_prepending_an_item_only_runs_the_new_item(self, tmp_path):
+        """The deferred v0.4 finding: positional rows made resume evaporate
+        exactly when jobs evolve. Keyed rows survive a prepend."""
+        ckpt = tmp_path / "run.ckpt"
+        calls = []
+
+        def work(item):
+            calls.append(item)
+            return item * 10
+
+        key = int  # item value is its identity
+
+        assert parallel_map(work, [2, 3, 4], checkpoint=ckpt, checkpoint_key=key).ok
+        calls.clear()
+        result = parallel_map(work, [1, 2, 3, 4], checkpoint=ckpt, checkpoint_key=key)
+        assert list(result) == [10, 20, 30, 40]
+        assert calls == [1]  # only the prepended item ran
+
+    def test_reordering_inputs_recomputes_nothing(self, tmp_path):
+        ckpt = tmp_path / "run.ckpt"
+        calls = []
+
+        def work(item):
+            calls.append(item)
+            return item * 10
+
+        assert parallel_map(work, [1, 2, 3], checkpoint=ckpt, checkpoint_key=int).ok
+        calls.clear()
+        result = parallel_map(work, [3, 1, 2], checkpoint=ckpt, checkpoint_key=int)
+        assert list(result) == [30, 10, 20]
+        assert calls == []
+
+    def test_cross_type_keys_do_not_collide(self, tmp_path):
+        """1, "1", and b"1" must be three distinct rows — plain text
+        normalization would silently serve the wrong result."""
+        ckpt = tmp_path / "run.ckpt"
+        items = [1, "1", b"1"]
+
+        def work(item):
+            return repr(item)
+
+        first = parallel_map(work, items, checkpoint=ckpt, checkpoint_key=lambda x: x)
+        assert list(first) == ["1", "'1'", "b'1'"]
+        # All three rows resumed independently, none served across types.
+        calls = []
+
+        def work2(item):
+            calls.append(item)
+            return repr(item)
+
+        # same signature requirement: reuse work via same file needs same fn;
+        # rerun with the original function instead
+        second = parallel_map(work, items, checkpoint=ckpt, checkpoint_key=lambda x: x)
+        assert list(second) == ["1", "'1'", "b'1'"]
+
+    def test_duplicate_key_raises(self, tmp_path):
+        with pytest.raises(CheckpointError, match="duplicate checkpoint_key"):
+            parallel_map(
+                lambda x: x,
+                [1, 1],
+                checkpoint=tmp_path / "run.ckpt",
+                checkpoint_key=int,
+            )
+
+    def test_key_function_error_propagates_at_submit(self, tmp_path):
+        def bad_key(item):
+            raise RuntimeError("key exploded")
+
+        with pytest.raises(RuntimeError, match="key exploded"):
+            parallel_map(
+                lambda x: x,
+                [1],
+                checkpoint=tmp_path / "run.ckpt",
+                checkpoint_key=bad_key,
+            )
+
+    def test_invalid_key_type_raises(self, tmp_path):
+        with pytest.raises(CheckpointError, match="str, int, or bytes"):
+            parallel_map(
+                lambda x: x,
+                [1],
+                checkpoint=tmp_path / "run.ckpt",
+                checkpoint_key=lambda x: 1.5,
+            )
+
+    def test_changed_payload_under_same_key_recomputes(self, tmp_path):
+        """key = which row; fingerprint = has the payload changed."""
+        ckpt = tmp_path / "run.ckpt"
+        calls = []
+
+        def work(item):
+            calls.append(item)
+            return item["v"]
+
+        key = lambda item: item["id"]  # noqa: E731
+        assert parallel_map(
+            work, [{"id": 1, "v": 10}], checkpoint=ckpt, checkpoint_key=key
+        ).ok
+        calls.clear()
+        result = parallel_map(
+            work, [{"id": 1, "v": 99}], checkpoint=ckpt, checkpoint_key=key
+        )
+        assert list(result) == [99]
+        assert len(calls) == 1  # same key, changed payload → recomputed
+
+    def test_checkpoint_key_without_checkpoint_rejected(self):
+        with pytest.raises(ValueError, match="checkpoint_key requires"):
+            parallel_map(lambda x: x, [1], checkpoint_key=int)
+
+    async def test_async_checkpoint_key_resume(self, tmp_path):
+        ckpt = tmp_path / "run.ckpt"
+        calls = []
+
+        async def work(item):
+            calls.append(item)
+            return item * 10
+
+        first = await async_parallel_map(
+            work, [2, 3], checkpoint=ckpt, checkpoint_key=int
+        )
+        assert first.ok
+        calls.clear()
+        second = await async_parallel_map(
+            work, [1, 2, 3], checkpoint=ckpt, checkpoint_key=int
+        )
+        assert list(second) == [10, 20, 30]
+        assert calls == [1]
+
+    def test_checkpoint_key_with_max_errors_resumes(self, tmp_path):
+        """The evolving-inputs overnight job: keyed rows + early abort."""
+        ckpt = tmp_path / "run.ckpt"
+        state = {"broken": True}
+        calls = []
+
+        def api(item):
+            calls.append(item)
+            if item >= 5 and state["broken"]:
+                raise ConnectionError("down")
+            return item * 10
+
+        first = parallel_map(
+            api,
+            range(20),
+            workers=1,
+            max_errors=3,
+            checkpoint=ckpt,
+            checkpoint_key=int,
+        )
+        assert not first.ok
+
+        state["broken"] = False
+        calls.clear()
+        # Inputs evolved: two new items prepended — keyed rows still hit.
+        second = parallel_map(
+            api,
+            [100, 101, *range(20)],
+            workers=1,
+            max_errors=3,
+            checkpoint=ckpt,
+            checkpoint_key=int,
+        )
+        assert second.ok
+        assert set(calls).isdisjoint(range(5))  # completed items never re-ran
+
+
+class TestSchemaV2:
+    def test_pre_v2_file_fails_closed(self, tmp_path):
+        """A v0.4-era positional file (no schema_version) must be refused
+        with instructions, never silently migrated or misread."""
+        import sqlite3
+
+        path = tmp_path / "old.ckpt"
+        conn = sqlite3.connect(path)
+        conn.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        conn.execute(
+            "CREATE TABLE results (idx INTEGER PRIMARY KEY,"
+            " fingerprint BLOB NOT NULL, value BLOB NOT NULL)"
+        )
+        conn.execute(
+            "INSERT INTO meta (key, value) VALUES ('task_signature', 'old.fn:abc')"
+        )
+        conn.commit()
+        conn.close()
+
+        with pytest.raises(CheckpointError, match="unsupported schema"):
+            parallel_map(_double, [1], checkpoint=path)
+
+    def test_positional_mode_still_resumes(self, tmp_path):
+        """No checkpoint_key: same behavior as before, new on-disk encoding."""
+        ckpt = tmp_path / "run.ckpt"
+        calls = []
+
+        def work(item):
+            calls.append(item)
+            return item * 10
+
+        assert parallel_map(work, [1, 2, 3], checkpoint=ckpt).ok
+        calls.clear()
+        assert list(parallel_map(work, [1, 2, 3], checkpoint=ckpt)) == [10, 20, 30]
+        assert calls == []
+
+
+def _double(x):
+    return x * 2

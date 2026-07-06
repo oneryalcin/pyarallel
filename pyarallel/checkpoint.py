@@ -1,28 +1,39 @@
 """Checkpoint store: resumable ``parallel_map`` runs.
 
-SQLite-backed — stdlib only, zero dependencies preserved. Rows are keyed by
-item index plus a fingerprint of the pickled item, and the whole file is
-bound to the identity of the mapped callable (name + bytecode): resuming
-with a different function fails closed instead of silently serving another
-computation's results.
+SQLite-backed — stdlib only, zero dependencies preserved. Rows are keyed
+by a type-tagged key (positional index by default, a user key with
+``checkpoint_key=``) plus a fingerprint of the pickled item, and the whole
+file is bound to the identity of the mapped callable (name + bytecode):
+resuming with a different function fails closed instead of silently
+serving another computation's results.
+
+Schema v2 (the only schema): ``results(key TEXT PRIMARY KEY, fingerprint,
+value)`` with keys encoded ``i:<decimal>`` / ``s:<text>`` / ``b:<base64>``
+— type-tagged and reversible, so ``1``, ``"1"``, and ``b"1"`` are three
+distinct rows. Files without ``schema_version = '2'`` (including v0.4-era
+positional files) fail closed with instructions to delete: one rule, no
+silent migration.
 
 Constraints (documented, not hidden): items and results must be picklable;
 a result that cannot be checkpointed aborts the run with
-``CheckpointError`` rather than mislabeling a successful item. Rows are
-positional — reordering or inserting input items shifts indices, and the
-fingerprint then forces recomputation of every shifted item. Items whose
-pickle is not deterministic (e.g. containing sets) fingerprint differently
-across runs and are safely recomputed.
+``CheckpointError`` rather than mislabeling a successful item. Positional
+rows mean reordering or inserting input items shifts indices, and the
+fingerprint then forces recomputation of every shifted item — use
+``checkpoint_key=`` when inputs evolve. Items whose pickle is not
+deterministic (e.g. containing sets) fingerprint differently across runs
+and are safely recomputed.
 """
 
 from __future__ import annotations
 
+import base64
 import functools
 import hashlib
 import inspect
 import pickle
 import sqlite3
 import types
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -138,8 +149,28 @@ def _task_signature(fn: Any) -> str:
     return f"{module}.{qualname}:{state.hexdigest()[:16]}"
 
 
+_SCHEMA_VERSION = "2"
+
+
+def _encode_key(key: Any) -> str:
+    """Type-tagged, reversible row-key encoding.
+
+    ``1``, ``"1"``, and ``b"1"`` must be three distinct rows — plain text
+    normalization would collide them and silently serve the wrong result.
+    """
+    if isinstance(key, bool) or not isinstance(key, (int, str, bytes)):
+        raise CheckpointError(
+            f"checkpoint_key must return str, int, or bytes, got {type(key).__name__}"
+        )
+    if isinstance(key, int):
+        return f"i:{key}"
+    if isinstance(key, str):
+        return f"s:{key}"
+    return f"b:{base64.b64encode(key).decode('ascii')}"
+
+
 class _CheckpointStore:
-    """One SQLite file of completed ``(index, fingerprint) -> value`` rows.
+    """One SQLite file of completed ``(key, fingerprint) -> value`` rows.
 
     All access happens from the thread that created the store (the sync
     submit/collect loop, or the event loop thread), so the default sqlite3
@@ -162,47 +193,64 @@ class _CheckpointStore:
             " key TEXT PRIMARY KEY,"
             " value TEXT NOT NULL)"
         )
-        self._conn.execute(
-            "CREATE TABLE IF NOT EXISTS results ("
-            " idx INTEGER PRIMARY KEY,"
-            " fingerprint BLOB NOT NULL,"
-            " value BLOB NOT NULL)"
-        )
-        row = self._conn.execute(
-            "SELECT value FROM meta WHERE key = 'task_signature'"
-        ).fetchone()
-        if row is None:
+        version = self._meta("schema_version")
+        signature_row = self._meta("task_signature")
+        if version is None and signature_row is None:
+            # Fresh file — stamp it as schema v2.
             self._conn.execute(
-                "INSERT INTO meta (key, value) VALUES ('task_signature', ?)",
-                (signature,),
+                "CREATE TABLE IF NOT EXISTS results ("
+                " key TEXT PRIMARY KEY,"
+                " fingerprint BLOB NOT NULL,"
+                " value BLOB NOT NULL)"
             )
-        elif row[0] != signature:
+            self._conn.execute(
+                "INSERT INTO meta (key, value) VALUES"
+                " ('schema_version', ?), ('task_signature', ?)",
+                (_SCHEMA_VERSION, signature),
+            )
+        elif version != _SCHEMA_VERSION:
+            # One rule, no silent migration: anything not stamped v2 —
+            # including v0.4-era positional files — fails closed.
+            self._conn.close()
+            raise CheckpointError(
+                f"Checkpoint {str(path)!r} uses an unsupported schema "
+                f"(found {version!r}, need {_SCHEMA_VERSION!r}). It was "
+                "written by an older pyarallel — delete the file to start "
+                "fresh."
+            )
+        elif signature_row != signature:
             self._conn.close()
             raise CheckpointError(
                 f"Checkpoint {str(path)!r} was created by a different function "
-                f"({row[0]}, now {signature}). Refusing to reuse its results — "
-                "delete the file or use a different checkpoint path."
+                f"({signature_row}, now {signature}). Refusing to reuse its "
+                "results — delete the file or use a different checkpoint path."
             )
         self._conn.commit()
+
+    def _meta(self, key: str) -> str | None:
+        row = self._conn.execute(
+            "SELECT value FROM meta WHERE key = ?", (key,)
+        ).fetchone()
+        return None if row is None else str(row[0])
 
     @staticmethod
     def fingerprint(item: Any) -> bytes:
         """Content hash of *item* used to detect changed inputs."""
         return hashlib.sha256(pickle.dumps(item)).digest()
 
-    def get(self, idx: int, fingerprint: bytes) -> tuple[Any] | None:
+    def get(self, key: str, fingerprint: bytes) -> tuple[Any] | None:
         """Return ``(value,)`` for a matching row, else ``None``.
 
         The 1-tuple wrapper distinguishes a stored ``None`` from a miss.
         """
         row = self._conn.execute(
-            "SELECT fingerprint, value FROM results WHERE idx = ?", (idx,)
+            "SELECT fingerprint, value FROM results WHERE key = ?", (key,)
         ).fetchone()
         if row is None or row[0] != fingerprint:
             return None
         return (pickle.loads(row[1]),)
 
-    def put(self, idx: int, fingerprint: bytes, value: Any) -> None:
+    def put(self, key: str, fingerprint: bytes, value: Any) -> None:
         """Record a completed item.
 
         Raises ``CheckpointError`` when the value cannot be pickled or the
@@ -212,15 +260,73 @@ class _CheckpointStore:
         try:
             blob = pickle.dumps(value)
             self._conn.execute(
-                "INSERT OR REPLACE INTO results (idx, fingerprint, value)"
+                "INSERT OR REPLACE INTO results (key, fingerprint, value)"
                 " VALUES (?, ?, ?)",
-                (idx, fingerprint, blob),
+                (key, fingerprint, blob),
             )
             self._conn.commit()
         except Exception as exc:
             raise CheckpointError(
-                f"Failed to checkpoint result for item {idx}: {exc}"
+                f"Failed to checkpoint result for row {key!r}: {exc}"
             ) from exc
 
     def close(self) -> None:
         self._conn.close()
+
+
+class _RunCheckpoint:
+    """Per-run view of a checkpoint store, as the engines consume it.
+
+    Owns row-key computation (positional ``i:<idx>`` or the user's
+    ``checkpoint_key``), duplicate-key detection, and the idx → (key,
+    fingerprint) bookkeeping between lookup and put. Key-function errors
+    propagate at lookup time — fail loud at submit, not at resume.
+    """
+
+    __slots__ = ("_store", "_key_fn", "_seen", "_rows")
+
+    def __init__(
+        self,
+        store: _CheckpointStore,
+        key_fn: Callable[[Any], str | int | bytes] | None,
+    ) -> None:
+        self._store = store
+        self._key_fn = key_fn
+        self._seen: set[str] = set()
+        self._rows: dict[int, tuple[str, bytes]] = {}
+
+    def lookup(self, idx: int, item: Any) -> tuple[Any] | None:
+        """Cached ``(value,)`` for *item*, else ``None`` (and remember the
+        row so a later ``put(idx, ...)`` writes to the right place)."""
+        if self._key_fn is None:
+            key = f"i:{idx}"
+        else:
+            key = _encode_key(self._key_fn(item))
+            if key in self._seen:
+                raise CheckpointError(
+                    f"duplicate checkpoint_key {key!r} — two input items "
+                    "map to the same row, which would silently corrupt "
+                    "resume. Keys must be unique per run."
+                )
+            self._seen.add(key)
+        fingerprint = _CheckpointStore.fingerprint(item)
+        cached = self._store.get(key, fingerprint)
+        if cached is None:
+            self._rows[idx] = (key, fingerprint)
+        return cached
+
+    def put(self, idx: int, value: Any) -> None:
+        key, fingerprint = self._rows.pop(idx)
+        self._store.put(key, fingerprint, value)
+
+    def close(self) -> None:
+        self._store.close()
+
+
+def _open_checkpoint(
+    path: str | Path,
+    fn: Any,
+    key_fn: Callable[[Any], str | int | bytes] | None,
+) -> _RunCheckpoint:
+    """Open (or create) a checkpoint file for one run of *fn*."""
+    return _RunCheckpoint(_CheckpointStore(path, _task_signature(fn)), key_fn)

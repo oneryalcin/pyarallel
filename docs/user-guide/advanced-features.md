@@ -246,8 +246,19 @@ Safety guards, stated honestly:
   changes. Bound methods and callable objects are rejected outright: their
   entire state is opaque.
 - A changed input at the same position is recomputed, never served stale.
-- Rows are positional: reordering or inserting inputs forces shifted items
-  to recompute. Resume is for *the same call, rerun*.
+- Rows are positional by default: reordering or inserting inputs forces
+  shifted items to recompute. For evolving inputs, key rows by identity:
+
+  ```python
+  result = parallel_map(fetch, users, checkpoint="run.ckpt",
+                        checkpoint_key=lambda u: u.id)
+  # next week: three new users prepended — only they run
+  ```
+
+  Duplicate keys raise `CheckpointError`; keys are type-tagged (`1` vs
+  `"1"` vs `b"1"` never collide); a changed payload under the same key
+  still recomputes.
+- Checkpoint files from pyarallel < 0.5 fail closed — delete and rerun.
 - Items and results must be picklable; a result that cannot be
   checkpointed aborts the run with `CheckpointError`.
 

@@ -20,6 +20,7 @@ results = await async_parallel_map(
     batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
     checkpoint=None,                 # Path to a resume file (SQLite)
+    checkpoint_key=None,             # Stable per-item identity for resume
     max_errors=None,                 # Abort after N failures
 )
 ```
@@ -39,6 +40,7 @@ results = await async_parallel_map(
 | `batch_size` | `int \| None` | `None` | Process items in chunks. With unsized iterables, input is consumed lazily one batch at a time |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
+| `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — see the [sync docs](core.md#checkpoint-resume) |
 | `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Tasks are then created through a bounded window; unrun items are marked `Aborted` — see the [sync docs](core.md#early-abort-with-max_errors) |
 
 ### Why `concurrency` instead of `workers`?
