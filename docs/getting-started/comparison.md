@@ -62,6 +62,12 @@ one call in isolation; it cannot pause the *pool* when the server says
 `Retry-After: 30`, so every worker discovers the 429 separately. And
 resume-after-crash never gets built because it's a project in itself.
 
+The async spelling of the hand-roll — `asyncio.TaskGroup` +
+`asyncio.Semaphore` — has exactly the same holes: the semaphore still
+isn't a rate limit, and coordinated backoff and resume still don't
+exist. (And `httpx.HTTPTransport(retries=N)` covers connection-level
+retries only — not HTTP-status retries, not rate-limit coordination.)
+
 **Use the hand-roll when** you need exactly one of these pieces —
 tenacity alone is excellent, and for complex retry strategies (circuit
 breakers, custom stop conditions) it composes *inside* pyarallel
@@ -121,6 +127,17 @@ half-finished batch run keyed by item identity.
 **Use pyarallel when** the bottleneck is a remote API's quota, not your
 CPU.
 
+## vs LLM-specific tooling (LiteLLM)
+
+If your whole problem is *LLM routing* — one interface over many
+providers, provider-aware rate limits, model fallbacks —
+[LiteLLM](https://docs.litellm.ai/)'s Router is built for exactly that.
+Pyarallel is provider-agnostic fan-out: it doesn't know what an LLM is.
+The two compose rather than compete — a LiteLLM (or openai, or raw
+httpx) call runs *inside* the worker; pyarallel brings the batch
+mechanics a router doesn't: checkpoint/resume, partial results with
+typed failures, windowed memory over a million inputs, `max_errors`.
+
 ## When NOT to use pyarallel
 
 Honesty is the point of this page — these are real disqualifiers, not
@@ -156,15 +173,20 @@ Kept short and honest — ✓ means built-in and coordinated, not
 | Async API | ✓ | DIY | ✓ | — | — |
 | Rate limiting (req/time) | ✓ | DIY | ✓ | — | — |
 | Retry with backoff | ✓ | tenacity | — | — | — |
-| 429/`Retry-After` slows the pool | ✓ | — | — | — | — |
+| 429/`Retry-After` slows the pool | ✓† | — | — | — | — |
 | Checkpoint/resume | ✓ | — | — | — | caching* |
-| Partial results + typed failures | ✓ | DIY | — | ✓ | — |
-| Deep multiprocessing (shared mem, pinning) | — | — | — | ✓ | ✓ |
+| Partial results + typed failures | ✓ | DIY | — | DIY | — |
+| Deep multiprocessing (worker state, CPU pinning) | — | — | — | ✓ | — |
 | numpy memmapping | — | — | — | — | ✓ |
 | Zero dependencies | ✓ | — | — | — | — |
 
 \* joblib's `Memory` caches function calls to disk — great for repeated
 computations, not positional/keyed batch resume.
+
+† Thread and async executors. Process/interpreter workers honor the
+`Retry-After` wait as their own retry delay, but can't pause the
+*shared* limiter — a live object doesn't cross a process boundary.
+API fan-out belongs on threads or async anyway.
 
 If your workload is "fan out one function over N items against a
 service that throttles you" — LLM calls, embeddings, scraping, SaaS

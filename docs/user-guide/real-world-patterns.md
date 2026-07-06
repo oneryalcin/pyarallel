@@ -47,7 +47,7 @@ result = parallel_map(
         wait_from=retry_after,          # a 429 pauses the WHOLE pool
     ),
     checkpoint="classify.ckpt",         # paid-for answers survive a crash
-    max_errors=20,                      # dead API → stop after 20 failures, not 20,000
+    max_errors=20,                      # dead API → abort near 20 failures, not at 20,000
 )
 
 for idx, label in result.successes():
@@ -67,8 +67,15 @@ Why each policy is there:
   with 2,000 calls, not 10,000. Inputs that evolve between runs? Key
   rows by identity with `checkpoint_key=lambda t: t.id`.
 - **`max_errors=20`** — the overnight-job guard. If the API dies, the
-  run aborts after 20 post-retry failures and returns partial results;
-  the morning rerun resumes from the checkpoint.
+  run stops admitting work once the 20th post-retry failure lands — at
+  most one admission window (default `2 × workers`) is still in flight —
+  and returns partial results; the morning rerun resumes from the
+  checkpoint. Shrink `batch_size` to tighten that bound on expensive
+  calls, at some throughput cost.
+
+The recipe is client-agnostic: swap the `openai` call for
+[LiteLLM](https://docs.litellm.ai/) (multi-provider routing), or raw
+`httpx` — pyarallel only sees a function and its exceptions.
 
 ## Batch Embedding Generation
 
@@ -378,7 +385,6 @@ paths = list(Path("photos").glob("*.jpg"))
 result = parallel_map(
     make_thumbnail, paths,
     executor="process",        # true parallelism — one Python per core
-    worker_init=None,          # or: load one model/connection per worker
     max_tasks_per_worker=100,  # recycle workers (native-leak guard)
 )
 
