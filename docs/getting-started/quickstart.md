@@ -67,6 +67,12 @@ results = parallel_map(crunch, datasets, workers=4, executor="process")
 !!! note
     Functions must be picklable for process execution — use module-level functions, not lambdas.
 
+On Python 3.14+, `executor="interpreter"` runs pure-Python CPU-bound
+work in sub-interpreters — process rules, one OS process, cheap workers.
+numpy/pandas fail there (`ImportError` — their C code doesn't support
+subinterpreters yet); keep `executor="process"` for those. See
+[Best Practices](../user-guide/best-practices.md#interpreters-executorinterpreter-python-314).
+
 ## Rate Limiting
 
 Control execution rate for API calls:

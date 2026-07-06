@@ -38,6 +38,7 @@ nav:
     - v0.5.0 Plan: development/plans/v0.5.0.md
     - v0.6 Engine Unification Plan: development/plans/v0.6-engine-unification.md
     - v0.6 Ledger Refactor Plan: development/plans/v0.6-ledger-refactor.md
+    - v0.7 Free-Threaded & Interpreters Plan: development/plans/v0.7-free-threaded-and-interpreters.md
 
 markdown_extensions:
   - admonition

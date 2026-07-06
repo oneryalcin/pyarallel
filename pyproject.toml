@@ -14,6 +14,8 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = []
@@ -52,18 +54,27 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 known-first-party = ["pyarallel"]
 
 [dependency-groups]
+# `test` stands alone: the free-threaded CI jobs install only this group —
+# the dev group cannot build on 3.13t (cffi, via mkdocs-material[imaging]).
+test = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.23",
+]
 dev = [
+    { include-group = "test" },
     "ruff>=0.15.0",
     "mkdocs-git-revision-date-plugin>=0.3.2",
     "mkdocs-material[imaging]>=9.5.50",
     "mkdocs-minify-plugin>=0.8.0",
     "mkdocstrings[python]>=0.27.0",
     "mypy>=1.14.1",
-    "pytest>=8.3.4",
-    "pytest-asyncio>=0.23",
     "build>=1.0.0",
     "twine>=6.0.0",
 ]
 
 [tool.mypy]
 strict = true
+# Type-check at the requires-python floor on every CI job. Also load-bearing:
+# mypy prunes `sys.version_info >= (3, 14)` branches, so the
+# InterpreterPoolExecutor import type-checks even where typeshed predates it.
+python_version = "3.12"

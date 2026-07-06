@@ -97,6 +97,7 @@ pip install pyarallel
 - **Debug mode** — `sequential=True` runs inline: no pool, real stack traces, working breakpoints
 - **Progress callbacks** — `on_progress=lambda done, total: print(f"{done}/{total}")` on collected and streaming APIs
 - **Process executor** — CPU-bound work: `executor="process"`, with `worker_init=` and `max_tasks_per_worker=`
+- **Interpreter executor** (Python 3.14+) — `executor="interpreter"`: true CPU parallelism for pure-Python work without process overhead (PEP 734)
 - **Contextvars propagation** — correlation IDs survive into thread workers
 - **Decorator API** — `@parallel` / `@async_parallel` with `.map()`, `.starmap()`, `.stream()` — fully typed via `Unpack[TypedDict]`
 

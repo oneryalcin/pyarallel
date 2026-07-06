@@ -1,8 +1,9 @@
-"""Process-executor support: making user functions importable in workers.
+"""Out-of-context executor support: making user functions importable in workers.
 
-Decorated top-level functions are no longer the module-global binding, so
-they can't be pickled directly. We ship (module, qualname) instead and
-re-import inside the worker.
+Serves both executors whose workers can't share the caller's objects —
+process and interpreter. Decorated top-level functions are no longer the
+module-global binding, so they can't be pickled directly. We ship
+(module, qualname) instead and re-import inside the worker.
 """
 
 from __future__ import annotations

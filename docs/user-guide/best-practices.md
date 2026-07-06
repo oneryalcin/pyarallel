@@ -15,6 +15,12 @@ Best for **I/O-bound** work where tasks spend most time waiting:
 results = parallel_map(fetch_url, urls, workers=20, executor="thread")
 ```
 
+!!! note "Free-threaded Python"
+    On free-threaded builds (3.13t/3.14t) threads parallelize CPU-bound
+    work too — a 4-worker CPU-bound map measured 2.4× over sequential
+    where the GIL build measured 1.0×. CI runs pyarallel's full suite
+    with the GIL off on both builds.
+
 ### Processes (`executor="process"`)
 
 Best for **CPU-bound** work that needs true parallelism:
@@ -29,6 +35,29 @@ results = parallel_map(compute, data, workers=4, executor="process")
 
 !!! warning
     Process executor requires picklable functions. Use module-level named functions, not lambdas or closures.
+
+### Interpreters (`executor="interpreter"`, Python 3.14+)
+
+Best for **pure-Python CPU-bound** work: true parallelism on standard
+GIL builds (a 4-worker spin benchmark measured 3.4× over threads) with
+~30 ms worker startup instead of process fork/spawn, all in one OS
+process.
+
+```python
+results = parallel_map(crunch, data, workers=4, executor="interpreter")
+```
+
+The process rules apply — importable module-level functions, picklable
+retry callables, no shared limiter, no contextvars — plus two of its
+own: functions defined in `__main__` are rejected (move them into a
+module), and there is no `max_tasks_per_worker` (no worker recycling).
+Each interpreter re-imports your module, so import-time cost and module
+memory are paid per worker, like a process.
+
+!!! warning "C extensions"
+    Extensions without subinterpreter support fail with `ImportError`
+    inside workers — **numpy and pandas among them today**. For
+    C-extension workloads use `executor="process"`.
 
 ### Worker Count
 
