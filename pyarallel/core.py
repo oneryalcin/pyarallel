@@ -6,6 +6,7 @@ type detection, no global config singletons, no enterprise astronautics.
 
 from __future__ import annotations
 
+import contextvars
 import functools
 import os
 import pickle
@@ -107,6 +108,68 @@ def _validate_common(
         raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
 
 
+def _validate_worker_options(
+    executor: str,
+    worker_init: Callable[[], None] | None,
+    max_tasks_per_worker: int | None,
+) -> None:
+    """Validation for the worker-lifecycle options (fail fast, fail loud)."""
+    if max_tasks_per_worker is not None:
+        if executor != "process":
+            raise ValueError(
+                "max_tasks_per_worker requires executor='process' — thread "
+                "workers have no per-worker task budget"
+            )
+        if max_tasks_per_worker < 1:
+            raise ValueError(
+                f"max_tasks_per_worker must be >= 1, got {max_tasks_per_worker}"
+            )
+    if worker_init is not None and executor == "process":
+        try:
+            pickle.dumps(worker_init)
+        except Exception as exc:
+            raise ValueError(
+                "worker_init cannot be pickled for executor='process' — "
+                "use a module-level function, not a lambda or closure."
+            ) from exc
+
+
+def _make_pool(
+    executor: ExecutorType,
+    workers: int | None,
+    worker_init: Callable[[], None] | None,
+    max_tasks_per_worker: int | None,
+) -> ThreadPoolExecutor | ProcessPoolExecutor:
+    """Build the executor pool with the worker-lifecycle options applied."""
+    if executor == "thread":
+        return ThreadPoolExecutor(max_workers=workers, initializer=worker_init)
+    return ProcessPoolExecutor(
+        max_workers=workers,
+        initializer=worker_init,
+        max_tasks_per_child=max_tasks_per_worker,
+    )
+
+
+def _submit_task(
+    pool: ThreadPoolExecutor | ProcessPoolExecutor,
+    executor: ExecutorType,
+    task_fn: Callable[..., _Outcome],
+    item: Any,
+) -> Future[_Outcome]:
+    """Submit one item, propagating the caller's context to thread workers.
+
+    ``copy_context()`` runs here, in the submitting thread, once per item
+    — copying inside the worker would capture the worker's own (empty)
+    context and propagate nothing. Per-item capture is also what makes
+    concurrent execution legal: a single ``Context`` cannot be entered
+    twice at once. Writes inside tasks land in the copy and stay
+    isolated. Contexts don't pickle, so process workers are skipped.
+    """
+    if executor == "thread":
+        return pool.submit(contextvars.copy_context().run, task_fn, item)
+    return pool.submit(task_fn, item)
+
+
 def _effective_workers(workers: int | None, executor: ExecutorType) -> int:
     """The worker count actually in force — the caller's, else the stdlib default.
 
@@ -179,6 +242,9 @@ def parallel_map[T, R](
     checkpoint: str | Path | None = None,
     checkpoint_key: Callable[[T], str | int | bytes] | None = None,
     max_errors: int | None = None,
+    sequential: bool = False,
+    worker_init: Callable[[], None] | None = None,
+    max_tasks_per_worker: int | None = None,
 ) -> ParallelResult[R]:
     """Execute *fn* over *items* in parallel, returning ordered results.
 
@@ -235,14 +301,48 @@ def parallel_map[T, R](
             with ``max_errors`` set, ``batch_size`` becomes the admission
             window (no barrier between chunks) — the same meaning it has
             for the streaming APIs.
+        sequential: Run every item inline in the calling thread — no
+            pool, real stack traces, working breakpoints, deterministic
+            order. Honors rate_limit, retry, checkpoint, on_progress, and
+            max_errors; ``timeout`` is checked between items only (an
+            in-flight item cannot be interrupted); ``workers`` is ignored,
+            so one env flag can flip production code into debug mode.
+            ``worker_init`` runs once in the calling thread.
+        worker_init: Run once in each worker before it takes tasks — open
+            one DB connection or load one model per worker, not per item.
+            For ``executor="process"`` it must be picklable (module-level
+            function).
+        max_tasks_per_worker: Recycle each process worker after this many
+            tasks (guards against native-library memory leaks). Requires
+            ``executor="process"``.
+
+    Contextvars set by the caller are visible inside thread-executor
+    tasks — each item runs under a fresh copy of the submitting thread's
+    context, so correlation IDs survive and writes inside tasks stay
+    isolated. Process workers are skipped (contexts don't pickle).
 
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
     """
     _validate_common(workers, executor, batch_size)
     _validate_max_errors(max_errors)
+    _validate_worker_options(executor, worker_init, max_tasks_per_worker)
     if checkpoint_key is not None and checkpoint is None:
         raise ValueError("checkpoint_key requires checkpoint= to be set")
+
+    if sequential:
+        return _sequential_collected_map(
+            fn,
+            items,
+            rate_limit=rate_limit,
+            timeout=timeout,
+            on_progress=on_progress,
+            retry=retry,
+            checkpoint=checkpoint,
+            checkpoint_key=checkpoint_key,
+            max_errors=max_errors,
+            worker_init=worker_init,
+        )
 
     if max_errors is not None:
         return _collected_map_windowed(
@@ -258,11 +358,12 @@ def parallel_map[T, R](
             checkpoint=checkpoint,
             checkpoint_key=checkpoint_key,
             max_errors=max_errors,
+            worker_init=worker_init,
+            max_tasks_per_worker=max_tasks_per_worker,
         )
 
     bucket = _as_limiter(rate_limit)
     task_fn = _build_task_fn(fn, executor, retry, bucket)
-    pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
     completed = 0
     deadline = (time.monotonic() + timeout) if timeout is not None else None
     timed_out = False
@@ -277,7 +378,7 @@ def parallel_map[T, R](
         if checkpoint is not None
         else None
     )
-    pool = pool_cls(max_workers=workers)
+    pool = _make_pool(executor, workers, worker_init, max_tasks_per_worker)
     try:
         for batch in plan.batches:
             if batch_size is not None:
@@ -309,7 +410,7 @@ def parallel_map[T, R](
                         continue
                 if bucket:
                     bucket.wait()
-                futures[pool.submit(task_fn, item)] = idx
+                futures[_submit_task(pool, executor, task_fn, item)] = idx
 
             try:
                 for future in as_completed(futures, timeout=chunk_timeout):
@@ -364,6 +465,8 @@ def _collected_map_windowed(
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
     max_errors: int,
+    worker_init: Callable[[], None] | None = None,
+    max_tasks_per_worker: int | None = None,
 ) -> ParallelResult[Any]:
     """Collected map with bounded admission — the ``max_errors`` engine.
 
@@ -375,7 +478,6 @@ def _collected_map_windowed(
     """
     bucket = _as_limiter(rate_limit)
     task_fn = _build_task_fn(fn, executor, retry, bucket)
-    pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
     window = (
         batch_size
         if batch_size is not None
@@ -396,7 +498,7 @@ def _collected_map_windowed(
         if checkpoint is not None
         else None
     )
-    pool = pool_cls(max_workers=workers)
+    pool = _make_pool(executor, workers, worker_init, max_tasks_per_worker)
 
     def _report() -> None:
         if on_progress:
@@ -420,7 +522,7 @@ def _collected_map_windowed(
                     continue  # cached — keep looking for work to admit
             if bucket:
                 bucket.wait()
-            in_flight[pool.submit(task_fn, item)] = idx
+            in_flight[_submit_task(pool, executor, task_fn, item)] = idx
             return True
 
     def _absorb(future: Future[_Outcome], idx: int) -> None:
@@ -516,6 +618,126 @@ def _collected_map_windowed(
     return ParallelResult(results)
 
 
+def _sequential_collected_map(
+    fn: Callable[..., Any],
+    items: Iterable[Any],
+    *,
+    rate_limit: Limiter | RateLimit | float | None,
+    timeout: float | None,
+    on_progress: Callable[[int, int], None] | None,
+    retry: Retry | None,
+    checkpoint: str | Path | None,
+    checkpoint_key: Callable[[Any], str | int | bytes] | None,
+    max_errors: int | None,
+    worker_init: Callable[[], None] | None,
+) -> ParallelResult[Any]:
+    """The debug engine: every item runs inline in the calling thread.
+
+    No pool, no futures — real stack traces and working breakpoints.
+    ``timeout`` is checked between items only (an in-flight item cannot
+    be interrupted). On timeout or abort, sized inputs fill by count and
+    unsized inputs return a shorter result — same policy as the windowed
+    engine. ``worker_init`` runs once, here, in the calling thread.
+    """
+    bucket = _as_limiter(rate_limit)
+    task_fn = _build_task_fn(fn, "thread", retry, bucket)
+    total = _total_if_known(items)
+    deadline = (time.monotonic() + timeout) if timeout is not None else None
+    results: list[Any] = []
+    completed = 0
+    failures = 0
+    timed_out = False
+    aborted = False
+
+    store = (
+        _open_checkpoint(checkpoint, fn, checkpoint_key)
+        if checkpoint is not None
+        else None
+    )
+    if worker_init is not None:
+        worker_init()
+
+    try:
+        for idx, item in enumerate(items):
+            if deadline is not None and time.monotonic() >= deadline:
+                timed_out = True
+                break
+            results.append(_PENDING)
+            if store is not None:
+                cached = store.lookup(idx, item)
+                if cached is not None:
+                    results[idx] = cached[0]
+                    completed += 1
+                    if on_progress:
+                        on_progress(completed, _progress_total(total, results))
+                    continue
+            if bucket:
+                bucket.wait()
+            outcome = task_fn(item)
+            if outcome.error is not None:
+                results[idx] = _Failure(outcome.error)
+                failures += 1
+            else:
+                results[idx] = outcome.value
+                if store is not None:
+                    store.put(idx, results[idx])
+            completed += 1
+            if on_progress:
+                on_progress(completed, _progress_total(total, results))
+            if max_errors is not None and failures >= max_errors:
+                aborted = True
+                break
+
+        # Same no-drain policy as the windowed engine: never touch the
+        # source after the stop.
+        if timed_out and total is not None:
+            assert timeout is not None
+            for idx in range(len(results), total):
+                results.append(_timeout_failure(timeout, idx))
+        elif aborted and total is not None:
+            reason = f"aborted after {failures} failures (max_errors={max_errors})"
+            results.extend(
+                _Failure(Aborted(reason)) for _ in range(total - len(results))
+            )
+    finally:
+        if store is not None:
+            store.close()
+
+    return ParallelResult(results)
+
+
+def _sequential_iter(
+    fn: Callable[..., Any],
+    items: Iterable[Any],
+    *,
+    rate_limit: Limiter | RateLimit | float | None,
+    retry: Retry | None,
+    on_progress: Callable[[int, int], None] | None,
+    max_errors: int | None,
+    worker_init: Callable[[], None] | None,
+) -> Iterator[ItemResult[Any]]:
+    """Streaming twin of the debug engine — inline, inherently ordered."""
+    bucket = _as_limiter(rate_limit)
+    task_fn = _build_task_fn(fn, "thread", retry, bucket)
+    total = _total_if_known(items)
+    if worker_init is not None:
+        worker_init()
+    failures = 0
+    for idx, item in enumerate(items):
+        if bucket:
+            bucket.wait()
+        outcome = task_fn(item)
+        result = _item_result(idx, outcome)
+        if on_progress:
+            done = idx + 1
+            on_progress(done, total if total is not None else done)
+        yield result
+        if not result.ok:
+            failures += 1
+            if max_errors is not None and failures >= max_errors:
+                return
+
+
 def _unpack_call(fn_and_args: tuple[Callable[..., Any], tuple[Any, ...]]) -> Any:
     """Unpack and call fn(*args) — picklable for process executor."""
     fn, args = fn_and_args
@@ -533,6 +755,9 @@ def parallel_starmap[R](
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    sequential: bool = False,
+    worker_init: Callable[[], None] | None = None,
+    max_tasks_per_worker: int | None = None,
 ) -> ParallelResult[R]:
     """Like ``parallel_map`` but unpacks each item as ``fn(*args)``.
 
@@ -559,6 +784,9 @@ def parallel_starmap[R](
                 on_progress=on_progress,
                 batch_size=batch_size,
                 retry=retry,
+                sequential=sequential,
+                worker_init=worker_init,
+                max_tasks_per_worker=max_tasks_per_worker,
             )
 
     packed = [(fn, args) for args in items]
@@ -572,6 +800,9 @@ def parallel_starmap[R](
         on_progress=on_progress,
         batch_size=batch_size,
         retry=retry,
+        sequential=sequential,
+        worker_init=worker_init,
+        max_tasks_per_worker=max_tasks_per_worker,
     )
 
 
@@ -587,6 +818,9 @@ def parallel_iter[T, R](
     ordered: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
     max_errors: int | None = None,
+    sequential: bool = False,
+    worker_init: Callable[[], None] | None = None,
+    max_tasks_per_worker: int | None = None,
 ) -> Iterator[ItemResult[R]]:
     """Execute *fn* over *items* in parallel, yielding ``ItemResult`` in
     completion order (or input order with ``ordered=True``).
@@ -634,6 +868,12 @@ def parallel_iter[T, R](
     worker thread or process cannot be interrupted and finish in the
     background.
 
+    ``sequential=True`` runs every item inline in the calling thread
+    (debug mode — no pool, real stack traces; inherently in input
+    order). ``worker_init`` runs once per worker before it takes tasks;
+    ``max_tasks_per_worker`` recycles process workers. Caller
+    contextvars are visible inside thread-executor tasks.
+
     Example::
 
         for item in parallel_iter(process, huge_list):
@@ -644,10 +884,22 @@ def parallel_iter[T, R](
     """
     _validate_common(workers, executor, batch_size)
     _validate_max_errors(max_errors)
+    _validate_worker_options(executor, worker_init, max_tasks_per_worker)
+
+    if sequential:
+        yield from _sequential_iter(
+            fn,
+            items,
+            rate_limit=rate_limit,
+            retry=retry,
+            on_progress=on_progress,
+            max_errors=max_errors,
+            worker_init=worker_init,
+        )
+        return
 
     bucket = _as_limiter(rate_limit)
     task_fn = _build_task_fn(fn, executor, retry, bucket)
-    pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
     window = (
         batch_size
         if batch_size is not None
@@ -663,7 +915,7 @@ def parallel_iter[T, R](
     buffered: dict[int, ItemResult[R]] = {}
     next_yield = 0
 
-    pool = pool_cls(max_workers=workers)
+    pool = _make_pool(executor, workers, worker_init, max_tasks_per_worker)
 
     def _submit_next() -> bool:
         nonlocal seen
@@ -674,7 +926,7 @@ def parallel_iter[T, R](
         seen += 1
         if bucket:
             bucket.wait()
-        in_flight[pool.submit(task_fn, item)] = idx
+        in_flight[_submit_task(pool, executor, task_fn, item)] = idx
         return True
 
     def _failures_pending() -> int:

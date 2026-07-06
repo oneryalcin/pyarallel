@@ -15,7 +15,8 @@ results = await async_parallel_map(
     *,
     concurrency=4,                   # Max concurrent tasks
     rate_limit=None,                 # RateLimit spec, shared Limiter, or ops/second
-    task_timeout=None,                    # Per-task timeout in seconds
+    timeout=None,                    # Total wall-clock timeout (mirror of sync)
+    task_timeout=None,               # Per-task timeout in seconds
     on_progress=None,                # callback(completed, total)
     batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
@@ -35,6 +36,7 @@ results = await async_parallel_map(
 | `items` | `Iterable` | required | Any iterable |
 | `concurrency` | `int` | `4` | Maximum concurrent tasks |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting. Pass a shared `Limiter` to draw from one budget across calls |
+| `timeout` | `float \| None` | `None` | **Total** wall-clock timeout — mirror of the sync `timeout`. Unfinished tasks are cancelled; their slots are marked `TimeoutError` |
 | `task_timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback. For unsized iterables with batching, `total` is items seen so far |
 | `batch_size` | `int \| None` | `None` | Process items in chunks. With unsized iterables, input is consumed lazily one batch at a time |
@@ -53,8 +55,11 @@ Pre-v1, Pyarallel keeps these names intentionally different. If you're moving fr
 
 ### Other Differences from Sync
 
-- `task_timeout` is **per-task** (via `asyncio.wait_for`), not total wall-clock like sync `timeout`
+- Both timeouts exist here: `timeout` is total wall-clock (same contract
+  as sync), `task_timeout` is per-task via `asyncio.wait_for` — the sync
+  API deliberately has no per-task timeout (threads can't be cancelled)
 - Uses `asyncio.TaskGroup` for structured concurrency — proper cleanup on errors
+- No `sequential=` — `concurrency=1` already serializes
 
 ### Examples
 

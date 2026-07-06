@@ -14,8 +14,11 @@ from pathlib import Path
 from typing import Any
 
 from ._plan import (
+    _append_timeout_failures,
+    _mark_timeout_indices,
     _plan_collected_map,
     _progress_total,
+    _timeout_failure,
     _total_if_known,
     _validate_max_errors,
 )
@@ -90,6 +93,7 @@ async def async_parallel_map[T, R](
     *,
     concurrency: int = 4,
     rate_limit: Limiter | RateLimit | float | None = None,
+    timeout: float | None = None,
     task_timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
@@ -107,6 +111,11 @@ async def async_parallel_map[T, R](
         rate_limit: ``RateLimit`` spec, ops-per-second as a number, or a
             shared ``Limiter`` instance to draw from one budget across
             multiple calls.
+        timeout: Total wall-clock timeout in seconds for the whole
+            operation — the mirror of the sync ``timeout``. On expiry,
+            unfinished tasks are cancelled and their slots (plus any
+            unseen lazy input) are marked with ``TimeoutError`` failures;
+            everything that completed keeps its result.
         task_timeout: Per-task timeout in seconds (each individual task).
         on_progress: ``callback(completed, total)`` after each task.
             When ``items`` has no known length and ``batch_size`` is set,
@@ -156,6 +165,7 @@ async def async_parallel_map[T, R](
             items,
             concurrency=concurrency,
             rate_limit=rate_limit,
+            timeout=timeout,
             task_timeout=task_timeout,
             on_progress=on_progress,
             batch_size=batch_size,
@@ -200,7 +210,8 @@ async def async_parallel_map[T, R](
             if on_progress:
                 on_progress(completed, _progress_total(plan.total, results))
 
-    try:
+    async def _consume() -> None:
+        nonlocal completed
         for batch in plan.batches:
             if batch_size is not None:
                 results.extend([_PENDING] * len(batch))
@@ -217,12 +228,26 @@ async def async_parallel_map[T, R](
                                 )
                             continue
                     tg.create_task(_run(i, item))
+
+    try:
+        if timeout is not None:
+            async with asyncio.timeout(timeout):
+                await _consume()
+        else:
+            await _consume()
     except* CheckpointError as eg:
         # The TaskGroup wraps child exceptions in an ExceptionGroup; re-raise
         # the CheckpointError plainly so `except CheckpointError` works the
         # same for sync and async callers, preserving its original cause.
         error = eg.exceptions[0]
         raise error from error.__cause__
+    except* TimeoutError:
+        # asyncio.timeout expiry — the TaskGroup has already cancelled its
+        # children. Mirror of the sync contract: mark unfinished slots and
+        # unseen lazy input with the same failure text.
+        assert timeout is not None
+        _mark_timeout_indices(results, range(len(results)), timeout)
+        _append_timeout_failures(results, plan.remaining, timeout)
     finally:
         if store is not None:
             store.close()
@@ -236,6 +261,7 @@ async def _async_collected_map_windowed(
     *,
     concurrency: int,
     rate_limit: Limiter | RateLimit | float | None,
+    timeout: float | None,
     task_timeout: float | None,
     on_progress: Callable[[int, int], None] | None,
     batch_size: int | None,
@@ -259,6 +285,7 @@ async def _async_collected_map_windowed(
     completed = 0
     failures = 0
     aborted = False
+    timed_out = False
 
     store = (
         _open_checkpoint(checkpoint, fn, checkpoint_key)
@@ -320,7 +347,7 @@ async def _async_collected_map_windowed(
         completed += 1
         _report()
 
-    try:
+    async def _drive() -> None:
         while True:
             # No mid-fill absorption here (unlike the sync twin): task
             # creation never blocks — limiter waits happen inside tasks,
@@ -337,7 +364,26 @@ async def _async_collected_map_windowed(
             if aborted:
                 break
 
-        if aborted:
+    try:
+        try:
+            if timeout is not None:
+                async with asyncio.timeout(timeout):
+                    await _drive()
+            else:
+                await _drive()
+        except TimeoutError:
+            timed_out = True
+
+        if timed_out:
+            assert timeout is not None
+            # Salvage completions that raced the deadline, drop the rest.
+            for task in [t for t in in_flight if t.done()]:
+                _absorb(task, in_flight.pop(task))
+            _mark_timeout_indices(results, in_flight.values(), timeout)
+            if total is not None:
+                for idx in range(len(results), total):
+                    results.append(_timeout_failure(timeout, idx))
+        elif aborted:
             # Salvage completions that raced the stop, cancel the rest.
             for task in [t for t in in_flight if t.done()]:
                 _absorb(task, in_flight.pop(task))
@@ -370,6 +416,7 @@ async def async_parallel_starmap[R](
     *,
     concurrency: int = 4,
     rate_limit: Limiter | RateLimit | float | None = None,
+    timeout: float | None = None,
     task_timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
@@ -385,6 +432,7 @@ async def async_parallel_starmap[R](
         items,
         concurrency=concurrency,
         rate_limit=rate_limit,
+        timeout=timeout,
         task_timeout=task_timeout,
         on_progress=on_progress,
         batch_size=batch_size,

@@ -59,6 +59,9 @@ class _BoundParallel[R]:
         checkpoint: str | Path | None = None,
         checkpoint_key: Callable[[Any], str | int | bytes] | None = None,
         max_errors: int | None = None,
+        sequential: bool | None = None,
+        worker_init: Callable[[], None] | None = None,
+        max_tasks_per_worker: int | None = None,
     ) -> ParallelResult[R]:
         """Run this function over *items* in parallel."""
         return parallel_map(
@@ -76,6 +79,9 @@ class _BoundParallel[R]:
                 checkpoint=checkpoint,
                 checkpoint_key=checkpoint_key,
                 max_errors=max_errors,
+                sequential=sequential,
+                worker_init=worker_init,
+                max_tasks_per_worker=max_tasks_per_worker,
             ),
         )
 
@@ -152,6 +158,9 @@ class _ParallelFunc[**P, R]:
         checkpoint: str | Path | None = None,
         checkpoint_key: Callable[[Any], str | int | bytes] | None = None,
         max_errors: int | None = None,
+        sequential: bool | None = None,
+        worker_init: Callable[[], None] | None = None,
+        max_tasks_per_worker: int | None = None,
     ) -> ParallelResult[R]:
         """Run this function over *items* in parallel."""
         return parallel_map(
@@ -169,6 +178,9 @@ class _ParallelFunc[**P, R]:
                 checkpoint=checkpoint,
                 checkpoint_key=checkpoint_key,
                 max_errors=max_errors,
+                sequential=sequential,
+                worker_init=worker_init,
+                max_tasks_per_worker=max_tasks_per_worker,
             ),
         )
 
@@ -270,6 +282,7 @@ class _BoundAsyncParallel[R]:
         *,
         concurrency: int | None = None,
         rate_limit: Limiter | RateLimit | float | None = None,
+        timeout: float | None = None,
         task_timeout: float | None = None,
         on_progress: Callable[[int, int], None] | None = None,
         batch_size: int | None = None,
@@ -285,6 +298,7 @@ class _BoundAsyncParallel[R]:
                 self._defaults,
                 concurrency=concurrency,
                 rate_limit=rate_limit,
+                timeout=timeout,
                 task_timeout=task_timeout,
                 on_progress=on_progress,
                 batch_size=batch_size,
@@ -352,6 +366,7 @@ class _AsyncParallelFunc[**P, R]:
         *,
         concurrency: int | None = None,
         rate_limit: Limiter | RateLimit | float | None = None,
+        timeout: float | None = None,
         task_timeout: float | None = None,
         on_progress: Callable[[int, int], None] | None = None,
         batch_size: int | None = None,
@@ -367,6 +382,7 @@ class _AsyncParallelFunc[**P, R]:
                 self._defaults,
                 concurrency=concurrency,
                 rate_limit=rate_limit,
+                timeout=timeout,
                 task_timeout=task_timeout,
                 on_progress=on_progress,
                 batch_size=batch_size,

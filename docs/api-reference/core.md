@@ -21,6 +21,9 @@ results = parallel_map(
     checkpoint=None,                 # Path to a resume file (SQLite)
     checkpoint_key=None,             # Stable per-item identity for resume
     max_errors=None,                 # Abort after N failures
+    sequential=False,                # Debug mode: run inline, no pool
+    worker_init=None,                # Run once per worker before tasks
+    max_tasks_per_worker=None,       # Recycle process workers (process only)
 )
 ```
 
@@ -42,6 +45,9 @@ results = parallel_map(
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
 | `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires `checkpoint=` |
 | `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Unrun items are marked `Aborted` |
+| `sequential` | `bool` | `False` | Run every item inline in the calling thread — no pool, real stack traces, working breakpoints. `workers` is ignored |
+| `worker_init` | `Callable[[], None] \| None` | `None` | Run once per worker before it takes tasks (one DB connection / model per worker). Must be picklable for `executor="process"` |
+| `max_tasks_per_worker` | `int \| None` | `None` | Recycle each process worker after N tasks (native-leak guard). Requires `executor="process"` |
 
 ### Examples
 
@@ -71,6 +77,44 @@ results = parallel_map(embed, chunks, checkpoint="embeddings.ckpt")
 # Abort early — a dead API costs tens of calls, not thousands
 results = parallel_map(fetch, urls, workers=10, max_errors=10)
 ```
+
+### Debug Mode with `sequential=True`
+
+`sequential=True` runs every item inline in the calling thread: no pool,
+no futures — real stack traces, working breakpoints, deterministic input
+order. It honors `rate_limit`, `retry`, `checkpoint`, `on_progress`, and
+`max_errors`; `timeout` is checked between items only (an in-flight item
+cannot be interrupted). `workers` is ignored rather than rejected, so a
+single flag can flip production code into debug mode:
+
+```python
+results = parallel_map(fetch, urls, workers=10,
+                       sequential=os.environ.get("DEBUG") == "1")
+```
+
+The async API doesn't need it — `concurrency=1` already serializes.
+
+### Context Variables
+
+`contextvars` set by the caller are visible inside thread-executor tasks:
+each item runs under a fresh copy of the submitting thread's context, so
+correlation IDs and request-scoped state survive into workers (they used
+to silently vanish). Writes inside tasks land in the copy and never leak
+back to the caller. Process workers are skipped — contexts don't pickle.
+
+### Worker Lifecycle
+
+`worker_init=` runs once in each worker before it takes tasks — the
+place for one DB connection or one loaded model per worker instead of
+per item. With `executor="process"` it must be a module-level function
+(fail-fast `ValueError` otherwise). Note: the initializer's contextvars
+are invisible to tasks (tasks run under the caller's context) — use
+globals or thread-locals for per-worker state.
+
+`max_tasks_per_worker=` recycles each **process** worker after N tasks —
+the standard guard against native-library memory leaks. With
+`executor="thread"` it raises `ValueError` (explicit beats silent
+ignore).
 
 ### Early Abort with `max_errors`
 
