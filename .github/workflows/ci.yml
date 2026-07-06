@@ -50,8 +50,10 @@ jobs:
         run: uv sync --no-default-groups --group test
       # Start-of-job sanity check: fail loudly if setup resolved a standard
       # build or a dependency re-enabled the GIL — a green job on the wrong
-      # interpreter would be testing nothing.
+      # interpreter would be testing nothing. --no-sync everywhere below:
+      # a bare `uv run` re-syncs the default (dev) group, which cannot
+      # build on t-ABIs — the exact thing this job avoids.
       - name: GIL guard
-        run: uv run python -c "import sys; assert not sys._is_gil_enabled(), 'GIL is enabled on a free-threaded job'"
+        run: uv run --no-sync python -c "import sys; assert not sys._is_gil_enabled(), 'GIL is enabled on a free-threaded job'"
       - name: Tests
-        run: uv run pytest -q
+        run: uv run --no-sync pytest -q
