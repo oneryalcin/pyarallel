@@ -171,12 +171,16 @@ positioned as the ergonomic layer over it. Cheap to verify, real story to tell.
 Python 3.14's `InterpreterPoolExecutor` (PEP 734) as a third executor —
 near-pass-through implementation, guarded by version check.
 
-### Collected-map engine unification
+### Collected-map engine unification *(done — on `v0.6-engine-unification`)*
 
-The plain collected path still batches with a barrier while the
-`max_errors` path admits through a window (documented coupling, flagged
-in the v0.5 design review). Unify collected maps onto the windowed
-engine so `batch_size` means one thing everywhere.
+The plain collected path batched with a barrier while the `max_errors`
+path admitted through a window (documented coupling, flagged in the
+v0.5 design review). Now unified: every non-sequential path runs
+through one windowed engine, `batch_size` means one thing everywhere
+(the in-flight admission window), input is always lazy, the source is
+never drained after a stop, and `ParallelResult.timed_out`/`.aborted`
+report how a run ended. Contract and review history:
+[v0.6 Engine Unification Plan](plans/v0.6-engine-unification.md).
 
 ---
 

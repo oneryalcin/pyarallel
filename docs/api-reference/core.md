@@ -38,9 +38,9 @@ results = parallel_map(
 | `workers` | `int \| None` | `None` | Number of parallel workers. `None` lets the executor choose |
 | `executor` | `"thread" \| "process"` | `"thread"` | Thread pool or process pool |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting (float = ops/second). Pass a shared `Limiter` to draw from one budget across calls |
-| `timeout` | `float \| None` | `None` | Total wall-clock timeout in seconds |
-| `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback `(completed, total)`. For unsized iterables with batching, `total` is items seen so far |
-| `batch_size` | `int \| None` | `None` | Process items in chunks of this size. With unsized iterables, input is consumed lazily one batch at a time |
+| `timeout` | `float \| None` | `None` | Total wall-clock timeout in seconds. Sets `result.timed_out` on expiry; the source is never drained after a stop |
+| `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback `(completed, total)`. For unsized iterables, `total` is items seen so far |
+| `batch_size` | `int \| None` | `None` | Admission window: max items submitted but unresolved (default `2 × workers`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
 | `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires `checkpoint=` |
@@ -65,7 +65,7 @@ results = parallel_map(fetch, urls, rate_limit=10)  # 10 per second
 results = parallel_map(fetch, urls, timeout=60.0,
                        on_progress=lambda d, t: print(f"{d}/{t}"))
 
-# Batched — keeps unsized iterables lazy one batch at a time
+# Wider admission window — more lookahead for uneven task durations
 results = parallel_map(process, million_items, workers=8, batch_size=500)
 
 # With retry — flaky network calls
@@ -120,10 +120,10 @@ ignore).
 
 With `max_errors=N`, the run stops once N items have failed (counted
 **after** retries are exhausted — an item that fails then succeeds on
-retry is a success). To make the abort actually cheap, work is admitted
-through a bounded window (`batch_size` if set, else `2 × workers`)
-instead of being submitted all upfront: total submissions stay within
-the abort point plus one window.
+retry is a success), and `result.aborted` is set. Because all admission
+is windowed (`batch_size` if set, else `2 × workers`), the abort is
+cheap by construction: total submissions stay within the abort point
+plus one window.
 
 On abort you still get a complete `ParallelResult` — one entry per input
 item. Finished work keeps its real result; items that never ran are
@@ -149,10 +149,6 @@ as it blocks every other sync call (threads cannot be cancelled). Put
 timeouts inside your function, or use the default unordered mode for
 the promptest abort on a dead API. Completed-but-unyielded successes
 behind the ending failure are discarded.
-
-Note: with `max_errors` set, `batch_size` acts as the admission window
-(no barrier between chunks) — the same meaning it has for the streaming
-APIs, not the chunked meaning of the plain collected path.
 
 The input source is **never consumed after the stop** — a blocking or
 infinite generator stays untouched. Sized inputs get one `Aborted`
@@ -355,13 +351,14 @@ Same as `parallel_map` except no `timeout` or `on_progress` (results stream as t
 | `ordered` | `bool` | `False` | Yield in input order instead of completion order |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | `callback(done, total)` per completed item |
 
-!!! note "Changed in v0.5"
-    `batch_size` is now an **in-flight bound**, not a chunk size. Earlier
-    versions processed chunks with a barrier between them (one slow item
-    stalled the next chunk) and materialized the whole input when
-    `batch_size` was unset. Neither is true anymore — the default window
-    of `2 × workers` already gives constant memory; raise `batch_size`
-    only to increase lookahead.
+!!! note "Changed in v0.5 (streaming) and v0.6 (everywhere)"
+    `batch_size` is an **in-flight bound**, not a chunk size — one
+    meaning across every API since v0.6. Earlier versions processed
+    chunks with a barrier between them (one slow item stalled the next
+    chunk) and materialized the whole input when `batch_size` was
+    unset. Neither is true anymore — the default window of `2 × workers`
+    already gives constant memory; raise `batch_size` only to increase
+    lookahead.
 
 ### Yields
 
@@ -452,11 +449,19 @@ for item in parallel_iter(process, items, workers=4):
 
 Container for parallel execution results. Behaves like a `list` when all tasks succeed. Provides structured access when some fail.
 
+`timed_out`/`aborted` report how the run *ended* — the reliable signal
+when per-item markers can't carry it: an unsized input that hits
+`timeout=` returns only the items actually pulled (possibly all
+successes), and the flag is what distinguishes that truncation from a
+completed run.
+
 ### Properties and Methods
 
 | Member | Returns | Description |
 |---|---|---|
 | `.ok` | `bool` | `True` if every task succeeded |
+| `.timed_out` | `bool` | `True` when the run stopped on the total `timeout=` deadline |
+| `.aborted` | `bool` | `True` when the run stopped early via `max_errors` |
 | `.values()` | `list[R]` | All results in order. Raises `ExceptionGroup` on failure |
 | `.ok_values()` | `list[R]` | Values of successful tasks only, in input order. Never raises |
 | `.successes()` | `list[tuple[int, R]]` | `(index, value)` for each success |

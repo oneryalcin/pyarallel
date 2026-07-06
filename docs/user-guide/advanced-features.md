@@ -14,9 +14,9 @@ results = parallel_map(process, items, workers=8, on_progress=my_progress)
 ```
 
 If `items` has a known length, `total` is the final input size. If `items` is
-an unsized iterable (for example a generator) and you also set `batch_size`,
-Pyarallel keeps input consumption lazy; in that mode `total` is the number of
-items discovered so far.
+an unsized iterable (for example a generator), input is consumed lazily and
+`total` is the number of items discovered so far — a percentage bar reads
+100% on every tick. Pass a sized input when you need a real total.
 
 Works with both `parallel_map` and `.map()`:
 
@@ -47,8 +47,8 @@ with tqdm(total=len(urls)) as pbar:
 
 !!! note
     tqdm works best with known-size inputs (lists, ranges). For generators
-    with `batch_size`, the total changes as batches are consumed, which
-    makes the progress bar jump — use a plain `on_progress` callback instead.
+    the total grows as input is consumed, which makes the progress bar
+    jump — use a plain `on_progress` callback instead.
 
 ## Timeouts
 
@@ -60,11 +60,17 @@ Set a wall-clock limit for the entire operation:
 results = parallel_map(fetch, urls, workers=10, timeout=30.0)
 
 # Tasks that didn't complete are marked as failures
-if not results.ok:
+if results.timed_out:
     for idx, exc in results.failures():
         if isinstance(exc, TimeoutError):
             print(f"Item {idx} timed out")
 ```
+
+`results.timed_out` is the reliable expiry signal. For sized inputs
+every unfinished slot is also marked with a `TimeoutError` failure; an
+unsized input (a generator) instead returns a **shorter** result
+covering only the items actually pulled — the source is never drained
+after a stop, so a blocking or infinite generator stays untouched.
 
 ### Per-Task Timeout (async)
 
@@ -275,15 +281,15 @@ from pyarallel import Aborted
 
 result = parallel_map(fetch, urls, workers=10, max_errors=10)
 
-if not result.ok:
+if result.aborted:
     real  = [(i, e) for i, e in result.failures() if not isinstance(e, Aborted)]
     unrun = [i for i, e in result.failures() if isinstance(e, Aborted)]
 ```
 
-Work is admitted through a bounded window when `max_errors` is set, so
-the abort is genuinely cheap — a 10k-item job against a dead API costs
-tens of calls, not thousands. Finished items keep their real results;
-never-run items are marked `Aborted`.
+Because admission is windowed, the abort is genuinely cheap — a
+10k-item job against a dead API costs tens of calls, not thousands.
+Finished items keep their real results; never-run items are marked
+`Aborted`, and `result.aborted` reports the early stop.
 
 The overnight-job combo is `max_errors` + `checkpoint`: the job aborts
 cheaply when the API dies, successes are already persisted, and the
@@ -297,19 +303,21 @@ result = parallel_map(fetch, users, workers=10,
 Streaming APIs accept `max_errors` too — the stream ends after the Nth
 failure is yielded, with no placeholder items for unseen input.
 
-## Batching
+## The Admission Window
 
-Control memory for large datasets by processing in chunks:
+Every API — collected and streaming — admits work through a bounded
+window: at most `batch_size` items (default `2 × workers`) are
+submitted but unresolved at any moment. Input is consumed lazily, one
+window ahead, so generators are never materialized:
 
 ```python
-# Submit 500 items at a time instead of 500,000 at once
+# At most 500 items in flight instead of the default 2 x workers
 results = parallel_map(process, huge_list, workers=8, batch_size=500)
 ```
 
-With `batch_size` set, unsized iterables are consumed lazily one batch at a
-time instead of being materialized up front.
-
-Errors in one batch don't prevent subsequent batches from running.
+There are no chunks and no barriers — a slow item never stalls the
+items behind it, and an error anywhere never prevents the rest from
+running.
 
 ## Starmap — Multi-Argument Functions
 

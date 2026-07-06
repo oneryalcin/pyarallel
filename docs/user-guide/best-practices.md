@@ -94,19 +94,23 @@ secondary per-second limits. Raise it only when you know the quota
 genuinely allows bursts, and keep it well under the documented burst
 allowance.
 
-## Memory Control with Batching
+## Memory: the Admission Window
 
-For large datasets, use `batch_size` to limit how many futures exist at once:
+Memory is bounded by default. Every API admits work through a window —
+at most `batch_size` items (default `2 × workers`) are submitted but
+unresolved at any moment, and input is consumed lazily, one window
+ahead, so generators are never materialized:
 
 ```python
-# 500K items — only 1000 futures in memory at a time
+# 500K items — at most 1000 in flight, input pulled as slots free up
 results = parallel_map(process, huge_list, workers=8, batch_size=1000)
 ```
 
-Without `batch_size`, all items are submitted at once. With `batch_size` set,
-unsized iterables are consumed lazily one batch at a time. On
-memory-constrained environments (K8s pods, Lambda), this helps prevent OOM
-kills.
+For a *collected* map the results list still grows to the input size —
+that is what "collected" means. When results should not accumulate at
+all (ETL to a DB, 10M+ rows), use `parallel_iter` and consume as you
+go. On memory-constrained environments (K8s pods, Lambda), both
+defaults help prevent OOM kills.
 
 ## Error Handling Patterns
 
