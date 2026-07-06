@@ -6,17 +6,19 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
+        <meta name="description" content="Run thousands of chat-completion calls with rate limiting, Retry-After backoff, checkpoint resume, and an overnight kill-switch.">
+      
       
         <meta name="author" content="Mehmet Oner Yalcin">
       
       
-        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/api-reference/rate-limiting/">
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/cookbook/llm-batch-calls/">
       
       
-        <link rel="prev" href="../async/">
+        <link rel="prev" href="../">
       
       
-        <link rel="next" href="../../development/CONTRIBUTING/">
+        <link rel="next" href="../embeddings/">
       
       
         
@@ -27,7 +29,7 @@
     
     
       
-        <title>Rate Limiting - Pyarallel</title>
+        <title>Batch LLM Calls (OpenAI, Anthropic, LiteLLM) - Pyarallel</title>
       
     
     
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#rate-limiting" class="md-skip">
+        <a href="#batch-llm-calls" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Rate Limiting
+              Batch LLM Calls (OpenAI, Anthropic, LiteLLM)
             
           </span>
         </div>
@@ -403,8 +405,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -415,13 +419,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -442,7 +444,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -460,7 +462,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/" class="md-nav__link">
+      <a href="../" class="md-nav__link">
         
   
   
@@ -485,10 +487,19 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../cookbook/llm-batch-calls/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -504,6 +515,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -516,7 +528,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/embeddings/" class="md-nav__link">
+      <a href="../embeddings/" class="md-nav__link">
         
   
   
@@ -544,7 +556,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/dataset-enrichment/" class="md-nav__link">
+      <a href="../dataset-enrichment/" class="md-nav__link">
         
   
   
@@ -572,7 +584,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/web-scraping/" class="md-nav__link">
+      <a href="../web-scraping/" class="md-nav__link">
         
   
   
@@ -600,7 +612,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/bulk-file-download/" class="md-nav__link">
+      <a href="../bulk-file-download/" class="md-nav__link">
         
   
   
@@ -628,7 +640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/github-bulk-repo-changes/" class="md-nav__link">
+      <a href="../github-bulk-repo-changes/" class="md-nav__link">
         
   
   
@@ -656,7 +668,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/docker-registry-cleanup/" class="md-nav__link">
+      <a href="../docker-registry-cleanup/" class="md-nav__link">
         
   
   
@@ -684,7 +696,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/secrets-rotation/" class="md-nav__link">
+      <a href="../secrets-rotation/" class="md-nav__link">
         
   
   
@@ -712,7 +724,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/streaming-etl/" class="md-nav__link">
+      <a href="../streaming-etl/" class="md-nav__link">
         
   
   
@@ -740,7 +752,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/ncbi-entrez-batch/" class="md-nav__link">
+      <a href="../ncbi-entrez-batch/" class="md-nav__link">
         
   
   
@@ -768,7 +780,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/cpu-fanout/" class="md-nav__link">
+      <a href="../cpu-fanout/" class="md-nav__link">
         
   
   
@@ -917,8 +929,6 @@
       
   
   
-    
-  
   
   
     
@@ -931,11 +941,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
@@ -956,7 +968,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -974,7 +986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/" class="md-nav__link">
+      <a href="../../api-reference/core/" class="md-nav__link">
         
   
   
@@ -1002,7 +1014,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../async/" class="md-nav__link">
+      <a href="../../api-reference/async/" class="md-nav__link">
         
   
   
@@ -1027,37 +1039,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Rate Limiting
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../api-reference/rate-limiting/" class="md-nav__link">
         
   
   
@@ -1073,76 +1058,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#basic-usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic Usage
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#sharing-one-budget-limiter" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sharing One Budget: Limiter
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Sharing One Budget: Limiter">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#server-mandated-holds-pause" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Server-Mandated Holds: pause()
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-it-works" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How It Works
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1432,64 +1347,6 @@
     
   
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#basic-usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic Usage
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#sharing-one-budget-limiter" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sharing One Budget: Limiter
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Sharing One Budget: Limiter">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#server-mandated-holds-pause" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Server-Mandated Holds: pause()
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-it-works" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How It Works
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
 </nav>
                   </div>
                 </div>
@@ -1508,85 +1365,84 @@
   
 
 
-<h1 id="rate-limiting">Rate Limiting<a class="headerlink" href="#rate-limiting" title="Permanent link">&para;</a></h1>
-<p>Pyarallel separates rate limiting into a <strong>spec</strong> and a <strong>runtime</strong>:</p>
+<h1 id="batch-llm-calls">Batch LLM Calls<a class="headerlink" href="#batch-llm-calls" title="Permanent link">&para;</a></h1>
+<p>Run thousands of chat-completion calls — classification, extraction,
+summarization — against a rate-limited LLM API. The problems are always
+the same: the provider throttles you (429s), individual calls fail
+randomly, calls are expensive enough that you never want to pay for one
+twice, and a dead API at 2 a.m. must not burn the quota retrying forever.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">openai</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">Limiter</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">Retry</span>
+
+<span class="n">client</span> <span class="o">=</span> <span class="n">openai</span><span class="o">.</span><span class="n">OpenAI</span><span class="p">()</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">classify</span><span class="p">(</span><span class="n">ticket</span><span class="p">):</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">chat</span><span class="o">.</span><span class="n">completions</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+        <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4o-mini&quot;</span><span class="p">,</span>
+        <span class="n">messages</span><span class="o">=</span><span class="p">[</span>
+            <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;system&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Classify the support ticket: billing, bug, or feature.&quot;</span><span class="p">},</span>
+            <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="n">ticket</span><span class="p">},</span>
+        <span class="p">],</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">choices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">content</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">retry_after</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Honor the server&#39;s Retry-After header when present.&quot;&quot;&quot;</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;response&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">header</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;retry-after&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">response</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="p">)</span> <span class="k">if</span> <span class="n">header</span> <span class="k">else</span> <span class="kc">None</span>
+
+<span class="c1"># One Limiter per API key — every job that spends this quota shares it.</span>
+<span class="n">limiter</span> <span class="o">=</span> <span class="n">Limiter</span><span class="p">(</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">450</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">,</span> <span class="n">burst</span><span class="o">=</span><span class="mi">10</span><span class="p">))</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+    <span class="n">classify</span><span class="p">,</span> <span class="n">tickets</span><span class="p">,</span>
+    <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">,</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span>
+        <span class="n">attempts</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">backoff</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">openai</span><span class="o">.</span><span class="n">RateLimitError</span><span class="p">,</span> <span class="n">openai</span><span class="o">.</span><span class="n">APIConnectionError</span><span class="p">,</span> <span class="n">openai</span><span class="o">.</span><span class="n">InternalServerError</span><span class="p">),</span>
+        <span class="n">wait_from</span><span class="o">=</span><span class="n">retry_after</span><span class="p">,</span>          <span class="c1"># a 429 pauses the WHOLE pool</span>
+    <span class="p">),</span>
+    <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;classify.ckpt&quot;</span><span class="p">,</span>         <span class="c1"># paid-for answers survive a crash</span>
+    <span class="n">max_errors</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>                      <span class="c1"># dead API → abort near 20 failures, not at 20,000</span>
+<span class="p">)</span>
+
+<span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">successes</span><span class="p">():</span>
+    <span class="n">save</span><span class="p">(</span><span class="n">tickets</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">label</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">exc</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">failures</span><span class="p">():</span>
+    <span class="n">log_failed</span><span class="p">(</span><span class="n">tickets</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">exc</span><span class="p">)</span>
+</code></pre></div>
+<p>Why each policy is there:</p>
 <ul>
-<li><code>RateLimit(count, per, burst)</code> — the immutable spec. Passing it (or a plain
-  number) to an entry point creates a private limiter for that call.</li>
-<li><code>Limiter(rate_limit)</code> — the shareable runtime. Pass the same instance to
-  multiple calls and functions to draw from <strong>one budget</strong> — the right model
-  when a quota belongs to an API key rather than to a single operation.</li>
+<li><strong><code>wait_from=retry_after</code></strong> — when the provider says <code>Retry-After: 30</code>,
+  that wait replaces the backoff <em>and</em> pauses the shared limiter. One
+  throttled call slows the whole pool; without it, all 10 workers
+  discover the 429 separately and the retry storm makes it worse.</li>
+<li><strong><code>checkpoint=</code></strong> — LLM calls cost real money. Completed answers are
+  persisted as they finish; a crash at item 8,000 of 10,000 resumes
+  with 2,000 calls, not 10,000. Inputs that evolve between runs? Key
+  rows by identity with <code>checkpoint_key=lambda t: t.id</code>.</li>
+<li><strong><code>max_errors=20</code></strong> — the overnight-job guard. If the API dies, the
+  run stops admitting work once the 20th post-retry failure lands — at
+  most one admission window (default <code>2 × workers</code>) is still in flight —
+  and returns partial results; the morning rerun resumes from the
+  checkpoint. Shrink <code>batch_size</code> to tighten that bound on expensive
+  calls, at some throughput cost.</li>
 </ul>
-<h2 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span>
-
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>  <span class="c1"># shorthand: 10/second</span>
-
-<span class="c1"># burst: how many calls may fire immediately before the sustained rate</span>
-<span class="c1"># applies. Default 1 = smooth, even pacing (safest against secondary</span>
-<span class="c1"># per-second limits); raise it when the quota genuinely allows bursts.</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span>
-                       <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">,</span> <span class="n">burst</span><span class="o">=</span><span class="mi">20</span><span class="p">))</span>
-</code></pre></div>
-<p>The <code>RateLimit</code> parameter table lives in the
-<a href="../core/#ratelimit">core reference</a>.</p>
-<h2 id="sharing-one-budget-limiter">Sharing One Budget: <code>Limiter</code><a class="headerlink" href="#sharing-one-budget-limiter" title="Permanent link">&para;</a></h2>
-<p>Real quotas are per API key, not per call. A <code>RateLimit</code> passed directly
-creates a fresh limiter each call — two concurrent maps would each think
-they own the full quota. Share a <code>Limiter</code> instead:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">Limiter</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">parallel_map</span>
-
-<span class="n">limiter</span> <span class="o">=</span> <span class="n">Limiter</span><span class="p">(</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
-
-<span class="n">users</span>  <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch_user</span><span class="p">,</span>  <span class="n">user_ids</span><span class="p">,</span>  <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">)</span>
-<span class="n">orders</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch_order</span><span class="p">,</span> <span class="n">order_ids</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">)</span>  <span class="c1"># same quota</span>
-</code></pre></div>
-<p>One <code>Limiter</code> instance may be used from many threads <strong>and</strong> event loops at
-once — the same object works across <code>parallel_map</code> and <code>async_parallel_map</code>
-concurrently.</p>
-<h3 id="server-mandated-holds-pause">Server-Mandated Holds: <code>pause()</code><a class="headerlink" href="#server-mandated-holds-pause" title="Permanent link">&para;</a></h3>
-<p><code>Limiter.pause(seconds)</code> holds all slots until the deadline passes — including
-callers already sleeping toward a slot, who re-check on wake and honor the
-hold. You rarely call it yourself — <code>Retry(wait_from=...)</code> calls it
-automatically when a task hits a 429 (see <a href="../core/">Retry</a>), so one task's
-throttle signal slows the whole pool. Concurrent pauses don't stack; the
-furthest deadline wins. The pause also empties the bucket: traffic resumes
-with one call at the deadline and the rest at the refill pace, never a burst
-into a server that just said stop.</p>
-<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
-<p>Rate limiting uses a <strong>token bucket</strong> with commit-at-grant acquisition:</p>
-<ol>
-<li>The bucket holds up to <code>burst</code> tokens and refills at the spec's rate</li>
-<li>A caller consumes a token only at the moment it is granted; a caller
-   that gives up while waiting (timeout, cancellation) consumes nothing —
-   abandoned waits never leak capacity</li>
-<li>Sleeping callers re-check shared state when they wake, so a <code>pause()</code>
-   issued mid-sleep is honored, never bypassed</li>
-<li>Refill is capped at <code>burst</code> — idle time never accumulates more than one
-   burst of credit</li>
-<li>Thread-safe and event-loop-safe — the lock is held only for bookkeeping,
-   never while sleeping. Waiters are not queued FIFO; under heavy contention
-   grant order is not guaranteed, only the aggregate rate</li>
-<li>With <code>retry=</code>, every retry attempt draws a fresh token — retries are API
-   calls too and never bypass the limiter (exception: <code>executor="process"</code>
-   workers can't share the parent's limiter, so their retries pace only by
-   backoff)</li>
-</ol>
-<p>Two implementation notes worth knowing: rate limiting applies at
-<strong>submission time</strong> for sync (items enter the pool at the controlled
-rate) and at <strong>execution time</strong> for async (tasks acquire the token
-inside the semaphore). Decorated functions take <code>rate_limit=</code> as a
-default and per-call override like every other option.</p>
-<p>For guidance — headroom below the documented limit, when to share a
-<code>Limiter</code>, burst discipline — see
-<a href="../../user-guide/best-practices/#rate-limiting">Best Practices</a>.</p>
+<p>The recipe is client-agnostic: swap the <code>openai</code> call for
+<a href="https://docs.litellm.ai/">LiteLLM</a> (multi-provider routing), or raw
+<code>httpx</code> — pyarallel only sees a function and its exceptions.</p>
 
 
 
 
 
 
+
+  
+  
 
 
 

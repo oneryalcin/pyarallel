@@ -17,6 +17,54 @@
          <lastmod>2026-07-06</lastmod>
     </url>
     <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/bulk-file-download/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/cpu-fanout/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/dataset-enrichment/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/docker-registry-cleanup/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/embeddings/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/github-bulk-repo-changes/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/llm-batch-calls/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/ncbi-entrez-batch/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/secrets-rotation/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/streaming-etl/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
+         <loc>https://oneryalcin.github.io/pyarallel/cookbook/web-scraping/</loc>
+         <lastmod>2026-07-06</lastmod>
+    </url>
+    <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/CONTRIBUTING/</loc>
          <lastmod>2026-07-06</lastmod>
     </url>
@@ -62,10 +110,6 @@
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/user-guide/best-practices/</loc>
-         <lastmod>2026-07-06</lastmod>
-    </url>
-    <url>
-         <loc>https://oneryalcin.github.io/pyarallel/user-guide/real-world-patterns/</loc>
          <lastmod>2026-07-06</lastmod>
     </url>
 </urlset>

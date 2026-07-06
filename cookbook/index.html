@@ -6,35 +6,37 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
+        <meta name="description" content="Copy-pasteable pyarallel recipes for real workloads — batch LLM calls, embeddings, scraping, bulk GitHub/registry operations, scientific-API fetches, secrets rotation, and CPU fan-out.">
+      
       
         <meta name="author" content="Mehmet Oner Yalcin">
       
       
-        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/api-reference/rate-limiting/">
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/cookbook/">
       
       
-        <link rel="prev" href="../async/">
+        <link rel="prev" href="../getting-started/comparison/">
       
       
-        <link rel="next" href="../../development/CONTRIBUTING/">
+        <link rel="next" href="llm-batch-calls/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Rate Limiting - Pyarallel</title>
+        <title>Cookbook - Pyarallel</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -53,7 +55,7 @@
       
     
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -76,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#rate-limiting" class="md-skip">
+        <a href="#cookbook" class="md-skip">
           Skip to content
         </a>
       
@@ -92,7 +94,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+    <a href=".." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -112,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Rate Limiting
+              Cookbook
             
           </span>
         </div>
@@ -204,7 +206,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+    <a href=".." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -234,7 +236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -315,7 +317,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/installation/" class="md-nav__link">
+      <a href="../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -343,7 +345,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/quickstart/" class="md-nav__link">
+      <a href="../getting-started/quickstart/" class="md-nav__link">
         
   
   
@@ -371,7 +373,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/comparison/" class="md-nav__link">
+      <a href="../getting-started/comparison/" class="md-nav__link">
         
   
   
@@ -403,8 +405,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -415,13 +419,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -442,7 +444,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -457,10 +459,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../cookbook/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -476,6 +505,81 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#apis-llms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APIs &amp; LLMs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#web-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Web &amp; files
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#infrastructure-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Infrastructure &amp; ops
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-science" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data &amp; science
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-bound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU-bound
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -488,7 +592,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/llm-batch-calls/" class="md-nav__link">
+      <a href="llm-batch-calls/" class="md-nav__link">
         
   
   
@@ -516,7 +620,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/embeddings/" class="md-nav__link">
+      <a href="embeddings/" class="md-nav__link">
         
   
   
@@ -544,7 +648,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/dataset-enrichment/" class="md-nav__link">
+      <a href="dataset-enrichment/" class="md-nav__link">
         
   
   
@@ -572,7 +676,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/web-scraping/" class="md-nav__link">
+      <a href="web-scraping/" class="md-nav__link">
         
   
   
@@ -600,7 +704,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/bulk-file-download/" class="md-nav__link">
+      <a href="bulk-file-download/" class="md-nav__link">
         
   
   
@@ -628,7 +732,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/github-bulk-repo-changes/" class="md-nav__link">
+      <a href="github-bulk-repo-changes/" class="md-nav__link">
         
   
   
@@ -656,7 +760,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/docker-registry-cleanup/" class="md-nav__link">
+      <a href="docker-registry-cleanup/" class="md-nav__link">
         
   
   
@@ -684,7 +788,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/secrets-rotation/" class="md-nav__link">
+      <a href="secrets-rotation/" class="md-nav__link">
         
   
   
@@ -712,7 +816,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/streaming-etl/" class="md-nav__link">
+      <a href="streaming-etl/" class="md-nav__link">
         
   
   
@@ -740,7 +844,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/ncbi-entrez-batch/" class="md-nav__link">
+      <a href="ncbi-entrez-batch/" class="md-nav__link">
         
   
   
@@ -768,7 +872,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../cookbook/cpu-fanout/" class="md-nav__link">
+      <a href="cpu-fanout/" class="md-nav__link">
         
   
   
@@ -857,7 +961,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/advanced-features/" class="md-nav__link">
+      <a href="../user-guide/advanced-features/" class="md-nav__link">
         
   
   
@@ -885,7 +989,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../user-guide/best-practices/" class="md-nav__link">
+      <a href="../user-guide/best-practices/" class="md-nav__link">
         
   
   
@@ -917,8 +1021,6 @@
       
   
   
-    
-  
   
   
     
@@ -931,11 +1033,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
@@ -956,7 +1060,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -974,7 +1078,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../core/" class="md-nav__link">
+      <a href="../api-reference/core/" class="md-nav__link">
         
   
   
@@ -1002,7 +1106,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../async/" class="md-nav__link">
+      <a href="../api-reference/async/" class="md-nav__link">
         
   
   
@@ -1027,37 +1131,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Rate Limiting
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../api-reference/rate-limiting/" class="md-nav__link">
         
   
   
@@ -1073,76 +1150,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#basic-usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Basic Usage
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#sharing-one-budget-limiter" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sharing One Budget: Limiter
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Sharing One Budget: Limiter">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#server-mandated-holds-pause" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Server-Mandated Holds: pause()
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-it-works" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How It Works
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1216,7 +1223,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/CONTRIBUTING/" class="md-nav__link">
+      <a href="../development/CONTRIBUTING/" class="md-nav__link">
         
   
   
@@ -1244,7 +1251,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/devx-principles/" class="md-nav__link">
+      <a href="../development/devx-principles/" class="md-nav__link">
         
   
   
@@ -1272,7 +1279,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/roadmap/" class="md-nav__link">
+      <a href="../development/roadmap/" class="md-nav__link">
         
   
   
@@ -1300,7 +1307,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/v0.5.0/" class="md-nav__link">
+      <a href="../development/plans/v0.5.0/" class="md-nav__link">
         
   
   
@@ -1328,7 +1335,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/v0.6-engine-unification/" class="md-nav__link">
+      <a href="../development/plans/v0.6-engine-unification/" class="md-nav__link">
         
   
   
@@ -1356,7 +1363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/v0.6-ledger-refactor/" class="md-nav__link">
+      <a href="../development/plans/v0.6-ledger-refactor/" class="md-nav__link">
         
   
   
@@ -1384,7 +1391,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../development/plans/v0.7-free-threaded-and-interpreters/" class="md-nav__link">
+      <a href="../development/plans/v0.7-free-threaded-and-interpreters/" class="md-nav__link">
         
   
   
@@ -1439,10 +1446,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#basic-usage" class="md-nav__link">
+  <a href="#apis-llms" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Basic Usage
+        APIs &amp; LLMs
       
     </span>
   </a>
@@ -1450,38 +1457,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#sharing-one-budget-limiter" class="md-nav__link">
+  <a href="#web-files" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Sharing One Budget: Limiter
+        Web &amp; files
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Sharing One Budget: Limiter">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#server-mandated-holds-pause" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Server-Mandated Holds: pause()
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-it-works" class="md-nav__link">
+  <a href="#infrastructure-ops" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How It Works
+        Infrastructure &amp; ops
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-science" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data &amp; science
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-bound" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU-bound
       
     </span>
   </a>
@@ -1508,85 +1520,69 @@
   
 
 
-<h1 id="rate-limiting">Rate Limiting<a class="headerlink" href="#rate-limiting" title="Permanent link">&para;</a></h1>
-<p>Pyarallel separates rate limiting into a <strong>spec</strong> and a <strong>runtime</strong>:</p>
+<h1 id="cookbook">Cookbook<a class="headerlink" href="#cookbook" title="Permanent link">&para;</a></h1>
+<p>Complete, copy-pasteable recipes for real workloads — not toy examples.
+Each one shows the specific combination of policies (rate limiting,
+retry with server-driven backoff, checkpoint/resume, early abort) that
+makes pyarallel the right tool, not just "a parallel loop."</p>
+<p>The through-line for most of these: they're jobs where <strong>repeating work
+is expensive or dangerous</strong>, or where <strong>the rate budget is a shared
+external resource</strong> — exactly where a hand-rolled semaphore + retry
+silently does the wrong thing.</p>
+<h2 id="apis-llms">APIs &amp; LLMs<a class="headerlink" href="#apis-llms" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>RateLimit(count, per, burst)</code> — the immutable spec. Passing it (or a plain
-  number) to an entry point creates a private limiter for that call.</li>
-<li><code>Limiter(rate_limit)</code> — the shareable runtime. Pass the same instance to
-  multiple calls and functions to draw from <strong>one budget</strong> — the right model
-  when a quota belongs to an API key rather than to a single operation.</li>
+<li><a href="llm-batch-calls/"><strong>Batch LLM Calls</strong></a> — thousands of
+  chat-completion calls with <code>Retry-After</code> backoff, checkpoint resume,
+  and an overnight kill-switch. OpenAI, Anthropic, LiteLLM.</li>
+<li><a href="embeddings/"><strong>Batch Embedding Generation</strong></a> — embed thousands of
+  texts with a shared rate-limit budget and crash-safe resume.</li>
+<li><a href="dataset-enrichment/"><strong>Dataset Enrichment via API</strong></a> — enrich
+  pandas / HuggingFace rows by calling an API per row.</li>
 </ul>
-<h2 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span>
-
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>  <span class="c1"># shorthand: 10/second</span>
-
-<span class="c1"># burst: how many calls may fire immediately before the sustained rate</span>
-<span class="c1"># applies. Default 1 = smooth, even pacing (safest against secondary</span>
-<span class="c1"># per-second limits); raise it when the quota genuinely allows bursts.</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span>
-                       <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">,</span> <span class="n">burst</span><span class="o">=</span><span class="mi">20</span><span class="p">))</span>
-</code></pre></div>
-<p>The <code>RateLimit</code> parameter table lives in the
-<a href="../core/#ratelimit">core reference</a>.</p>
-<h2 id="sharing-one-budget-limiter">Sharing One Budget: <code>Limiter</code><a class="headerlink" href="#sharing-one-budget-limiter" title="Permanent link">&para;</a></h2>
-<p>Real quotas are per API key, not per call. A <code>RateLimit</code> passed directly
-creates a fresh limiter each call — two concurrent maps would each think
-they own the full quota. Share a <code>Limiter</code> instead:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">Limiter</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">parallel_map</span>
-
-<span class="n">limiter</span> <span class="o">=</span> <span class="n">Limiter</span><span class="p">(</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
-
-<span class="n">users</span>  <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch_user</span><span class="p">,</span>  <span class="n">user_ids</span><span class="p">,</span>  <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">)</span>
-<span class="n">orders</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch_order</span><span class="p">,</span> <span class="n">order_ids</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">)</span>  <span class="c1"># same quota</span>
-</code></pre></div>
-<p>One <code>Limiter</code> instance may be used from many threads <strong>and</strong> event loops at
-once — the same object works across <code>parallel_map</code> and <code>async_parallel_map</code>
-concurrently.</p>
-<h3 id="server-mandated-holds-pause">Server-Mandated Holds: <code>pause()</code><a class="headerlink" href="#server-mandated-holds-pause" title="Permanent link">&para;</a></h3>
-<p><code>Limiter.pause(seconds)</code> holds all slots until the deadline passes — including
-callers already sleeping toward a slot, who re-check on wake and honor the
-hold. You rarely call it yourself — <code>Retry(wait_from=...)</code> calls it
-automatically when a task hits a 429 (see <a href="../core/">Retry</a>), so one task's
-throttle signal slows the whole pool. Concurrent pauses don't stack; the
-furthest deadline wins. The pause also empties the bucket: traffic resumes
-with one call at the deadline and the rest at the refill pace, never a burst
-into a server that just said stop.</p>
-<h2 id="how-it-works">How It Works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h2>
-<p>Rate limiting uses a <strong>token bucket</strong> with commit-at-grant acquisition:</p>
-<ol>
-<li>The bucket holds up to <code>burst</code> tokens and refills at the spec's rate</li>
-<li>A caller consumes a token only at the moment it is granted; a caller
-   that gives up while waiting (timeout, cancellation) consumes nothing —
-   abandoned waits never leak capacity</li>
-<li>Sleeping callers re-check shared state when they wake, so a <code>pause()</code>
-   issued mid-sleep is honored, never bypassed</li>
-<li>Refill is capped at <code>burst</code> — idle time never accumulates more than one
-   burst of credit</li>
-<li>Thread-safe and event-loop-safe — the lock is held only for bookkeeping,
-   never while sleeping. Waiters are not queued FIFO; under heavy contention
-   grant order is not guaranteed, only the aggregate rate</li>
-<li>With <code>retry=</code>, every retry attempt draws a fresh token — retries are API
-   calls too and never bypass the limiter (exception: <code>executor="process"</code>
-   workers can't share the parent's limiter, so their retries pace only by
-   backoff)</li>
-</ol>
-<p>Two implementation notes worth knowing: rate limiting applies at
-<strong>submission time</strong> for sync (items enter the pool at the controlled
-rate) and at <strong>execution time</strong> for async (tasks acquire the token
-inside the semaphore). Decorated functions take <code>rate_limit=</code> as a
-default and per-call override like every other option.</p>
-<p>For guidance — headroom below the documented limit, when to share a
-<code>Limiter</code>, burst discipline — see
-<a href="../../user-guide/best-practices/#rate-limiting">Best Practices</a>.</p>
+<h2 id="web-files">Web &amp; files<a class="headerlink" href="#web-files" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="web-scraping/"><strong>Polite Web Scraping at Scale</strong></a> — rate-limited to
+  avoid IP bans, retry on transient failures, per-URL error tracking.</li>
+<li><a href="bulk-file-download/"><strong>Bulk File Download</strong></a> — hundreds of files
+  concurrently with retry and structured errors.</li>
+</ul>
+<h2 id="infrastructure-ops">Infrastructure &amp; ops<a class="headerlink" href="#infrastructure-ops" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="github-bulk-repo-changes/"><strong>Bulk GitHub Repo Changes</strong></a> — apply
+  one change across a whole org without tripping abuse detection;
+  resume, and a migration kill-switch.</li>
+<li><a href="docker-registry-cleanup/"><strong>Bulk Docker Registry Cleanup</strong></a> —
+  delete thousands of image tags without a 429 storm; resumable.</li>
+<li><a href="secrets-rotation/"><strong>Bulk Secrets Rotation</strong></a> — rotate thousands of
+  credentials with identity-keyed resume so a crash never rotates the
+  same secret twice.</li>
+</ul>
+<h2 id="data-science">Data &amp; science<a class="headerlink" href="#data-science" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="streaming-etl/"><strong>Streaming ETL Pipeline</strong></a> — process millions of
+  rows at constant memory.</li>
+<li><a href="ncbi-entrez-batch/"><strong>Batch NCBI E-utilities / Entrez</strong></a> — fetch
+  tens of thousands of GenBank/PubMed records under NCBI's rate limit
+  with one shared budget and resume.</li>
+</ul>
+<h2 id="cpu-bound">CPU-bound<a class="headerlink" href="#cpu-bound" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="cpu-fanout/"><strong>CPU-Bound Fan-Out</strong></a> — image resizing, PDF parsing,
+  hashing across process or interpreter workers.</li>
+</ul>
+<hr />
+<p>New to pyarallel? Start with the <a href="../getting-started/quickstart/">Quick Start</a>,
+or see the <a href="../getting-started/comparison/">Comparison</a> to decide
+whether it fits your problem.</p>
 
 
 
 
 
 
+
+  
+  
 
 
 
@@ -1636,10 +1632,10 @@ default and per-call override like every other option.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

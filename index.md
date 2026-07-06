@@ -1,0 +1,57 @@
+# Pyarallel
+
+The fan-out layer for rate-limited APIs. Simple, explicit parallel execution for Python.
+
+## Overview
+
+Pyarallel is for "apply one function to many inputs" workloads against services that throttle you — LLM calls, embeddings, scraping, SaaS APIs — as well as general parallel processing. It wraps Python's `concurrent.futures` and `asyncio` with the policies that workload actually needs: rate limiting, per-item retry, structured error handling, and progress callbacks. Sync and async, zero dependencies.
+
+**Design principles:**
+
+- **Explicit over implicit** — `.map()` for parallel, normal calls stay normal
+- **No magic** — no type-sniffing, no global config, no singletons
+- **Structured errors** — all failures collected via `ExceptionGroup`, never silently lost
+- **Sync + async** — mirror APIs, you choose explicitly
+
+## Quick Example
+
+```
+from pyarallel import parallel_map, RateLimit
+
+# Fan out 200 API calls, rate-limited to 100/min, with progress
+results = parallel_map(
+    fetch_url,
+    urls,
+    workers=10,
+    rate_limit=RateLimit(100, "minute"),
+    on_progress=lambda done, total: print(f"{done}/{total}"),
+)
+
+for item in results:        # raises ExceptionGroup if any failed
+    process(item)
+```
+
+Or with the decorator:
+
+```
+from pyarallel import parallel
+
+@parallel(workers=4)
+def fetch(url):
+    return requests.get(url).json()
+
+data = fetch("http://example.com")        # normal call, returns dict
+results = fetch.map(["u1", "u2", "u3"])   # parallel, returns ParallelResult
+```
+
+## Documentation
+
+- [Installation](https://oneryalcin.github.io/pyarallel/getting-started/installation/index.md)
+- [Quick Start](https://oneryalcin.github.io/pyarallel/getting-started/quickstart/index.md)
+- [Advanced Features](https://oneryalcin.github.io/pyarallel/user-guide/advanced-features/index.md)
+- [Best Practices](https://oneryalcin.github.io/pyarallel/user-guide/best-practices/index.md)
+- [API Reference](https://oneryalcin.github.io/pyarallel/api-reference/core/index.md)
+
+## License
+
+MIT — see [LICENSE](https://github.com/oneryalcin/pyarallel/blob/main/LICENSE.md).

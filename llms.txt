@@ -1,0 +1,34 @@
+# Pyarallel
+
+pyarallel is a zero-dependency Python library for fanning out one function over many inputs against rate-limited services — parallel map with token-bucket rate limiting, retry with server-driven (Retry-After) backoff, SQLite checkpoint/resume, early abort, and constant-memory streaming, for sync and async.
+
+
+## Getting Started
+
+- [Home](https://oneryalcin.github.io/pyarallel/index.md): Overview and the fan-out niche
+- [Quick Start](https://oneryalcin.github.io/pyarallel/getting-started/quickstart/index.md): Quick start
+- [Comparison](https://oneryalcin.github.io/pyarallel/getting-started/comparison/index.md): When to use pyarallel vs alternatives
+
+## Cookbook
+
+- [Overview](https://oneryalcin.github.io/pyarallel/cookbook/index.md)
+- [Bulk File Download](https://oneryalcin.github.io/pyarallel/cookbook/bulk-file-download/index.md)
+- [CPU-Bound Fan-Out](https://oneryalcin.github.io/pyarallel/cookbook/cpu-fanout/index.md)
+- [Dataset Enrichment](https://oneryalcin.github.io/pyarallel/cookbook/dataset-enrichment/index.md)
+- [Docker Registry Cleanup](https://oneryalcin.github.io/pyarallel/cookbook/docker-registry-cleanup/index.md)
+- [Batch Embedding Generation](https://oneryalcin.github.io/pyarallel/cookbook/embeddings/index.md)
+- [Bulk GitHub Repo Changes](https://oneryalcin.github.io/pyarallel/cookbook/github-bulk-repo-changes/index.md)
+- [Batch LLM Calls](https://oneryalcin.github.io/pyarallel/cookbook/llm-batch-calls/index.md)
+- [NCBI / Entrez Batch](https://oneryalcin.github.io/pyarallel/cookbook/ncbi-entrez-batch/index.md)
+- [Secrets Rotation](https://oneryalcin.github.io/pyarallel/cookbook/secrets-rotation/index.md)
+- [Streaming ETL](https://oneryalcin.github.io/pyarallel/cookbook/streaming-etl/index.md)
+- [Web Scraping](https://oneryalcin.github.io/pyarallel/cookbook/web-scraping/index.md)
+
+## Reference
+
+- [Async](https://oneryalcin.github.io/pyarallel/api-reference/async/index.md)
+- [Core](https://oneryalcin.github.io/pyarallel/api-reference/core/index.md)
+- [Rate Limiting](https://oneryalcin.github.io/pyarallel/api-reference/rate-limiting/index.md)
+- [Advanced Features](https://oneryalcin.github.io/pyarallel/user-guide/advanced-features/index.md)
+- [Best Practices](https://oneryalcin.github.io/pyarallel/user-guide/best-practices/index.md)
+
