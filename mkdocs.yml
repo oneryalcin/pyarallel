@@ -23,6 +23,7 @@ nav:
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quickstart.md
+    - Comparison: getting-started/comparison.md
   - User Guide:
     - Real-World Patterns: user-guide/real-world-patterns.md
     - Advanced Features: user-guide/advanced-features.md
