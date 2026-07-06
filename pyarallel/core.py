@@ -22,7 +22,7 @@ from concurrent.futures import (
     wait,
 )
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, TypedDict
 
 from ._plan import (
     _append_timeout_failures,
@@ -48,6 +48,58 @@ from .result import (
 )
 
 ExecutorType = Literal["thread", "process"]
+
+
+class SyncMapOptions(TypedDict, total=False):
+    """Per-call options of ``parallel_map`` — the decorator ``.map()``
+    surface. Declared to match the engine signature (the source of
+    truth); ``typing_assertions.py`` keeps them honest. Every key allows
+    ``None`` = "inherit the decorator default"."""
+
+    workers: int | None
+    executor: ExecutorType | None
+    rate_limit: Limiter | RateLimit | float | None
+    timeout: float | None
+    on_progress: Callable[[int, int], None] | None
+    batch_size: int | None
+    retry: Retry | None
+    checkpoint: str | Path | None
+    checkpoint_key: Callable[[Any], str | int | bytes] | None
+    max_errors: int | None
+    sequential: bool | None
+    worker_init: Callable[[], None] | None
+    max_tasks_per_worker: int | None
+
+
+class SyncStarmapOptions(TypedDict, total=False):
+    """Per-call options of ``parallel_starmap`` (no checkpoint)."""
+
+    workers: int | None
+    executor: ExecutorType | None
+    rate_limit: Limiter | RateLimit | float | None
+    timeout: float | None
+    on_progress: Callable[[int, int], None] | None
+    batch_size: int | None
+    retry: Retry | None
+    sequential: bool | None
+    worker_init: Callable[[], None] | None
+    max_tasks_per_worker: int | None
+
+
+class SyncStreamOptions(TypedDict, total=False):
+    """Per-call options of ``parallel_iter`` — the ``.stream()`` surface."""
+
+    workers: int | None
+    executor: ExecutorType | None
+    rate_limit: Limiter | RateLimit | float | None
+    batch_size: int | None
+    retry: Retry | None
+    ordered: bool | None
+    on_progress: Callable[[int, int], None] | None
+    max_errors: int | None
+    sequential: bool | None
+    worker_init: Callable[[], None] | None
+    max_tasks_per_worker: int | None
 
 
 def _execute_outcome(

@@ -5,23 +5,45 @@ changing its call signature or return type — and without erasing its types:
 the wrappers are generic over the function's parameters and return type, so
 ``fetch.map(urls)`` is a ``ParallelResult`` of what ``fetch`` returns.
 Participates in the descriptor protocol so decorated instance methods work.
+
+Per-call options are typed once per engine (``SyncMapOptions`` etc.,
+declared next to the engine functions) and threaded through with
+``Unpack`` — the engine's explicit signature stays the source of truth,
+and a signature change no longer touches five hand-copied keyword lists.
+An explicit ``None`` for any option means "inherit the decorator
+default" (``_merge_opts`` skips ``None``); an explicit ``None`` cannot
+*override* a non-None decorator default — known, documented limitation.
 """
 
 from __future__ import annotations
 
 import functools
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Iterator
-from pathlib import Path
-from typing import Any, cast, overload
+from typing import Any, Unpack, cast, overload
 
-from .aio import async_parallel_iter, async_parallel_map, async_parallel_starmap
-from .core import ExecutorType, parallel_iter, parallel_map, parallel_starmap
+from .aio import (
+    AsyncMapOptions,
+    AsyncStarmapOptions,
+    AsyncStreamOptions,
+    async_parallel_iter,
+    async_parallel_map,
+    async_parallel_starmap,
+)
+from .core import (
+    ExecutorType,
+    SyncMapOptions,
+    SyncStarmapOptions,
+    SyncStreamOptions,
+    parallel_iter,
+    parallel_map,
+    parallel_starmap,
+)
 from .limiter import Limiter
-from .policies import RateLimit, Retry
+from .policies import RateLimit
 from .result import ItemResult, ParallelResult
 
 
-def _merge_opts(defaults: dict[str, Any], **overrides: Any) -> dict[str, Any]:
+def _merge_opts(defaults: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
     """Merge decorator defaults with per-call overrides (skip None values)."""
     opts = dict(defaults)
     opts.update({k: v for k, v in overrides.items() if v is not None})
@@ -46,62 +68,24 @@ class _BoundParallel[R]:
         return self._fn(*args, **kwargs)
 
     def map(
-        self,
-        items: Iterable[Any],
-        *,
-        workers: int | None = None,
-        executor: ExecutorType | None = None,
-        rate_limit: Limiter | RateLimit | float | None = None,
-        timeout: float | None = None,
-        on_progress: Callable[[int, int], None] | None = None,
-        batch_size: int | None = None,
-        retry: Retry | None = None,
-        checkpoint: str | Path | None = None,
-        checkpoint_key: Callable[[Any], str | int | bytes] | None = None,
-        max_errors: int | None = None,
-        sequential: bool | None = None,
-        worker_init: Callable[[], None] | None = None,
-        max_tasks_per_worker: int | None = None,
+        self, items: Iterable[Any], **opts: Unpack[SyncMapOptions]
     ) -> ParallelResult[R]:
         """Run this function over *items* in parallel."""
-        return parallel_map(
-            self._fn,
-            items,
-            **_merge_opts(
-                self._defaults,
-                workers=workers,
-                executor=executor,
-                rate_limit=rate_limit,
-                timeout=timeout,
-                on_progress=on_progress,
-                batch_size=batch_size,
-                retry=retry,
-                checkpoint=checkpoint,
-                checkpoint_key=checkpoint_key,
-                max_errors=max_errors,
-                sequential=sequential,
-                worker_init=worker_init,
-                max_tasks_per_worker=max_tasks_per_worker,
-            ),
-        )
+        return parallel_map(self._fn, items, **_merge_opts(self._defaults, dict(opts)))
 
     def starmap(
-        self,
-        items: Iterable[tuple[Any, ...]],
-        **kwargs: Any,
+        self, items: Iterable[tuple[Any, ...]], **opts: Unpack[SyncStarmapOptions]
     ) -> ParallelResult[R]:
         """Like ``.map()`` but unpacks each item as ``fn(*args)``."""
         return parallel_starmap(
-            self._fn, items, **_merge_opts(self._defaults, **kwargs)
+            self._fn, items, **_merge_opts(self._defaults, dict(opts))
         )
 
     def stream(
-        self,
-        items: Iterable[Any],
-        **kwargs: Any,
+        self, items: Iterable[Any], **opts: Unpack[SyncStreamOptions]
     ) -> Iterator[ItemResult[R]]:
-        """Yield ``ItemResult`` in completion order — constant memory."""
-        return parallel_iter(self._fn, items, **_merge_opts(self._defaults, **kwargs))
+        """Yield ``ItemResult`` as tasks finish — constant memory."""
+        return parallel_iter(self._fn, items, **_merge_opts(self._defaults, dict(opts)))
 
 
 class _ParallelFunc[**P, R]:
@@ -145,65 +129,31 @@ class _ParallelFunc[**P, R]:
         return _BoundParallel(bound, self._defaults)
 
     def map(
-        self,
-        items: Iterable[Any],
-        *,
-        workers: int | None = None,
-        executor: ExecutorType | None = None,
-        rate_limit: Limiter | RateLimit | float | None = None,
-        timeout: float | None = None,
-        on_progress: Callable[[int, int], None] | None = None,
-        batch_size: int | None = None,
-        retry: Retry | None = None,
-        checkpoint: str | Path | None = None,
-        checkpoint_key: Callable[[Any], str | int | bytes] | None = None,
-        max_errors: int | None = None,
-        sequential: bool | None = None,
-        worker_init: Callable[[], None] | None = None,
-        max_tasks_per_worker: int | None = None,
+        self, items: Iterable[Any], **opts: Unpack[SyncMapOptions]
     ) -> ParallelResult[R]:
         """Run this function over *items* in parallel."""
         return parallel_map(
             cast("Callable[[Any], R]", self.__wrapped__),
             items,
-            **_merge_opts(
-                self._defaults,
-                workers=workers,
-                executor=executor,
-                rate_limit=rate_limit,
-                timeout=timeout,
-                on_progress=on_progress,
-                batch_size=batch_size,
-                retry=retry,
-                checkpoint=checkpoint,
-                checkpoint_key=checkpoint_key,
-                max_errors=max_errors,
-                sequential=sequential,
-                worker_init=worker_init,
-                max_tasks_per_worker=max_tasks_per_worker,
-            ),
+            **_merge_opts(self._defaults, dict(opts)),
         )
 
     def starmap(
-        self,
-        items: Iterable[tuple[Any, ...]],
-        **kwargs: Any,
+        self, items: Iterable[tuple[Any, ...]], **opts: Unpack[SyncStarmapOptions]
     ) -> ParallelResult[R]:
         """Like ``.map()`` but unpacks each item as ``fn(*args)``."""
         return parallel_starmap(
-            self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs)
+            self.__wrapped__, items, **_merge_opts(self._defaults, dict(opts))
         )
 
     def stream(
-        self,
-        items: Iterable[Any],
-        **kwargs: Any,
+        self, items: Iterable[Any], **opts: Unpack[SyncStreamOptions]
     ) -> Iterator[ItemResult[R]]:
-        """Yield ``ItemResult`` in completion order — constant memory."""
+        """Yield ``ItemResult`` as tasks finish — constant memory."""
         return parallel_iter(
             cast("Callable[[Any], R]", self.__wrapped__),
             items,
-            **_merge_opts(self._defaults, **kwargs),
+            **_merge_opts(self._defaults, dict(opts)),
         )
 
 
@@ -277,50 +227,24 @@ class _BoundAsyncParallel[R]:
         return await self._fn(*args, **kwargs)
 
     async def map(
-        self,
-        items: Iterable[Any],
-        *,
-        concurrency: int | None = None,
-        rate_limit: Limiter | RateLimit | float | None = None,
-        timeout: float | None = None,
-        task_timeout: float | None = None,
-        on_progress: Callable[[int, int], None] | None = None,
-        batch_size: int | None = None,
-        retry: Retry | None = None,
-        checkpoint: str | Path | None = None,
-        checkpoint_key: Callable[[Any], str | int | bytes] | None = None,
-        max_errors: int | None = None,
+        self, items: Iterable[Any], **opts: Unpack[AsyncMapOptions]
     ) -> ParallelResult[R]:
         return await async_parallel_map(
-            self._fn,
-            items,
-            **_merge_opts(
-                self._defaults,
-                concurrency=concurrency,
-                rate_limit=rate_limit,
-                timeout=timeout,
-                task_timeout=task_timeout,
-                on_progress=on_progress,
-                batch_size=batch_size,
-                retry=retry,
-                checkpoint=checkpoint,
-                checkpoint_key=checkpoint_key,
-                max_errors=max_errors,
-            ),
+            self._fn, items, **_merge_opts(self._defaults, dict(opts))
         )
 
     async def starmap(
-        self, items: Iterable[tuple[Any, ...]], **kwargs: Any
+        self, items: Iterable[tuple[Any, ...]], **opts: Unpack[AsyncStarmapOptions]
     ) -> ParallelResult[R]:
         return await async_parallel_starmap(
-            self._fn, items, **_merge_opts(self._defaults, **kwargs)
+            self._fn, items, **_merge_opts(self._defaults, dict(opts))
         )
 
     async def stream(
-        self, items: Iterable[Any], **kwargs: Any
+        self, items: Iterable[Any], **opts: Unpack[AsyncStreamOptions]
     ) -> AsyncIterator[ItemResult[R]]:
         async for item in async_parallel_iter(
-            self._fn, items, **_merge_opts(self._defaults, **kwargs)
+            self._fn, items, **_merge_opts(self._defaults, dict(opts))
         ):
             yield item
 
@@ -361,52 +285,28 @@ class _AsyncParallelFunc[**P, R]:
         return _BoundAsyncParallel(bound, self._defaults)
 
     async def map(
-        self,
-        items: Iterable[Any],
-        *,
-        concurrency: int | None = None,
-        rate_limit: Limiter | RateLimit | float | None = None,
-        timeout: float | None = None,
-        task_timeout: float | None = None,
-        on_progress: Callable[[int, int], None] | None = None,
-        batch_size: int | None = None,
-        retry: Retry | None = None,
-        checkpoint: str | Path | None = None,
-        checkpoint_key: Callable[[Any], str | int | bytes] | None = None,
-        max_errors: int | None = None,
+        self, items: Iterable[Any], **opts: Unpack[AsyncMapOptions]
     ) -> ParallelResult[R]:
         return await async_parallel_map(
             cast("Callable[[Any], Awaitable[R]]", self.__wrapped__),
             items,
-            **_merge_opts(
-                self._defaults,
-                concurrency=concurrency,
-                rate_limit=rate_limit,
-                timeout=timeout,
-                task_timeout=task_timeout,
-                on_progress=on_progress,
-                batch_size=batch_size,
-                retry=retry,
-                checkpoint=checkpoint,
-                checkpoint_key=checkpoint_key,
-                max_errors=max_errors,
-            ),
+            **_merge_opts(self._defaults, dict(opts)),
         )
 
     async def starmap(
-        self, items: Iterable[tuple[Any, ...]], **kwargs: Any
+        self, items: Iterable[tuple[Any, ...]], **opts: Unpack[AsyncStarmapOptions]
     ) -> ParallelResult[R]:
         return await async_parallel_starmap(
-            self.__wrapped__, items, **_merge_opts(self._defaults, **kwargs)
+            self.__wrapped__, items, **_merge_opts(self._defaults, dict(opts))
         )
 
     async def stream(
-        self, items: Iterable[Any], **kwargs: Any
+        self, items: Iterable[Any], **opts: Unpack[AsyncStreamOptions]
     ) -> AsyncIterator[ItemResult[R]]:
         async for item in async_parallel_iter(
             cast("Callable[[Any], Awaitable[R]]", self.__wrapped__),
             items,
-            **_merge_opts(self._defaults, **kwargs),
+            **_merge_opts(self._defaults, dict(opts)),
         ):
             yield item
 

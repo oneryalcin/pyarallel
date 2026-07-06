@@ -92,6 +92,63 @@ async def check_async_decorator() -> None:
     assert_type(await fetch_many.map(["u"]), ParallelResult[bytes])
 
 
+def check_decorator_option_keys() -> None:
+    """Phase 7 contract: the Unpack[TypedDict] surfaces accept every
+    engine option, keep `| None` (explicit None = inherit), and reject
+    unknown keys at type-check time."""
+    limiter = Limiter(RateLimit(10))
+
+    assert_type(
+        triple.map(
+            [1],
+            workers=8,
+            executor="process",
+            rate_limit=limiter,
+            timeout=30.0,
+            on_progress=lambda done, total: None,
+            batch_size=100,
+            retry=Retry(attempts=2),
+            checkpoint="run.ckpt",
+            checkpoint_key=lambda item: str(item),
+            max_errors=10,
+            sequential=True,
+            worker_init=lambda: None,
+            max_tasks_per_worker=50,
+        ),
+        ParallelResult[str],
+    )
+    # Explicit None means "inherit the decorator default" — must type-check.
+    assert_type(triple.map([1], workers=None, executor=None), ParallelResult[str])
+
+    assert_type(
+        triple.stream([1], ordered=True, max_errors=3, sequential=None),
+        Iterator[ItemResult[str]],
+    )
+    assert_type(triple.starmap([(1,)], sequential=True), ParallelResult[str])
+
+    triple.map([1], wrokers=4)  # type: ignore[call-arg]  # typo is caught
+
+
+async def check_async_decorator_option_keys() -> None:
+    assert_type(
+        await fetch_many.map(
+            ["u"],
+            concurrency=8,
+            timeout=60.0,
+            task_timeout=5.0,
+            retry=Retry(attempts=2),
+            checkpoint="run.ckpt",
+            checkpoint_key=lambda item: str(item),
+            max_errors=10,
+        ),
+        ParallelResult[bytes],
+    )
+    stream = fetch_many.stream(["u"], ordered=True, max_errors=3)
+    assert_type(stream, AsyncIterator[ItemResult[bytes]])
+
+    await fetch_many.map(["u"], sequential=True)  # type: ignore[call-arg]  # sync-only option
+
+
 def check_policy_arguments() -> None:
     limiter = Limiter(RateLimit(100, "minute", burst=20))
     parallel_map(fetch, ["a"], rate_limit=limiter)

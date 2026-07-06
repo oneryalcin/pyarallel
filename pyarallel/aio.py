@@ -11,7 +11,7 @@ import contextlib
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from ._plan import (
     _append_timeout_failures,
@@ -34,6 +34,47 @@ from .result import (
     _item_result,
     _Outcome,
 )
+
+
+class AsyncMapOptions(TypedDict, total=False):
+    """Per-call options of ``async_parallel_map`` — the async decorator
+    ``.map()`` surface. Every key allows ``None`` = "inherit"."""
+
+    concurrency: int | None
+    rate_limit: Limiter | RateLimit | float | None
+    timeout: float | None
+    task_timeout: float | None
+    on_progress: Callable[[int, int], None] | None
+    batch_size: int | None
+    retry: Retry | None
+    checkpoint: str | Path | None
+    checkpoint_key: Callable[[Any], str | int | bytes] | None
+    max_errors: int | None
+
+
+class AsyncStarmapOptions(TypedDict, total=False):
+    """Per-call options of ``async_parallel_starmap`` (no checkpoint)."""
+
+    concurrency: int | None
+    rate_limit: Limiter | RateLimit | float | None
+    timeout: float | None
+    task_timeout: float | None
+    on_progress: Callable[[int, int], None] | None
+    batch_size: int | None
+    retry: Retry | None
+
+
+class AsyncStreamOptions(TypedDict, total=False):
+    """Per-call options of ``async_parallel_iter`` — ``.stream()``."""
+
+    concurrency: int | None
+    rate_limit: Limiter | RateLimit | float | None
+    task_timeout: float | None
+    batch_size: int | None
+    retry: Retry | None
+    ordered: bool | None
+    on_progress: Callable[[int, int], None] | None
+    max_errors: int | None
 
 
 async def _async_execute_outcome(
