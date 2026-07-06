@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — v0.6
+## 0.6.0 — 2026-07-06
 
 **One engine for every execution path.** All collected maps — sync and
 async — now run through the same windowed engine that streaming and
