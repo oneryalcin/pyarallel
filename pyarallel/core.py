@@ -357,9 +357,10 @@ def parallel_map[T, R](
             pool, real stack traces, working breakpoints, deterministic
             order. Honors rate_limit, retry, checkpoint, on_progress, and
             max_errors; ``timeout`` is checked between items only (an
-            in-flight item cannot be interrupted); ``workers`` is ignored,
-            so one env flag can flip production code into debug mode.
-            ``worker_init`` runs once in the calling thread.
+            in-flight item cannot be interrupted); ``workers`` and
+            ``executor`` are both ignored (debug mode always runs
+            in-thread), so one env flag can flip production code into
+            debug mode. ``worker_init`` runs once in the calling thread.
         worker_init: Run once in each worker before it takes tasks — open
             one DB connection or load one model per worker, not per item.
             For ``executor="process"`` it must be picklable (module-level
