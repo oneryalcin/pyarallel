@@ -478,7 +478,8 @@ def parallel_map[T, R](
         worker_init: Run once in each worker before it takes tasks — open
             one DB connection or load one model per worker, not per item.
             For ``executor="process"`` it must be picklable (module-level
-            function).
+            function); for ``executor="interpreter"`` it must be a named
+            module-level function in an importable module (not ``__main__``).
         max_tasks_per_worker: Recycle each process worker after this many
             tasks (guards against native-library memory leaks). Requires
             ``executor="process"``.

@@ -69,7 +69,9 @@ results = parallel_map(crunch, datasets, workers=4, executor="process")
 
 On Python 3.14+, `executor="interpreter"` runs pure-Python CPU-bound
 work in sub-interpreters — process rules, one OS process, cheap workers.
-See [Best Practices](../user-guide/best-practices.md#interpreters-executorinterpreter-python-314).
+numpy/pandas fail there (`ImportError` — their C code doesn't support
+subinterpreters yet); keep `executor="process"` for those. See
+[Best Practices](../user-guide/best-practices.md#interpreters-executorinterpreter-python-314).
 
 ## Rate Limiting
 
