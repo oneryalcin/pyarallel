@@ -10,13 +10,13 @@
         <meta name="author" content="Mehmet Oner Yalcin">
       
       
-        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/development/devx-principles/">
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/getting-started/comparison/">
       
       
-        <link rel="prev" href="../CONTRIBUTING/">
+        <link rel="prev" href="../quickstart/">
       
       
-        <link rel="next" href="../roadmap/">
+        <link rel="next" href="../../user-guide/real-world-patterns/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>DevX Principles - Pyarallel</title>
+        <title>Comparison - Pyarallel</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#devx-principles" class="md-skip">
+        <a href="#comparison-pyarallel-vs-the-alternatives" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              DevX Principles
+              Comparison
             
           </span>
         </div>
@@ -258,8 +258,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -270,13 +272,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -297,7 +297,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -315,7 +315,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/installation/" class="md-nav__link">
+      <a href="../installation/" class="md-nav__link">
         
   
   
@@ -343,7 +343,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../getting-started/quickstart/" class="md-nav__link">
+      <a href="../quickstart/" class="md-nav__link">
         
   
   
@@ -368,10 +368,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../getting-started/comparison/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -387,6 +414,103 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#vs-the-hand-rolled-stack-threadpoolexecutor-tenacity-semaphore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vs the hand-rolled stack (ThreadPoolExecutor + tenacity + semaphore)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vs-aiometer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vs aiometer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vs-mpire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vs mpire
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vs-joblib" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vs joblib
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#vs-llm-specific-tooling-litellm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        vs LLM-specific tooling (LiteLLM)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-not-to-use-pyarallel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When NOT to use pyarallel
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-feature-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The feature grid
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -693,8 +817,6 @@
       
   
   
-    
-  
   
   
     
@@ -707,11 +829,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
@@ -732,7 +856,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -750,7 +874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CONTRIBUTING/" class="md-nav__link">
+      <a href="../../development/CONTRIBUTING/" class="md-nav__link">
         
   
   
@@ -775,37 +899,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    DevX Principles
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../development/devx-principles/" class="md-nav__link">
         
   
   
@@ -821,114 +918,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#1-keep-the-surface-small" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Keep the Surface Small
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-prefer-explicit-semantics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Prefer Explicit Semantics
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-optimize-for-strong-typing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Optimize for Strong Typing
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-preserve-native-call-feel" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Preserve Native Call Feel
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-document-tradeoffs-honestly" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Document Tradeoffs Honestly
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#6-prefer-one-honest-model-over-two-convenient-ones" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Prefer One Honest Model Over Two Convenient Ones
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#7-deprecate-deliberately" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        7. Deprecate Deliberately
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#8-avoid-premature-abstraction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        8. Avoid Premature Abstraction
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -941,7 +930,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../roadmap/" class="md-nav__link">
+      <a href="../../development/roadmap/" class="md-nav__link">
         
   
   
@@ -969,7 +958,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/v0.5.0/" class="md-nav__link">
+      <a href="../../development/plans/v0.5.0/" class="md-nav__link">
         
   
   
@@ -997,7 +986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/v0.6-engine-unification/" class="md-nav__link">
+      <a href="../../development/plans/v0.6-engine-unification/" class="md-nav__link">
         
   
   
@@ -1025,7 +1014,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/v0.6-ledger-refactor/" class="md-nav__link">
+      <a href="../../development/plans/v0.6-ledger-refactor/" class="md-nav__link">
         
   
   
@@ -1053,7 +1042,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../plans/v0.7-free-threaded-and-interpreters/" class="md-nav__link">
+      <a href="../../development/plans/v0.7-free-threaded-and-interpreters/" class="md-nav__link">
         
   
   
@@ -1108,10 +1097,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-keep-the-surface-small" class="md-nav__link">
+  <a href="#vs-the-hand-rolled-stack-threadpoolexecutor-tenacity-semaphore" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Keep the Surface Small
+        vs the hand-rolled stack (ThreadPoolExecutor + tenacity + semaphore)
       
     </span>
   </a>
@@ -1119,10 +1108,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-prefer-explicit-semantics" class="md-nav__link">
+  <a href="#vs-aiometer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Prefer Explicit Semantics
+        vs aiometer
       
     </span>
   </a>
@@ -1130,10 +1119,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-optimize-for-strong-typing" class="md-nav__link">
+  <a href="#vs-mpire" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Optimize for Strong Typing
+        vs mpire
       
     </span>
   </a>
@@ -1141,10 +1130,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-preserve-native-call-feel" class="md-nav__link">
+  <a href="#vs-joblib" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Preserve Native Call Feel
+        vs joblib
       
     </span>
   </a>
@@ -1152,10 +1141,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-document-tradeoffs-honestly" class="md-nav__link">
+  <a href="#vs-llm-specific-tooling-litellm" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Document Tradeoffs Honestly
+        vs LLM-specific tooling (LiteLLM)
       
     </span>
   </a>
@@ -1163,10 +1152,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#6-prefer-one-honest-model-over-two-convenient-ones" class="md-nav__link">
+  <a href="#when-not-to-use-pyarallel" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Prefer One Honest Model Over Two Convenient Ones
+        When NOT to use pyarallel
       
     </span>
   </a>
@@ -1174,21 +1163,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#7-deprecate-deliberately" class="md-nav__link">
+  <a href="#the-feature-grid" class="md-nav__link">
     <span class="md-ellipsis">
       
-        7. Deprecate Deliberately
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#8-avoid-premature-abstraction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        8. Avoid Premature Abstraction
+        The feature grid
       
     </span>
   </a>
@@ -1215,38 +1193,253 @@
   
 
 
-<h1 id="devx-principles">DevX Principles<a class="headerlink" href="#devx-principles" title="Permanent link">&para;</a></h1>
-<p>These are the product and API design principles for Pyarallel. Use them when
-adding features, changing names, or deciding whether a convenience API is worth
-the long-term cost.</p>
-<h2 id="1-keep-the-surface-small">1. Keep the Surface Small<a class="headerlink" href="#1-keep-the-surface-small" title="Permanent link">&para;</a></h2>
-<p>Pyarallel should feel like a few sharp tools, not a framework. New features
-must justify their cost in API surface, docs, and maintenance.</p>
-<h2 id="2-prefer-explicit-semantics">2. Prefer Explicit Semantics<a class="headerlink" href="#2-prefer-explicit-semantics" title="Permanent link">&para;</a></h2>
-<p>Different concepts should use different names. Sync pool sizing is not the same
-thing as async coroutine concurrency. Convenience should not come from hiding
-real semantic differences.</p>
-<h2 id="3-optimize-for-strong-typing">3. Optimize for Strong Typing<a class="headerlink" href="#3-optimize-for-strong-typing" title="Permanent link">&para;</a></h2>
-<p>Return types should make success and failure explicit. Good autocomplete, clear
-editor errors, and predictable type checking are part of the product.</p>
-<h2 id="4-preserve-native-call-feel">4. Preserve Native Call Feel<a class="headerlink" href="#4-preserve-native-call-feel" title="Permanent link">&para;</a></h2>
-<p>Decorators and wrappers should keep normal call signatures and return values
-whenever possible. Parallel behavior should feel additive, not magical.</p>
-<h2 id="5-document-tradeoffs-honestly">5. Document Tradeoffs Honestly<a class="headerlink" href="#5-document-tradeoffs-honestly" title="Permanent link">&para;</a></h2>
-<p>Do not oversell behavior. If batching is lazy only with <code>batch_size</code>, say that.
-If progress totals are provisional for unsized iterables, say that. Trust comes
-from accuracy.</p>
-<h2 id="6-prefer-one-honest-model-over-two-convenient-ones">6. Prefer One Honest Model Over Two Convenient Ones<a class="headerlink" href="#6-prefer-one-honest-model-over-two-convenient-ones" title="Permanent link">&para;</a></h2>
-<p>If sync and async APIs need different terms, keep them different. If streaming
-needs a typed result object, use one instead of mixing values and exceptions in
-the same channel.</p>
-<h2 id="7-deprecate-deliberately">7. Deprecate Deliberately<a class="headerlink" href="#7-deprecate-deliberately" title="Permanent link">&para;</a></h2>
-<p>When an API is wrong or confusing, prefer a clean replacement path over keeping
-compatibility forever. Pre-v1 is the time to fix conceptual mistakes.</p>
-<h2 id="8-avoid-premature-abstraction">8. Avoid Premature Abstraction<a class="headerlink" href="#8-avoid-premature-abstraction" title="Permanent link">&para;</a></h2>
-<p>Do not split code or add layers just because a review suggests it. Extract only
-when behavior is truly duplicated or when a boundary materially improves
-correctness, maintainability, or clarity.</p>
+<h1 id="comparison-pyarallel-vs-the-alternatives">Comparison — pyarallel vs the Alternatives<a class="headerlink" href="#comparison-pyarallel-vs-the-alternatives" title="Permanent link">&para;</a></h1>
+<p>Pyarallel occupies one niche: <strong>applying one function to many inputs
+against services that throttle you</strong>, with the policies that workload
+needs — rate limiting, retry, server-driven backoff, resume — built into
+one tool. Several good libraries live nearby. This page says honestly
+where each one wins, including where pyarallel is the wrong choice.</p>
+<h2 id="vs-the-hand-rolled-stack-threadpoolexecutor-tenacity-semaphore">vs the hand-rolled stack (ThreadPoolExecutor + tenacity + semaphore)<a class="headerlink" href="#vs-the-hand-rolled-stack-threadpoolexecutor-tenacity-semaphore" title="Permanent link">&para;</a></h2>
+<p>This is pyarallel's real competitor — not a library, a <em>pattern</em>.
+Everyone builds it: an executor for concurrency, <a href="https://tenacity.readthedocs.io/">tenacity</a>
+for retry, a token bucket or semaphore for rate limiting, a dict for
+errors, and a "TODO: resume" comment.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># The stack you&#39;ve written before</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tenacity</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPoolExecutor</span><span class="p">,</span> <span class="n">as_completed</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">threading</span><span class="w"> </span><span class="kn">import</span> <span class="n">Semaphore</span>
+
+<span class="n">limiter</span> <span class="o">=</span> <span class="n">Semaphore</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>          <span class="c1"># concurrency, but NOT a rate limit</span>
+
+<span class="nd">@tenacity</span><span class="o">.</span><span class="n">retry</span><span class="p">(</span>
+    <span class="n">stop</span><span class="o">=</span><span class="n">tenacity</span><span class="o">.</span><span class="n">stop_after_attempt</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span>
+    <span class="n">wait</span><span class="o">=</span><span class="n">tenacity</span><span class="o">.</span><span class="n">wait_exponential</span><span class="p">(),</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">tenacity</span><span class="o">.</span><span class="n">retry_if_exception_type</span><span class="p">(</span><span class="ne">ConnectionError</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fetch_with_retry</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">limiter</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+
+<span class="n">results</span><span class="p">,</span> <span class="n">errors</span> <span class="o">=</span> <span class="p">{},</span> <span class="p">{}</span>
+<span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
+    <span class="n">futures</span> <span class="o">=</span> <span class="p">{</span><span class="n">pool</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">fetch_with_retry</span><span class="p">,</span> <span class="n">u</span><span class="p">):</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">u</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">urls</span><span class="p">)}</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">as_completed</span><span class="p">(</span><span class="n">futures</span><span class="p">):</span>
+        <span class="n">i</span> <span class="o">=</span> <span class="n">futures</span><span class="p">[</span><span class="n">f</span><span class="p">]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">results</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">errors</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">e</span>
+<span class="c1"># Still missing: an actual requests-per-minute limit, Retry-After</span>
+<span class="c1"># handling, resume after a crash, partial-result semantics.</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># The same job in pyarallel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">Retry</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+    <span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">),</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="ne">ConnectionError</span><span class="p">,)),</span>
+    <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;run.ckpt&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>The difference isn't line count — it's the parts the hand-roll never
+gets to. A semaphore bounds <em>concurrency</em>, not <em>rate</em>: 10 workers
+against a 100/minute quota still burn it in seconds. Tenacity retries
+one call in isolation; it cannot pause the <em>pool</em> when the server says
+<code>Retry-After: 30</code>, so every worker discovers the 429 separately. And
+resume-after-crash never gets built because it's a project in itself.</p>
+<p>The async spelling of the hand-roll — <code>asyncio.TaskGroup</code> +
+<code>asyncio.Semaphore</code> — has exactly the same holes: the semaphore still
+isn't a rate limit, and coordinated backoff and resume still don't
+exist. (And <code>httpx.HTTPTransport(retries=N)</code> covers connection-level
+retries only — not HTTP-status retries, not rate-limit coordination.)</p>
+<p><strong>Use the hand-roll when</strong> you need exactly one of these pieces —
+tenacity alone is excellent, and for complex retry strategies (circuit
+breakers, custom stop conditions) it composes <em>inside</em> pyarallel
+workers (<a href="../../user-guide/best-practices/#composing-with-tenacity">how</a>).</p>
+<h2 id="vs-aiometer">vs aiometer<a class="headerlink" href="#vs-aiometer" title="Permanent link">&para;</a></h2>
+<p><a href="https://pypi.org/project/aiometer/">aiometer</a> is a small, clean async
+concurrency scheduler: <code>max_at_once</code> bounds concurrency,
+<code>max_per_second</code> bounds rate, results stream or collect. If that's all
+you need, it's a lovely tool.</p>
+<p>Differences that matter in practice:</p>
+<ul>
+<li><strong>Async-only</strong> (asyncio/trio). Pyarallel has the same API for sync
+  and async — most scripts, notebooks, and cron jobs are sync.</li>
+<li><strong>No retry</strong> — you bring your own, and it can't coordinate with the
+  rate limiter (the 429-pauses-the-pool behavior needs both in one
+  place).</li>
+<li><strong>No resume</strong> and no structured partial results — an exception mid-run
+  is yours to handle.</li>
+</ul>
+<p><strong>Use aiometer when</strong> you're already fully async, your error handling is
+simple, and you want a minimal dependency that schedules and gets out of
+the way.</p>
+<h2 id="vs-mpire">vs mpire<a class="headerlink" href="#vs-mpire" title="Permanent link">&para;</a></h2>
+<p><a href="https://pypi.org/project/mpire/">mpire</a> is the multiprocessing
+specialist, and in that lane it's <em>more</em> featureful than pyarallel:
+copy-on-write shared objects, per-worker state, CPU pinning, worker
+insights, progress dashboards, dill serialization for exotic objects.</p>
+<p>Pyarallel's process executor covers the common CPU-bound fan-out
+(<code>executor="process"</code>, <code>worker_init=</code>, <code>max_tasks_per_worker=</code>) but
+doesn't try to match that depth. The lane it owns is the other one:
+mpire has no rate limiting, no retry policy, no async, no
+checkpoint/resume — it isn't built for calling throttled APIs.</p>
+<p><strong>Use mpire when</strong> heavy multiprocessing <em>is</em> the job — big
+shared-memory datasets, worker state, squeezing cores. <strong>Use pyarallel
+when</strong> the job is I/O against services that push back, or when one tool
+must cover both sides.</p>
+<h2 id="vs-joblib">vs joblib<a class="headerlink" href="#vs-joblib" title="Permanent link">&para;</a></h2>
+<p><a href="https://joblib.readthedocs.io/">joblib</a> is the scientific-computing
+workhorse: <code>Parallel(n_jobs=-1)(delayed(f)(x) for x in data)</code>, numpy
+memmapping, disk caching via <code>Memory</code>, and it's already under sklearn.
+For CPU-bound numerical work over arrays it's the default for a reason.</p>
+<p>It has no rate limiting, no retry, no async, and its disk cache
+memoizes <em>function calls</em> — related to, but not the same as, resuming a
+half-finished batch run keyed by item identity.</p>
+<p><strong>Use joblib when</strong> you're in the numpy/sklearn world crunching arrays.
+<strong>Use pyarallel when</strong> the bottleneck is a remote API's quota, not your
+CPU.</p>
+<h2 id="vs-llm-specific-tooling-litellm">vs LLM-specific tooling (LiteLLM)<a class="headerlink" href="#vs-llm-specific-tooling-litellm" title="Permanent link">&para;</a></h2>
+<p>If your whole problem is <em>LLM routing</em> — one interface over many
+providers, provider-aware rate limits, model fallbacks —
+<a href="https://docs.litellm.ai/">LiteLLM</a>'s Router is built for exactly that.
+Pyarallel is provider-agnostic fan-out: it doesn't know what an LLM is.
+The two compose rather than compete — a LiteLLM (or openai, or raw
+httpx) call runs <em>inside</em> the worker; pyarallel brings the batch
+mechanics a router doesn't: checkpoint/resume, partial results with
+typed failures, windowed memory over a million inputs, <code>max_errors</code>.</p>
+<h2 id="when-not-to-use-pyarallel">When NOT to use pyarallel<a class="headerlink" href="#when-not-to-use-pyarallel" title="Permanent link">&para;</a></h2>
+<p>Honesty is the point of this page — these are real disqualifiers, not
+straw men:</p>
+<ul>
+<li><strong>Dependencies between tasks (DAGs, pipelines).</strong> Pyarallel is one
+  function over N independent inputs, deliberately. Step B needs step
+  A's output? <a href="https://www.prefect.io/">Prefect</a>, <a href="https://dagster.io/">Dagster</a>,
+  or Airflow.</li>
+<li><strong>Distributed across machines.</strong> One process, one machine. Cluster
+  scale is <a href="https://www.ray.io/">Ray</a> or <a href="https://www.dask.org/">Dask</a>.</li>
+<li><strong>Background jobs / task queues.</strong> Fire-and-forget with brokers,
+  schedules, and worker fleets is <a href="https://docs.celeryq.dev/">Celery</a>
+  / RQ / <a href="https://arq-docs.helpmanual.io/">arq</a> territory.</li>
+<li><strong>Vectorizable numerical work.</strong> If numpy/polars can express it,
+  vectorization beats any pool by orders of magnitude. Parallelize the
+  parts that can't vectorize.</li>
+<li><strong>A five-line one-off with no failures worth handling.</strong>
+  <code>ThreadPoolExecutor.map</code> is in the stdlib and is fine. Pyarallel earns
+  its import when rate limits, retries, partial failures, or resume
+  enter the picture.</li>
+<li><strong>Streaming/event processing.</strong> Continuous consumption from Kafka
+  et al. is a different shape — pyarallel runs <em>batches</em> to completion.</li>
+</ul>
+<h2 id="the-feature-grid">The feature grid<a class="headerlink" href="#the-feature-grid" title="Permanent link">&para;</a></h2>
+<p>Kept short and honest — ✓ means built-in and coordinated, not
+"achievable with glue code":</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>pyarallel</th>
+<th>hand-roll</th>
+<th>aiometer</th>
+<th>mpire</th>
+<th>joblib</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sync API</td>
+<td>✓</td>
+<td>✓</td>
+<td>—</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Async API</td>
+<td>✓</td>
+<td>DIY</td>
+<td>✓</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Rate limiting (req/time)</td>
+<td>✓</td>
+<td>DIY</td>
+<td>✓</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Retry with backoff</td>
+<td>✓</td>
+<td>tenacity</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>429/<code>Retry-After</code> slows the pool</td>
+<td>✓†</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Checkpoint/resume</td>
+<td>✓</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>caching*</td>
+</tr>
+<tr>
+<td>Partial results + typed failures</td>
+<td>✓</td>
+<td>DIY</td>
+<td>—</td>
+<td>DIY</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Deep multiprocessing (worker state, CPU pinning)</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>✓</td>
+<td>—</td>
+</tr>
+<tr>
+<td>numpy memmapping</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Zero dependencies</td>
+<td>✓</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>* joblib's <code>Memory</code> caches function calls to disk — great for repeated
+computations, not positional/keyed batch resume.</p>
+<p>† Thread and async executors. Process/interpreter workers honor the
+<code>Retry-After</code> wait as their own retry delay, but can't pause the
+<em>shared</em> limiter — a live object doesn't cross a process boundary.
+API fan-out belongs on threads or async anyway.</p>
+<p>If your workload is "fan out one function over N items against a
+service that throttles you" — LLM calls, embeddings, scraping, SaaS
+APIs — that first column is the stack you'd otherwise assemble by hand.
+That's the bet. See it in action:
+<a href="../../user-guide/real-world-patterns/">Real-World Patterns</a>.</p>
 
 
 

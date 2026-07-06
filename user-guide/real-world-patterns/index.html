@@ -13,14 +13,17 @@
         <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/user-guide/real-world-patterns/">
       
       
-        <link rel="prev" href="../../getting-started/quickstart/">
+        <link rel="prev" href="../../getting-started/comparison/">
       
       
         <link rel="next" href="../advanced-features/">
       
       
+        
+      
+      
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.50">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -28,10 +31,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.a40c8224.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -54,7 +57,6 @@
     
       
 
-    
     
     
   </head>
@@ -122,11 +124,13 @@
     
     
     
-      <label class="md-header__button md-icon" for="__search">
-        
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
-      </label>
-      <div class="md-search" data-md-component="search" role="dialog">
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
   <label class="md-search__overlay" for="__search"></label>
   <div class="md-search__inner" role="search">
     <form class="md-search__form" name="search">
@@ -160,13 +164,14 @@
     </div>
   </div>
 </div>
+      
     
     
       <div class="md-header__source">
         <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
   </div>
   <div class="md-source__repository">
     oneryalcin/pyarallel
@@ -212,7 +217,7 @@
       <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
   </div>
   <div class="md-source__repository">
     oneryalcin/pyarallel
@@ -232,9 +237,16 @@
       <a href="../.." class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     Home
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -248,6 +260,7 @@
   
   
   
+    
     
     
     
@@ -269,9 +282,16 @@
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
+  
   <span class="md-ellipsis">
+    
+  
     Getting Started
+  
+
+    
   </span>
+  
   
 
             <span class="md-nav__icon md-icon"></span>
@@ -280,7 +300,11 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
-            Getting Started
+            
+  
+    Getting Started
+  
+
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -294,9 +318,16 @@
       <a href="../../getting-started/installation/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     Installation
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -315,9 +346,44 @@
       <a href="../../getting-started/quickstart/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     Quick Start
+  
+
+    
   </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison
+  
+
+    
+  </span>
+  
   
 
       </a>
@@ -344,6 +410,7 @@
     
     
     
+    
       
         
         
@@ -360,9 +427,16 @@
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
+  
   <span class="md-ellipsis">
+    
+  
     User Guide
+  
+
+    
   </span>
+  
   
 
             <span class="md-nav__icon md-icon"></span>
@@ -371,7 +445,11 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            User Guide
+            
+  
+    User Guide
+  
+
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -394,9 +472,16 @@
         <label class="md-nav__link md-nav__link--active" for="__toc">
           
   
+  
   <span class="md-ellipsis">
+    
+  
     Real-World Patterns
+  
+
+    
   </span>
+  
   
 
           <span class="md-nav__icon md-icon"></span>
@@ -405,9 +490,16 @@
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     Real-World Patterns
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -428,9 +520,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#batch-llm-calls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch LLM Calls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#batch-embedding-generation" class="md-nav__link">
     <span class="md-ellipsis">
-      Batch Embedding Generation
+      
+        Batch Embedding Generation
+      
     </span>
   </a>
   
@@ -439,7 +544,9 @@
         <li class="md-nav__item">
   <a href="#web-scraping" class="md-nav__link">
     <span class="md-ellipsis">
-      Web Scraping
+      
+        Web Scraping
+      
     </span>
   </a>
   
@@ -448,7 +555,9 @@
         <li class="md-nav__item">
   <a href="#dataset-enrichment-via-api" class="md-nav__link">
     <span class="md-ellipsis">
-      Dataset Enrichment via API
+      
+        Dataset Enrichment via API
+      
     </span>
   </a>
   
@@ -458,7 +567,9 @@
           <li class="md-nav__item">
   <a href="#with-huggingface-datasets" class="md-nav__link">
     <span class="md-ellipsis">
-      With HuggingFace Datasets
+      
+        With HuggingFace Datasets
+      
     </span>
   </a>
   
@@ -472,7 +583,9 @@
         <li class="md-nav__item">
   <a href="#bulk-file-download" class="md-nav__link">
     <span class="md-ellipsis">
-      Bulk File Download
+      
+        Bulk File Download
+      
     </span>
   </a>
   
@@ -481,7 +594,20 @@
         <li class="md-nav__item">
   <a href="#streaming-etl-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
-      Streaming ETL Pipeline
+      
+        Streaming ETL Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-bound-fan-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU-Bound Fan-Out
+      
     </span>
   </a>
   
@@ -506,9 +632,16 @@
       <a href="../advanced-features/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     Advanced Features
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -527,9 +660,16 @@
       <a href="../best-practices/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     Best Practices
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -551,6 +691,7 @@
   
   
   
+    
     
     
     
@@ -572,9 +713,16 @@
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
+  
   <span class="md-ellipsis">
+    
+  
     API Reference
+  
+
+    
   </span>
+  
   
 
             <span class="md-nav__icon md-icon"></span>
@@ -583,7 +731,11 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
-            API Reference
+            
+  
+    API Reference
+  
+
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -597,9 +749,16 @@
       <a href="../../api-reference/core/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     Core
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -618,9 +777,16 @@
       <a href="../../api-reference/async/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     Async
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -639,9 +805,16 @@
       <a href="../../api-reference/rate-limiting/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     Rate Limiting
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -666,6 +839,7 @@
     
     
     
+    
       
         
         
@@ -684,9 +858,16 @@
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
             
   
+  
   <span class="md-ellipsis">
+    
+  
     Development
+  
+
+    
   </span>
+  
   
 
             <span class="md-nav__icon md-icon"></span>
@@ -695,7 +876,11 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
-            Development
+            
+  
+    Development
+  
+
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -709,9 +894,16 @@
       <a href="../../development/CONTRIBUTING/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     Contributing
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -730,9 +922,16 @@
       <a href="../../development/devx-principles/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     DevX Principles
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -751,9 +950,16 @@
       <a href="../../development/roadmap/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     Roadmap
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -772,9 +978,16 @@
       <a href="../../development/plans/v0.5.0/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     v0.5.0 Plan
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -793,9 +1006,16 @@
       <a href="../../development/plans/v0.6-engine-unification/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     v0.6 Engine Unification Plan
+  
+
+    
   </span>
+  
   
 
       </a>
@@ -814,9 +1034,44 @@
       <a href="../../development/plans/v0.6-ledger-refactor/" class="md-nav__link">
         
   
+  
   <span class="md-ellipsis">
+    
+  
     v0.6 Ledger Refactor Plan
+  
+
+    
   </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.7-free-threaded-and-interpreters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.7 Free-Threaded & Interpreters Plan
+  
+
+    
+  </span>
+  
   
 
       </a>
@@ -859,9 +1114,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#batch-llm-calls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Batch LLM Calls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#batch-embedding-generation" class="md-nav__link">
     <span class="md-ellipsis">
-      Batch Embedding Generation
+      
+        Batch Embedding Generation
+      
     </span>
   </a>
   
@@ -870,7 +1138,9 @@
         <li class="md-nav__item">
   <a href="#web-scraping" class="md-nav__link">
     <span class="md-ellipsis">
-      Web Scraping
+      
+        Web Scraping
+      
     </span>
   </a>
   
@@ -879,7 +1149,9 @@
         <li class="md-nav__item">
   <a href="#dataset-enrichment-via-api" class="md-nav__link">
     <span class="md-ellipsis">
-      Dataset Enrichment via API
+      
+        Dataset Enrichment via API
+      
     </span>
   </a>
   
@@ -889,7 +1161,9 @@
           <li class="md-nav__item">
   <a href="#with-huggingface-datasets" class="md-nav__link">
     <span class="md-ellipsis">
-      With HuggingFace Datasets
+      
+        With HuggingFace Datasets
+      
     </span>
   </a>
   
@@ -903,7 +1177,9 @@
         <li class="md-nav__item">
   <a href="#bulk-file-download" class="md-nav__link">
     <span class="md-ellipsis">
-      Bulk File Download
+      
+        Bulk File Download
+      
     </span>
   </a>
   
@@ -912,7 +1188,20 @@
         <li class="md-nav__item">
   <a href="#streaming-etl-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
-      Streaming ETL Pipeline
+      
+        Streaming ETL Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-bound-fan-out" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU-Bound Fan-Out
+      
     </span>
   </a>
   
@@ -928,9 +1217,11 @@
           
           
             <div class="md-content" data-md-component="content">
+              
               <article class="md-content__inner md-typeset">
                 
                   
+
 
   
   
@@ -939,6 +1230,75 @@
 <h1 id="real-world-patterns">Real-World Patterns<a class="headerlink" href="#real-world-patterns" title="Permanent link">&para;</a></h1>
 <p>Practical examples for common workloads. Each pattern shows a complete,
 copy-pasteable approach — not a toy example.</p>
+<h2 id="batch-llm-calls">Batch LLM Calls<a class="headerlink" href="#batch-llm-calls" title="Permanent link">&para;</a></h2>
+<p>Run thousands of chat-completion calls — classification, extraction,
+summarization — against a rate-limited LLM API. The problems are always
+the same: the provider throttles you (429s), individual calls fail
+randomly, calls are expensive enough that you never want to pay for one
+twice, and a dead API at 2 a.m. must not burn the quota retrying forever.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">openai</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">Limiter</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">Retry</span>
+
+<span class="n">client</span> <span class="o">=</span> <span class="n">openai</span><span class="o">.</span><span class="n">OpenAI</span><span class="p">()</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">classify</span><span class="p">(</span><span class="n">ticket</span><span class="p">):</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">chat</span><span class="o">.</span><span class="n">completions</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
+        <span class="n">model</span><span class="o">=</span><span class="s2">&quot;gpt-4o-mini&quot;</span><span class="p">,</span>
+        <span class="n">messages</span><span class="o">=</span><span class="p">[</span>
+            <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;system&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;Classify the support ticket: billing, bug, or feature.&quot;</span><span class="p">},</span>
+            <span class="p">{</span><span class="s2">&quot;role&quot;</span><span class="p">:</span> <span class="s2">&quot;user&quot;</span><span class="p">,</span> <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="n">ticket</span><span class="p">},</span>
+        <span class="p">],</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">choices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">content</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">retry_after</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Honor the server&#39;s Retry-After header when present.&quot;&quot;&quot;</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;response&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">header</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;retry-after&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">response</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="p">)</span> <span class="k">if</span> <span class="n">header</span> <span class="k">else</span> <span class="kc">None</span>
+
+<span class="c1"># One Limiter per API key — every job that spends this quota shares it.</span>
+<span class="n">limiter</span> <span class="o">=</span> <span class="n">Limiter</span><span class="p">(</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">450</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">,</span> <span class="n">burst</span><span class="o">=</span><span class="mi">10</span><span class="p">))</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+    <span class="n">classify</span><span class="p">,</span> <span class="n">tickets</span><span class="p">,</span>
+    <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">,</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span>
+        <span class="n">attempts</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">backoff</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">openai</span><span class="o">.</span><span class="n">RateLimitError</span><span class="p">,</span> <span class="n">openai</span><span class="o">.</span><span class="n">APIConnectionError</span><span class="p">,</span> <span class="n">openai</span><span class="o">.</span><span class="n">InternalServerError</span><span class="p">),</span>
+        <span class="n">wait_from</span><span class="o">=</span><span class="n">retry_after</span><span class="p">,</span>          <span class="c1"># a 429 pauses the WHOLE pool</span>
+    <span class="p">),</span>
+    <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;classify.ckpt&quot;</span><span class="p">,</span>         <span class="c1"># paid-for answers survive a crash</span>
+    <span class="n">max_errors</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>                      <span class="c1"># dead API → abort near 20 failures, not at 20,000</span>
+<span class="p">)</span>
+
+<span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">successes</span><span class="p">():</span>
+    <span class="n">save</span><span class="p">(</span><span class="n">tickets</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">label</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">exc</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">failures</span><span class="p">():</span>
+    <span class="n">log_failed</span><span class="p">(</span><span class="n">tickets</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">exc</span><span class="p">)</span>
+</code></pre></div>
+<p>Why each policy is there:</p>
+<ul>
+<li><strong><code>wait_from=retry_after</code></strong> — when the provider says <code>Retry-After: 30</code>,
+  that wait replaces the backoff <em>and</em> pauses the shared limiter. One
+  throttled call slows the whole pool; without it, all 10 workers
+  discover the 429 separately and the retry storm makes it worse.</li>
+<li><strong><code>checkpoint=</code></strong> — LLM calls cost real money. Completed answers are
+  persisted as they finish; a crash at item 8,000 of 10,000 resumes
+  with 2,000 calls, not 10,000. Inputs that evolve between runs? Key
+  rows by identity with <code>checkpoint_key=lambda t: t.id</code>.</li>
+<li><strong><code>max_errors=20</code></strong> — the overnight-job guard. If the API dies, the
+  run stops admitting work once the 20th post-retry failure lands — at
+  most one admission window (default <code>2 × workers</code>) is still in flight —
+  and returns partial results; the morning rerun resumes from the
+  checkpoint. Shrink <code>batch_size</code> to tighten that bound on expensive
+  calls, at some throughput cost.</li>
+</ul>
+<p>The recipe is client-agnostic: swap the <code>openai</code> call for
+<a href="https://docs.litellm.ai/">LiteLLM</a> (multi-provider routing), or raw
+<code>httpx</code> — pyarallel only sees a function and its exceptions.</p>
 <h2 id="batch-embedding-generation">Batch Embedding Generation<a class="headerlink" href="#batch-embedding-generation" title="Permanent link">&para;</a></h2>
 <p>Call an embedding API for thousands of texts with rate limiting and retry.
 Works with OpenAI, Cohere, HuggingFace Inference API, or any HTTP endpoint.</p>
@@ -1191,6 +1551,49 @@ pandas DataFrames, HuggingFace datasets, or any iterable of records.</p>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">log_error</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
 </code></pre></div>
+<h2 id="cpu-bound-fan-out">CPU-Bound Fan-Out<a class="headerlink" href="#cpu-bound-fan-out" title="Permanent link">&para;</a></h2>
+<p>Same API, different executor. Resize a directory of images, parse a
+pile of PDFs, hash a million records — anything where the bottleneck is
+your CPU, not a remote service:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">PIL</span><span class="w"> </span><span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">make_thumbnail</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Must be a module-level function — process workers re-import it.&quot;&quot;&quot;</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="n">img</span><span class="o">.</span><span class="n">thumbnail</span><span class="p">((</span><span class="mi">800</span><span class="p">,</span> <span class="mi">600</span><span class="p">))</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">with_stem</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">stem</span> <span class="o">+</span> <span class="s2">&quot;_thumb&quot;</span><span class="p">)</span>
+    <span class="n">img</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+
+<span class="n">paths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;photos&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;*.jpg&quot;</span><span class="p">))</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+    <span class="n">make_thumbnail</span><span class="p">,</span> <span class="n">paths</span><span class="p">,</span>
+    <span class="n">executor</span><span class="o">=</span><span class="s2">&quot;process&quot;</span><span class="p">,</span>        <span class="c1"># true parallelism — one Python per core</span>
+    <span class="n">max_tasks_per_worker</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>  <span class="c1"># recycle workers (native-leak guard)</span>
+<span class="p">)</span>
+
+<span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">exc</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">failures</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;failed: </span><span class="si">{</span><span class="n">paths</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="si">}</span><span class="s2"> — </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>Everything else composes unchanged: <code>retry=</code> for flaky items,
+<code>on_progress=</code> for a progress bar, <code>parallel_iter</code> when results
+shouldn't accumulate in memory, <code>sequential=True</code> to debug with real
+stack traces. <code>workers=None</code> defaults to one worker per core.</p>
+<p>Two variants worth knowing:</p>
+<ul>
+<li><strong>Pure-Python CPU work on Python 3.14+</strong>: <code>executor="interpreter"</code>
+  gives the same true parallelism with ~30 ms workers and no OS
+  processes — but C extensions like Pillow/numpy don't support
+  subinterpreters yet, so <em>this</em> recipe stays on <code>"process"</code>. See
+  <a href="../best-practices/#interpreters-executorinterpreter-python-314">choosing the right executor</a>.</li>
+<li><strong>Heavy multiprocessing</strong> (shared memory, per-worker state, CPU
+  pinning) is <a href="https://pypi.org/project/mpire/">mpire</a>'s specialty —
+  see the <a href="../../getting-started/comparison/#vs-mpire">comparison</a> for
+  where each tool wins.</li>
+</ul>
 
 
 
@@ -1243,10 +1646,13 @@ pandas DataFrames, HuggingFace datasets, or any iterable of records.</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.60a45f97.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
