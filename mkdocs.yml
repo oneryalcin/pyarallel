@@ -24,8 +24,20 @@ nav:
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quickstart.md
     - Comparison: getting-started/comparison.md
+  - Cookbook:
+    - Overview: cookbook/index.md
+    - Batch LLM Calls: cookbook/llm-batch-calls.md
+    - Batch Embedding Generation: cookbook/embeddings.md
+    - Dataset Enrichment: cookbook/dataset-enrichment.md
+    - Web Scraping: cookbook/web-scraping.md
+    - Bulk File Download: cookbook/bulk-file-download.md
+    - Bulk GitHub Repo Changes: cookbook/github-bulk-repo-changes.md
+    - Docker Registry Cleanup: cookbook/docker-registry-cleanup.md
+    - Secrets Rotation: cookbook/secrets-rotation.md
+    - Streaming ETL: cookbook/streaming-etl.md
+    - NCBI / Entrez Batch: cookbook/ncbi-entrez-batch.md
+    - CPU-Bound Fan-Out: cookbook/cpu-fanout.md
   - User Guide:
-    - Real-World Patterns: user-guide/real-world-patterns.md
     - Advanced Features: user-guide/advanced-features.md
     - Best Practices: user-guide/best-practices.md
   - API Reference:
@@ -40,6 +52,31 @@ nav:
     - v0.6 Engine Unification Plan: development/plans/v0.6-engine-unification.md
     - v0.6 Ledger Refactor Plan: development/plans/v0.6-ledger-refactor.md
     - v0.7 Free-Threaded & Interpreters Plan: development/plans/v0.7-free-threaded-and-interpreters.md
+
+plugins:
+  - search
+  - redirects:
+      redirect_maps:
+        # The single-page guide split into the Cookbook in v0.8 — keep the
+        # 0.7.0 URL (shipped, linked from the README) alive.
+        user-guide/real-world-patterns.md: cookbook/index.md
+  - llmstxt:
+      markdown_description: >
+        pyarallel is a zero-dependency Python library for fanning out one
+        function over many inputs against rate-limited services — parallel
+        map with token-bucket rate limiting, retry with server-driven
+        (Retry-After) backoff, SQLite checkpoint/resume, early abort, and
+        constant-memory streaming, for sync and async.
+      sections:
+        Getting Started:
+          - index.md: Overview and the fan-out niche
+          - getting-started/quickstart.md: Quick start
+          - getting-started/comparison.md: When to use pyarallel vs alternatives
+        Cookbook:
+          - cookbook/*.md
+        Reference:
+          - api-reference/*.md
+          - user-guide/*.md
 
 markdown_extensions:
   - admonition

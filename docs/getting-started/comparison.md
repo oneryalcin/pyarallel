@@ -192,4 +192,4 @@ If your workload is "fan out one function over N items against a
 service that throttles you" — LLM calls, embeddings, scraping, SaaS
 APIs — that first column is the stack you'd otherwise assemble by hand.
 That's the bet. See it in action:
-[Real-World Patterns](../user-guide/real-world-patterns.md).
+the [Cookbook](../cookbook/index.md).

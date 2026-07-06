@@ -15,10 +15,10 @@ test:
 	uv run pytest tests/ -v
 
 docs-serve:
-	uv run mkdocs serve
+	DISABLE_MKDOCS_2_WARNING=true uv run mkdocs serve
 
 docs-deploy:
-	uv run mkdocs gh-deploy
+	DISABLE_MKDOCS_2_WARNING=true uv run mkdocs gh-deploy
 
 format:
 	uv run ruff format .
