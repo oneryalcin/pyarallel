@@ -7,10 +7,50 @@ unsized inputs flow through one contract.
 
 from __future__ import annotations
 
+import enum
 from collections.abc import Iterable
 from typing import Any
 
 from .result import _PENDING, _Failure
+
+
+class _StopReason(enum.Enum):
+    """Why a run stopped early. A run stops for exactly one reason."""
+
+    TIMED_OUT = "timed_out"
+    ABORTED = "aborted"
+
+
+class _RunStop:
+    """The stop state of one run — first writer wins.
+
+    ``timed_out``/``aborted`` exclusivity used to be a read-time formula
+    (``aborted and not timed_out``) applied at each ``ParallelResult``
+    construction; this makes it structural. A failure salvaged after the
+    deadline may still call ``stop(ABORTED)`` — it no-ops, exactly the
+    masking the formula encoded.
+    """
+
+    __slots__ = ("reason",)
+
+    def __init__(self) -> None:
+        self.reason: _StopReason | None = None
+
+    def stop(self, reason: _StopReason) -> None:
+        if self.reason is None:
+            self.reason = reason
+
+    @property
+    def stopped(self) -> bool:
+        return self.reason is not None
+
+    @property
+    def timed_out(self) -> bool:
+        return self.reason is _StopReason.TIMED_OUT
+
+    @property
+    def aborted(self) -> bool:
+        return self.reason is _StopReason.ABORTED
 
 
 def _validate_max_errors(max_errors: int | None) -> None:

@@ -2,6 +2,15 @@
 
 Simple, explicit parallel execution over ``concurrent.futures``. No magic
 type detection, no global config singletons, no enterprise astronautics.
+
+TWIN FILE: ``aio.py`` mirrors the engines here in async form, and the
+duplication is deliberate — a shared-ledger extraction was designed,
+adversarially reviewed, and *held* (see
+``docs/development/plans/v0.6-ledger-refactor.md``): the state and the
+control flow in these drivers are too entangled to split without smearing
+the invariants across files. The price of that decision is on you, the
+editor: an engine fix here almost always needs its mirror in ``aio.py`` —
+both historical drift bugs happened by forgetting exactly that.
 """
 
 from __future__ import annotations
@@ -26,6 +35,8 @@ from typing import Any, Literal, TypedDict
 from ._plan import (
     _mark_timeout_indices,
     _progress_total,
+    _RunStop,
+    _StopReason,
     _timeout_failure,
     _total_if_known,
     _validate_max_errors,
@@ -470,8 +481,7 @@ def _collected_map(
     in_flight: dict[Future[_Outcome], int] = {}
     completed = 0
     failures = 0
-    aborted = False
-    timed_out = False
+    halt = _RunStop()
     deadline = (time.monotonic() + timeout) if timeout is not None else None
 
     store = (
@@ -486,13 +496,13 @@ def _collected_map(
             on_progress(completed, _progress_total(total, results))
 
     def _submit_next() -> bool:
-        nonlocal completed, timed_out
+        nonlocal completed
         while True:
             # Cached checkpoint hits consume real time (lookup + key_fn)
             # without ever reaching a wait — the deadline must bind here
             # too, or a checkpoint-heavy run ignores timeout= entirely.
             if deadline is not None and time.monotonic() >= deadline:
-                timed_out = True
+                halt.stop(_StopReason.TIMED_OUT)
                 return False
             try:
                 item = next(source)
@@ -516,13 +526,13 @@ def _collected_map(
                     # never submitted — mark its slot, stop admitting.
                     assert timeout is not None
                     results[idx] = _timeout_failure(timeout, idx)
-                    timed_out = True
+                    halt.stop(_StopReason.TIMED_OUT)
                     return False
             in_flight[_submit_task(pool, executor, task_fn, item)] = idx
             return True
 
     def _absorb(future: Future[_Outcome], idx: int) -> None:
-        nonlocal completed, failures, aborted
+        nonlocal completed, failures
         error: Exception | None
         try:
             outcome = future.result()
@@ -534,7 +544,7 @@ def _collected_map(
             results[idx] = _Failure(error)
             failures += 1
             if max_errors is not None and failures >= max_errors:
-                aborted = True
+                halt.stop(_StopReason.ABORTED)
         else:
             results[idx] = outcome.value
             # Outside the except: a checkpoint write failure raises
@@ -555,9 +565,9 @@ def _collected_map(
             # Deadline first — an already-expired timeout must not admit
             # any work at all (timeout=0 means zero tasks run).
             if deadline is not None and time.monotonic() >= deadline:
-                timed_out = True
+                halt.stop(_StopReason.TIMED_OUT)
                 break
-            while not aborted and len(in_flight) < window:
+            while not halt.stopped and len(in_flight) < window:
                 if not _submit_next():
                     break
                 if sweep_mid_fill:
@@ -567,7 +577,7 @@ def _collected_map(
             # A mid-fill abort must stop here — falling through to the
             # blocking wait would delay the abort by a task completion
             # (or repackage it as a timeout if the deadline fires first).
-            if timed_out or aborted:
+            if halt.stopped:
                 break
             if not in_flight:
                 break
@@ -578,18 +588,18 @@ def _collected_map(
                 in_flight, timeout=wait_timeout, return_when=FIRST_COMPLETED
             )
             if not done:
-                timed_out = True
+                halt.stop(_StopReason.TIMED_OUT)
                 break
             for future in done:
                 _absorb(future, in_flight.pop(future))
-            if aborted:
+            if halt.stopped:
                 break
 
         # Aftermath fills never touch the source again: a poison, blocking,
         # or infinite input must not be consumed after the run has stopped.
         # Sized inputs get one placeholder per unseen item (by count);
         # unsized inputs yield a shorter result — documented.
-        if timed_out:
+        if halt.timed_out:
             assert timeout is not None
             for future in in_flight:
                 future.cancel()
@@ -597,7 +607,7 @@ def _collected_map(
             if total is not None:
                 for idx in range(len(results), total):
                     results.append(_timeout_failure(timeout, idx))
-        elif aborted:
+        elif halt.aborted:
             # Salvage completions that raced the stop, drop the rest.
             done, pending = wait(in_flight, timeout=0)
             for future in done:
@@ -619,15 +629,12 @@ def _collected_map(
         # be interrupted and may complete in the background; waiting for
         # them instead was tried and rejected (Round 2): a single hung
         # task would block the error from ever surfacing.
-        stopped = timed_out or aborted or sys.exc_info()[0] is not None
+        stopped = halt.stopped or sys.exc_info()[0] is not None
         pool.shutdown(wait=not stopped, cancel_futures=stopped)
         if store is not None:
             store.close()
 
-    # First stop reason wins: the flags are exclusive by construction.
-    return ParallelResult(
-        results, timed_out=timed_out, aborted=aborted and not timed_out
-    )
+    return ParallelResult(results, timed_out=halt.timed_out, aborted=halt.aborted)
 
 
 def _sequential_collected_map(
@@ -658,8 +665,7 @@ def _sequential_collected_map(
     results: list[Any] = []
     completed = 0
     failures = 0
-    timed_out = False
-    aborted = False
+    halt = _RunStop()
 
     store = (
         _open_checkpoint(checkpoint, fn, checkpoint_key)
@@ -672,7 +678,7 @@ def _sequential_collected_map(
     try:
         for idx, item in enumerate(items):
             if deadline is not None and time.monotonic() >= deadline:
-                timed_out = True
+                halt.stop(_StopReason.TIMED_OUT)
                 break
             results.append(_PENDING)
             if store is not None:
@@ -690,7 +696,7 @@ def _sequential_collected_map(
                 if not bucket.wait(timeout=budget):
                     assert timeout is not None
                     results[idx] = _timeout_failure(timeout, idx)
-                    timed_out = True
+                    halt.stop(_StopReason.TIMED_OUT)
                     break
             outcome = task_fn(item)
             if outcome.error is not None:
@@ -704,16 +710,16 @@ def _sequential_collected_map(
             if on_progress:
                 on_progress(completed, _progress_total(total, results))
             if max_errors is not None and failures >= max_errors:
-                aborted = True
+                halt.stop(_StopReason.ABORTED)
                 break
 
         # Same no-drain policy as the windowed engine: never touch the
         # source after the stop.
-        if timed_out and total is not None:
+        if halt.timed_out and total is not None:
             assert timeout is not None
             for idx in range(len(results), total):
                 results.append(_timeout_failure(timeout, idx))
-        elif aborted and total is not None:
+        elif halt.aborted and total is not None:
             reason = f"aborted after {failures} failures (max_errors={max_errors})"
             results.extend(
                 _Failure(Aborted(reason)) for _ in range(total - len(results))
@@ -722,7 +728,7 @@ def _sequential_collected_map(
         if store is not None:
             store.close()
 
-    return ParallelResult(results, timed_out=timed_out, aborted=aborted)
+    return ParallelResult(results, timed_out=halt.timed_out, aborted=halt.aborted)
 
 
 def _sequential_iter(

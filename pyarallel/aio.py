@@ -3,6 +3,11 @@
 One windowed collected-map engine plus a streaming twin, both driven by
 ``asyncio.wait(FIRST_COMPLETED)``; ``asyncio.Semaphore`` caps
 concurrency inside the admission window.
+
+TWIN FILE: ``core.py`` mirrors the engines here in sync form — see its
+module docstring for why the duplication is deliberate (the ledger
+extraction was reviewed and held). An engine fix here almost always
+needs its mirror in ``core.py``.
 """
 
 from __future__ import annotations
@@ -17,6 +22,8 @@ from typing import Any, TypedDict
 from ._plan import (
     _mark_timeout_indices,
     _progress_total,
+    _RunStop,
+    _StopReason,
     _timeout_failure,
     _total_if_known,
     _validate_max_errors,
@@ -254,8 +261,7 @@ async def _async_collected_map(
     in_flight: dict[asyncio.Task[_Outcome], int] = {}
     completed = 0
     failures = 0
-    aborted = False
-    timed_out = False
+    halt = _RunStop()
     # asyncio.timeout() enforces the deadline at await points only; this
     # mirror of it lets the synchronous cached-admission loop bind too.
     deadline = (time.monotonic() + timeout) if timeout is not None else None
@@ -279,13 +285,13 @@ async def _async_collected_map(
             on_progress(completed, _progress_total(total, results))
 
     def _submit_next() -> bool:
-        nonlocal completed, timed_out
+        nonlocal completed
         while True:
             # Cached checkpoint hits consume real time (lookup + key_fn)
             # without ever reaching an await, so asyncio.timeout() cannot
             # preempt them — the deadline must bind here too.
             if deadline is not None and time.monotonic() >= deadline:
-                timed_out = True
+                halt.stop(_StopReason.TIMED_OUT)
                 return False
             try:
                 item = next(source)
@@ -304,7 +310,7 @@ async def _async_collected_map(
             return True
 
     def _absorb(task: asyncio.Task[_Outcome], idx: int) -> None:
-        nonlocal completed, failures, aborted
+        nonlocal completed, failures
         error: Exception | None
         try:
             outcome = task.result()
@@ -316,7 +322,7 @@ async def _async_collected_map(
             results[idx] = _Failure(error)
             failures += 1
             if max_errors is not None and failures >= max_errors:
-                aborted = True
+                halt.stop(_StopReason.ABORTED)
         else:
             results[idx] = outcome.value
             # Outside the except: a checkpoint write failure raises
@@ -331,23 +337,23 @@ async def _async_collected_map(
             # No mid-fill absorption here (unlike the sync twin): task
             # creation never blocks — limiter waits happen inside tasks,
             # which are cancelled on abort before they can call the API.
-            while not aborted and len(in_flight) < window and _submit_next():
+            while not halt.stopped and len(in_flight) < window and _submit_next():
                 pass
-            if timed_out or not in_flight:
+            if halt.stopped or not in_flight:
                 break
             done, _pending = await asyncio.wait(
                 in_flight, return_when=asyncio.FIRST_COMPLETED
             )
             for task in done:
                 _absorb(task, in_flight.pop(task))
-            if aborted:
+            if halt.stopped:
                 break
 
     try:
         if timeout is not None and timeout <= 0:
             # Already expired: admit no work (asyncio.timeout alone
             # cancels only at the first suspension point).
-            timed_out = True
+            halt.stop(_StopReason.TIMED_OUT)
         elif timeout is not None:
             scope = asyncio.timeout(timeout)
             try:
@@ -359,20 +365,22 @@ async def _async_collected_map(
                 # and must propagate, not be repackaged as expiry.
                 if not scope.expired():
                     raise
-                timed_out = True
+                halt.stop(_StopReason.TIMED_OUT)
         else:
             await _drive()
 
-        if timed_out:
+        if halt.timed_out:
             assert timeout is not None
             # Salvage completions that raced the deadline, drop the rest.
+            # A salvaged Nth failure calls stop(ABORTED) — a no-op: the
+            # run already stopped on the deadline, first writer wins.
             for task in [t for t in in_flight if t.done()]:
                 _absorb(task, in_flight.pop(task))
             _mark_timeout_indices(results, in_flight.values(), timeout)
             if total is not None:
                 for idx in range(len(results), total):
                     results.append(_timeout_failure(timeout, idx))
-        elif aborted:
+        elif halt.aborted:
             # Salvage completions that raced the stop, cancel the rest.
             for task in [t for t in in_flight if t.done()]:
                 _absorb(task, in_flight.pop(task))
@@ -396,11 +404,7 @@ async def _async_collected_map(
         if store is not None:
             store.close()
 
-    # First stop reason wins: a failure salvaged after the deadline must
-    # not also report the run as aborted — the flags are exclusive.
-    return ParallelResult(
-        results, timed_out=timed_out, aborted=aborted and not timed_out
-    )
+    return ParallelResult(results, timed_out=halt.timed_out, aborted=halt.aborted)
 
 
 async def async_parallel_starmap[R](
