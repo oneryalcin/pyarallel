@@ -185,20 +185,43 @@ class _CheckpointStore:
 
     def __init__(self, path: str | Path, signature: str) -> None:
         self._conn = sqlite3.connect(path)
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA busy_timeout=10000")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute(
-            "CREATE TABLE IF NOT EXISTS meta ("
-            " key TEXT PRIMARY KEY,"
-            " value TEXT NOT NULL)"
-        )
-        version = self._meta("schema_version")
-        signature_row = self._meta("task_signature")
-        if version is None and signature_row is None:
-            # Fresh file — stamp it as schema v2.
+        try:
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA busy_timeout=10000")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
             self._conn.execute(
-                "CREATE TABLE IF NOT EXISTS results ("
+                "CREATE TABLE IF NOT EXISTS meta ("
+                " key TEXT PRIMARY KEY,"
+                " value TEXT NOT NULL)"
+            )
+            version = self._meta("schema_version")
+            signature_row = self._meta("task_signature")
+        except sqlite3.Error as exc:
+            # A truncated write, disk corruption, or a non-database file
+            # must fail closed with the same exception type as every
+            # other unusable checkpoint — not leak sqlite3 internals.
+            self._conn.close()
+            raise CheckpointError(
+                f"Checkpoint {str(path)!r} is not a usable checkpoint "
+                f"database ({exc}). Delete the file to start fresh."
+            ) from exc
+        if version is None and signature_row is None:
+            # Fresh file — but only if nothing else already lives here. A
+            # results table of any other shape (interrupted write,
+            # foreign file) must fail closed, not be silently adopted.
+            stale = self._conn.execute(
+                "SELECT name FROM sqlite_master"
+                " WHERE type = 'table' AND name = 'results'"
+            ).fetchone()
+            if stale is not None:
+                self._conn.close()
+                raise CheckpointError(
+                    f"Checkpoint {str(path)!r} contains an unrecognized "
+                    "results table with no schema version. Delete the "
+                    "file to start fresh."
+                )
+            self._conn.execute(
+                "CREATE TABLE results ("
                 " key TEXT PRIMARY KEY,"
                 " fingerprint BLOB NOT NULL,"
                 " value BLOB NOT NULL)"

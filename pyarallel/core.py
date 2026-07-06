@@ -455,6 +455,7 @@ def parallel_map[T, R](
                     break
 
             futures: dict[Future[_Outcome], int] = {}
+            submit_timed_out = False
             for idx, item in batch:
                 if store is not None:
                     cached = store.lookup(idx, item)
@@ -464,11 +465,20 @@ def parallel_map[T, R](
                         if on_progress:
                             on_progress(completed, _progress_total(plan.total, results))
                         continue
-                if bucket:
-                    bucket.wait()
+                if bucket is not None:
+                    budget: float | None = None
+                    if deadline is not None:
+                        budget = max(0.0, deadline - time.monotonic())
+                    if not bucket.wait(timeout=budget):
+                        # The next token cannot arrive inside the deadline:
+                        # timeout= wins over rate-limit pacing.
+                        submit_timed_out = True
+                        break
                 futures[_submit_task(pool, executor, task_fn, item)] = idx
 
             try:
+                if submit_timed_out:
+                    raise TimeoutError
                 for future in as_completed(futures, timeout=chunk_timeout):
                     idx = futures[future]
                     try:
@@ -497,6 +507,9 @@ def parallel_map[T, R](
                     if not f.done():
                         f.cancel()
                 _mark_timeout_indices(results, futures.values(), timeout)
+                # Batch items never submitted (deadline hit mid-pacing)
+                # must be marked too, or their slots would leak _PENDING.
+                _mark_timeout_indices(results, (idx for idx, _item in batch), timeout)
                 _append_timeout_failures(results, plan.remaining, timeout)
                 break
     finally:
@@ -561,7 +574,7 @@ def _collected_map_windowed(
             on_progress(completed, _progress_total(total, results))
 
     def _submit_next() -> bool:
-        nonlocal completed
+        nonlocal completed, timed_out
         while True:
             try:
                 item = next(source)
@@ -576,8 +589,17 @@ def _collected_map_windowed(
                     completed += 1
                     _report()
                     continue  # cached — keep looking for work to admit
-            if bucket:
-                bucket.wait()
+            if bucket is not None:
+                budget: float | None = None
+                if deadline is not None:
+                    budget = max(0.0, deadline - time.monotonic())
+                if not bucket.wait(timeout=budget):
+                    # timeout= wins over rate-limit pacing; this item was
+                    # never submitted — mark its slot, stop admitting.
+                    assert timeout is not None
+                    results[idx] = _timeout_failure(timeout, idx)
+                    timed_out = True
+                    return False
             in_flight[_submit_task(pool, executor, task_fn, item)] = idx
             return True
 
@@ -620,6 +642,8 @@ def _collected_map_windowed(
                 done_now, _pending_now = wait(in_flight, timeout=0)
                 for future in done_now:
                     _absorb(future, in_flight.pop(future))
+            if timed_out:
+                break
             if not in_flight:
                 break
             wait_timeout: float | None = None
@@ -727,8 +751,15 @@ def _sequential_collected_map(
                     if on_progress:
                         on_progress(completed, _progress_total(total, results))
                     continue
-            if bucket:
-                bucket.wait()
+            if bucket is not None:
+                budget: float | None = None
+                if deadline is not None:
+                    budget = max(0.0, deadline - time.monotonic())
+                if not bucket.wait(timeout=budget):
+                    assert timeout is not None
+                    results[idx] = _timeout_failure(timeout, idx)
+                    timed_out = True
+                    break
             outcome = task_fn(item)
             if outcome.error is not None:
                 results[idx] = _Failure(outcome.error)

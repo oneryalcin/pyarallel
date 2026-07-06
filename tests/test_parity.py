@@ -422,3 +422,55 @@ class TestFinalReviewFindings:
             )
         )
         assert len(results) == 3
+
+
+class TestTimeoutBeatsRateLimitPacing:
+    """Codex adversarial (final gate) [high]: the sync driver blocked in
+    bucket.wait() with no deadline bound — timeout= was bypassed whenever
+    rate limiting was active. Each engine must give up mid-pacing."""
+
+    def test_collected_map(self):
+        start = time.monotonic()
+        result = parallel_map(
+            lambda x: x,
+            range(3),
+            workers=1,
+            rate_limit=RateLimit(1, "second"),
+            timeout=0.15,
+        )
+        elapsed = time.monotonic() - start
+        assert elapsed < 1.0  # not 2s of token pacing
+        assert not result.ok
+        assert len(result) == 3
+        assert any(isinstance(e, TimeoutError) for _, e in result.failures())
+
+    def test_windowed_map_with_max_errors(self):
+        start = time.monotonic()
+        result = parallel_map(
+            lambda x: x,
+            range(3),
+            workers=1,
+            rate_limit=RateLimit(1, "second"),
+            timeout=0.15,
+            max_errors=10,
+        )
+        elapsed = time.monotonic() - start
+        assert elapsed < 1.0
+        assert not result.ok
+        assert len(result) == 3
+        assert any(isinstance(e, TimeoutError) for _, e in result.failures())
+
+    def test_sequential(self):
+        start = time.monotonic()
+        result = parallel_map(
+            lambda x: x,
+            range(3),
+            rate_limit=RateLimit(1, "second"),
+            timeout=0.15,
+            sequential=True,
+        )
+        elapsed = time.monotonic() - start
+        assert elapsed < 1.0
+        assert not result.ok
+        assert len(result) == 3
+        assert any(isinstance(e, TimeoutError) for _, e in result.failures())

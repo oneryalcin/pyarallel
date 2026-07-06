@@ -194,3 +194,20 @@ class TestIntegration:
         limiter = Limiter(RateLimit(100, "second", burst=100))
         results = list(parallel_iter(lambda x: x * 2, range(5), rate_limit=limiter))
         assert sorted(r.value for r in results) == [0, 2, 4, 6, 8]
+
+
+class TestWaitTimeout:
+    def test_wait_with_budget_gives_up_without_consuming(self):
+        """A predicted wait beyond the budget returns False immediately —
+        no sleeping the budget away, and no capacity consumed."""
+        limiter, clock = make_limiter(rate=1, burst=1)
+        drain(limiter)
+        start = time.monotonic()
+        assert limiter.wait(timeout=0.2) is False  # predicted 1s > 0.2s
+        assert time.monotonic() - start < 0.1  # returned immediately
+        clock.advance(1.0)
+        drain(limiter)  # the failed wait leaked nothing
+
+    def test_wait_without_budget_still_blocks_and_returns_true(self):
+        limiter, _clock = make_limiter(rate=1000, burst=1)
+        assert limiter.wait() is True

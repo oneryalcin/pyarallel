@@ -509,3 +509,29 @@ class TestSchemaV2:
 
 def _double(x):
     return x * 2
+
+
+class TestCorruptFiles:
+    """Final design review: every unusable file fails closed with
+    CheckpointError — never raw sqlite3 exceptions."""
+
+    def test_non_database_file_fails_closed(self, tmp_path):
+        path = tmp_path / "garbage.ckpt"
+        path.write_bytes(b"this is not a sqlite database at all")
+        with pytest.raises(CheckpointError, match="not a usable checkpoint"):
+            parallel_map(_double, [1], checkpoint=path)
+
+    def test_empty_meta_with_stale_results_table_fails_closed(self, tmp_path):
+        """An empty meta table plus a foreign-shaped results table must not
+        be adopted as a fresh v2 file."""
+        import sqlite3
+
+        path = tmp_path / "weird.ckpt"
+        conn = sqlite3.connect(path)
+        conn.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        conn.execute("CREATE TABLE results (something_else INTEGER)")
+        conn.commit()
+        conn.close()
+
+        with pytest.raises(CheckpointError, match="unrecognized"):
+            parallel_map(_double, [1], checkpoint=path)
