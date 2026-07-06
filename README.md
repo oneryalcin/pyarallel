@@ -2,7 +2,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/pyarallel)](https://pypi.org/project/pyarallel/) [![PyPI Downloads](https://static.pepy.tech/badge/pyarallel/month)](https://pepy.tech/project/pyarallel)
 
-The fan-out layer for rate-limited APIs. Apply one function to many inputs — with rate limiting, retry, batching, and structured errors. Sync and async.
+The fan-out layer for rate-limited APIs. Apply one function to many inputs — with rate limiting, retry, resume, and structured errors. Sync and async.
 
 Pyarallel is for "fan out one function over N items" workloads against services that throttle you: LLM calls, embeddings, scraping, SaaS APIs — plus general file processing and data crunching. Everyone hand-rolls the same stack for this: a semaphore, tenacity, a rate limiter, ad-hoc 429 handling. Pyarallel is that stack as one coherent tool. Not DAGs, not queues, not distributed systems. Just `concurrent.futures` and `asyncio` with the policies and result handling already built in.
 
@@ -35,7 +35,7 @@ with ThreadPoolExecutor(max_workers=10) as pool:
         except Exception as e:
             errors.append((i, e))
 
-# No rate limiting. No retry. No batching. And you still
+# No rate limiting. No retry. No resume. And you still
 # need to wire those yourself every time.
 ```
 

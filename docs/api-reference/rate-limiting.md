@@ -10,40 +10,21 @@ Pyarallel separates rate limiting into a **spec** and a **runtime**:
 
 ## Basic Usage
 
-### With `RateLimit` Object
-
 ```python
 from pyarallel import parallel_map, RateLimit
 
-# 100 operations per minute, evenly spaced
-results = parallel_map(call_api, ids, workers=4,
-                       rate_limit=RateLimit(100, "minute"))
+results = parallel_map(call_api, ids, rate_limit=RateLimit(100, "minute"))
+results = parallel_map(fn, items, rate_limit=10)  # shorthand: 10/second
 
-# 1000 per hour
-results = parallel_map(process, items,
-                       rate_limit=RateLimit(1000, "hour"))
-```
-
-### Shorthand (ops per second)
-
-Pass a number for simple per-second limits:
-
-```python
-results = parallel_map(fn, items, rate_limit=10)  # 10 per second
-```
-
-### Burst Capacity
-
-`burst` is the token-bucket capacity: how many calls may fire immediately
-before the sustained rate applies. The default of 1 gives smooth, evenly
-spaced pacing — the safest choice against secondary per-second limits.
-Raise it when the quota genuinely allows bursts:
-
-```python
-# Up to 20 requests immediately, then refill at 100/minute
+# burst: how many calls may fire immediately before the sustained rate
+# applies. Default 1 = smooth, even pacing (safest against secondary
+# per-second limits); raise it when the quota genuinely allows bursts.
 results = parallel_map(call_api, ids,
                        rate_limit=RateLimit(100, "minute", burst=20))
 ```
+
+The `RateLimit` parameter table lives in the
+[core reference](core.md#ratelimit).
 
 ## Sharing One Budget: `Limiter`
 
@@ -95,29 +76,12 @@ Rate limiting uses a **token bucket** with commit-at-grant acquisition:
    workers can't share the parent's limiter, so their retries pace only by
    backoff)
 
-## With the Decorator
+Two implementation notes worth knowing: rate limiting applies at
+**submission time** for sync (items enter the pool at the controlled
+rate) and at **execution time** for async (tasks acquire the token
+inside the semaphore). Decorated functions take `rate_limit=` as a
+default and per-call override like every other option.
 
-Set a default rate limit, override per-call:
-
-```python
-@parallel(workers=4, rate_limit=RateLimit(100, "minute"))
-def call_api(item_id):
-    return api.get(item_id)
-
-# Uses default rate limit
-results = call_api.map(ids)
-
-# Override for this call
-results = call_api.map(ids, rate_limit=RateLimit(500, "minute"))
-```
-
-A shared `Limiter` works here too — pass the same instance as the default
-for several decorated functions hitting the same API.
-
-## Tips
-
-- **Leave buffer** below actual API limits (use 90% of the limit)
-- **Share a `Limiter`** whenever two calls hit the same quota — separate
-  `RateLimit` specs on each call means each call assumes the full budget
-- **Rate limiting is at submission time** (sync) — items are submitted to the pool at the controlled rate
-- **Rate limiting is at execution time** (async) — tasks acquire the rate token inside the semaphore
+For guidance — headroom below the documented limit, when to share a
+`Limiter`, burst discipline — see
+[Best Practices](../user-guide/best-practices.md#rate-limiting).

@@ -43,7 +43,15 @@ data = fetch("http://example.com")
 
 # Parallel call — returns ParallelResult
 results = fetch.map(["http://a.com", "http://b.com"])
+
+# Decorator args are defaults — any call can override them
+results = fetch.map(urls, workers=16, rate_limit=100)
 ```
+
+It works on instance and static methods too (descriptor protocol), and
+the async twin `@async_parallel` follows the same pattern — see the
+[API reference](../api-reference/core.md#parallel) for both. Plain
+`parallel_map(scraper.fetch, urls)` with a bound method also just works.
 
 ## CPU-Bound Work
 

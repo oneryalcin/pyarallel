@@ -64,14 +64,6 @@ results = parallel_map(call_api, ids, workers=4,
                        rate_limit=RateLimit(90, "minute"))
 ```
 
-### Shorthand
-
-For simple per-second limits, pass a number:
-
-```python
-results = parallel_map(fn, items, rate_limit=10)  # 10 per second
-```
-
 ### One Limiter per API Key
 
 A `RateLimit` passed directly creates a fresh private limiter each call —
@@ -94,23 +86,16 @@ secondary per-second limits. Raise it only when you know the quota
 genuinely allows bursts, and keep it well under the documented burst
 allowance.
 
-## Memory: the Admission Window
+## Memory: Collected vs Streaming
 
-Memory is bounded by default. Every API admits work through a window —
-at most `batch_size` items (default `2 × workers`) are submitted but
-unresolved at any moment, and input is consumed lazily, one window
-ahead, so generators are never materialized:
-
-```python
-# 500K items — at most 1000 in flight, input pulled as slots free up
-results = parallel_map(process, huge_list, workers=8, batch_size=1000)
-```
-
-For a *collected* map the results list still grows to the input size —
-that is what "collected" means. When results should not accumulate at
-all (ETL to a DB, 10M+ rows), use `parallel_iter` and consume as you
-go. On memory-constrained environments (K8s pods, Lambda), both
-defaults help prevent OOM kills.
+In-flight work is bounded by default on every API (the
+[admission window](advanced-features.md#the-admission-window)), so the
+memory decision is really one question: do the *results* fit in memory?
+A collected map's result list grows to the input size — that is what
+"collected" means. When results should not accumulate at all (ETL to a
+DB, 10M+ rows), use `parallel_iter` and consume as you go. On
+memory-constrained environments (K8s pods, Lambda), that choice is the
+one that prevents OOM kills.
 
 ## Error Handling Patterns
 
@@ -125,20 +110,6 @@ try:
 except ExceptionGroup as eg:
     for exc in eg.exceptions:
         log.error(exc)
-```
-
-### Built-in Retry
-
-Use `Retry` for automatic per-item retry with exponential backoff:
-
-```python
-from pyarallel import Retry
-
-# Retry transient failures, fail fast on bad input
-results = parallel_map(
-    fetch, urls, workers=10,
-    retry=Retry(attempts=3, backoff=1.0, on=(ConnectionError, TimeoutError)),
-)
 ```
 
 ### Collect-and-Retry Manually
@@ -156,28 +127,15 @@ if not result.ok:
     retry_result = parallel_map(process, failed, workers=2)
 ```
 
-### Honor 429s with `wait_from`
+### Built-in Retry vs Tenacity
 
-When an API sends `Retry-After`, use it — the server knows its own load
-better than your backoff curve does. With a shared `Limiter`, the wait
-pauses the whole pool, not just the throttled task:
-
-```python
-def retry_after(exc):
-    response = getattr(exc, "response", None)
-    header = response.headers.get("retry-after") if response else None
-    return float(header) if header else None
-
-results = parallel_map(
-    call_api, ids,
-    rate_limit=shared_limiter,
-    retry=Retry(attempts=4, on=(ApiError,), wait_from=retry_after),
-)
-```
-
-Write `retry_if`/`wait_from` defensively — they receive every exception
-that `on=` lets through, and a predicate that raises replaces the real
-error in the failure report.
+Reach for the built-in `Retry` first — it owns the concurrency layer,
+which is what makes 429 + `Retry-After` handling actually work: the
+server-mandated wait pauses the *shared limiter*, slowing the whole
+pool instead of one task. See
+[Retry](advanced-features.md#retry) and
+[server-driven backoff](advanced-features.md#server-driven-backoff-429-retry-after)
+in the feature guide.
 
 ### Composing with Tenacity
 
@@ -268,6 +226,7 @@ def test_decorated_function():
 3. **Share one `Limiter` per API key** — separate specs per call each assume the full quota
 4. **Prefer threads for I/O** — processes have serialization overhead
 5. **Check `result.ok` before iterating** — avoids surprise `ExceptionGroup` raises
-6. **Use `on_progress` for long jobs** — for unsized iterables with batching,
-   `total` is items seen so far, not the final size
+6. **Use `on_progress` for long jobs** — for unsized iterables `total`
+   counts items admitted so far, not the final size; pass a sized input
+   for a real total
 7. **Checkpoint anything you'd hate to restart** — `checkpoint="run.ckpt"` is one argument

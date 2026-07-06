@@ -84,77 +84,6 @@ results = await async_parallel_map(fetch, urls, concurrency=10, task_timeout=5.0
 # Each individual task gets 5 seconds before timing out
 ```
 
-## Method Support
-
-The `@parallel` decorator works with instance methods via the descriptor protocol:
-
-### Instance Methods
-
-```python
-class Scraper:
-    def __init__(self, session):
-        self.session = session
-
-    @parallel(workers=4)
-    def fetch(self, url):
-        return self.session.get(url).text
-
-s = Scraper(requests.Session())
-s.fetch("http://example.com")       # normal — returns str
-s.fetch.map(urls)                   # parallel — returns ParallelResult
-```
-
-### Static Methods
-
-```python
-class MathUtils:
-    @staticmethod
-    @parallel(workers=4)
-    def square(x):
-        return x ** 2
-
-MathUtils.square(5)                 # 25
-MathUtils.square.map([1, 2, 3])    # ParallelResult([1, 4, 9])
-```
-
-### Using parallel_map with Methods
-
-You can always use `parallel_map` directly with bound methods:
-
-```python
-scraper = Scraper(session)
-results = parallel_map(scraper.fetch, urls, workers=8)
-```
-
-## Overriding Decorator Defaults
-
-Per-call overrides on `.map()`:
-
-```python
-@parallel(workers=2, rate_limit=RateLimit(10, "second"))
-def process(item): ...
-
-# Override workers and rate limit for this specific call
-results = process.map(big_list, workers=16, rate_limit=RateLimit(1000, "minute"))
-```
-
-## Async Decorator
-
-Same pattern as sync, with `async`/`await`:
-
-```python
-from pyarallel import async_parallel
-
-@async_parallel(concurrency=10)
-async def fetch(url):
-    async with httpx.AsyncClient() as c:
-        return (await c.get(url)).json()
-
-data = await fetch("http://example.com")       # single call
-results = await fetch.map(urls)                 # parallel
-results = await fetch.map(urls, task_timeout=5.0)  # with per-task timeout
-```
-
 ## Retry
 
 Built-in per-item retry with exponential backoff and jitter:
@@ -177,7 +106,7 @@ results = parallel_map(fetch, urls, workers=10,
 
 **How backoff works:** delay = `backoff * 2^attempt`, capped at `max_delay`. With `jitter=True` (default), the delay is multiplied by a random factor between 0.5 and 1.5 — this prevents all workers from retrying at the exact same moment when a service recovers.
 
-Retries happen *inside the worker* — only the failing item is retried, not the entire batch. This composes cleanly with rate limiting and batching: **every retry attempt draws a fresh rate-limit token**, so a retry storm can never blow through your quota.
+Retries happen *inside the worker* — only the failing item is retried, never its neighbors. This composes cleanly with rate limiting: **every retry attempt draws a fresh rate-limit token**, so a retry storm can never blow through your quota.
 
 ### Server-Driven Backoff (429 / Retry-After)
 
