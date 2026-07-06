@@ -379,7 +379,10 @@ def parallel_map[T, R](
     """
     _validate_common(workers, executor, batch_size)
     _validate_max_errors(max_errors)
-    _validate_worker_options(executor, worker_init, max_tasks_per_worker)
+    if not sequential:
+        # Debug mode ignores the pool entirely — a process-configured call
+        # with a local worker_init must still be one flag away from inline.
+        _validate_worker_options(executor, worker_init, max_tasks_per_worker)
     if checkpoint_key is not None and checkpoint is None:
         raise ValueError("checkpoint_key requires checkpoint= to be set")
 
@@ -937,7 +940,8 @@ def parallel_iter[T, R](
     """
     _validate_common(workers, executor, batch_size)
     _validate_max_errors(max_errors)
-    _validate_worker_options(executor, worker_init, max_tasks_per_worker)
+    if not sequential:
+        _validate_worker_options(executor, worker_init, max_tasks_per_worker)
 
     if sequential:
         yield from _sequential_iter(

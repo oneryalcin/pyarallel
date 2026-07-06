@@ -364,3 +364,61 @@ class TestDecoratorParity:
 
         results = list(double.stream(range(4), sequential=True))
         assert [r.index for r in results] == [0, 1, 2, 3]
+
+
+class TestFinalReviewFindings:
+    """Regression tests from the final Codex review."""
+
+    async def test_async_timeout_already_expired_runs_nothing(self):
+        """Codex [P2]: asyncio.timeout(0) cancels only at the first
+        suspension point — immediate coroutines used to run and return
+        successes despite a zero total timeout."""
+        calls = []
+
+        async def task(x):
+            calls.append(x)
+            return x
+
+        result = await async_parallel_map(task, range(20), timeout=0)
+        assert calls == []
+        assert len(result) == 20
+        assert all(isinstance(e, TimeoutError) for _, e in result.failures())
+
+    async def test_async_timeout_already_expired_windowed_path(self):
+        calls = []
+
+        async def task(x):
+            calls.append(x)
+            return x
+
+        result = await async_parallel_map(task, range(20), timeout=0, max_errors=5)
+        assert calls == []
+        assert len(result) == 20
+        assert all(isinstance(e, TimeoutError) for _, e in result.failures())
+
+    def test_sequential_skips_pool_validation(self):
+        """Codex [P2]: the one-flag debug promise — a process-configured
+        call with a local worker_init must still run inline."""
+        ran = []
+        result = parallel_map(
+            lambda x: x * 2,
+            range(3),
+            executor="process",
+            worker_init=lambda: ran.append(1),  # unpicklable, pool would reject
+            max_tasks_per_worker=10,  # thread pool would reject, ignored here
+            sequential=True,
+        )
+        assert list(result) == [0, 2, 4]
+        assert ran == [1]
+
+    def test_sequential_streaming_skips_pool_validation(self):
+        results = list(
+            parallel_iter(
+                lambda x: x,
+                range(3),
+                executor="process",
+                worker_init=lambda: None,
+                sequential=True,
+            )
+        )
+        assert len(results) == 3

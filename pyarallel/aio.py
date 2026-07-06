@@ -220,6 +220,16 @@ async def async_parallel_map[T, R](
     if plan.total == 0:
         return ParallelResult([])
     results = plan.results
+
+    if timeout is not None and timeout <= 0:
+        # Mirror the sync contract: an already-expired deadline admits no
+        # work at all. asyncio.timeout() alone cannot guarantee that —
+        # it cancels only at the first suspension point, after tasks
+        # would already have been created.
+        _mark_timeout_indices(results, range(len(results)), timeout)
+        _append_timeout_failures(results, plan.remaining, timeout)
+        return ParallelResult(results)
+
     semaphore = asyncio.Semaphore(concurrency)
     limiter = _as_limiter(rate_limit)
     completed = 0
@@ -407,7 +417,11 @@ async def _async_collected_map_windowed(
 
     try:
         try:
-            if timeout is not None:
+            if timeout is not None and timeout <= 0:
+                # Already expired: admit no work (asyncio.timeout alone
+                # cancels only at the first suspension point).
+                timed_out = True
+            elif timeout is not None:
                 async with asyncio.timeout(timeout):
                     await _drive()
             else:
