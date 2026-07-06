@@ -279,14 +279,19 @@ class TestContextvarPropagation:
             _request_id.reset(token)
 
     def test_process_executor_documented_skip_does_not_crash(self):
-        """Contexts don't pickle — process workers see the default value,
-        and nothing blows up."""
+        """Contexts don't pickle, so pyarallel makes no per-item
+        propagation promise for process workers — and nothing blows up.
+        What a worker actually sees is platform-dependent: fresh default
+        under spawn (macOS/Windows), the fork-time snapshot under fork
+        (Linux) — either way it is the OS start method talking, not
+        per-item propagation."""
         token = _request_id.set("not-propagated")
         try:
             result = parallel_map(
                 _read_request_id, range(2), workers=2, executor="process"
             )
-            assert list(result) == ["unset", "unset"]
+            assert result.ok
+            assert all(v in ("unset", "not-propagated") for v in result)
         finally:
             _request_id.reset(token)
 
