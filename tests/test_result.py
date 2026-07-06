@@ -197,3 +197,72 @@ class TestItemResult:
 
         with pytest.raises(ValueError):
             ItemResult[int](index=0, value=1, error=ValueError("bad"))
+
+
+class TestRunStatus:
+    """v0.6 D7: timed_out/aborted report how the run ended — the one
+    reliable truncation signal when unsized inputs can't get placeholder
+    failure entries."""
+
+    def test_defaults_false_on_manual_construction(self):
+        r = ParallelResult([1, 2])
+        assert r.timed_out is False
+        assert r.aborted is False
+
+    def test_flags_are_read_only_and_settable_at_construction(self):
+        r = ParallelResult([], timed_out=True, aborted=True)
+        assert r.timed_out is True
+        assert r.aborted is True
+
+    def test_clean_run_reports_neither(self):
+        from pyarallel import parallel_map
+
+        r = parallel_map(lambda x: x, range(5), workers=2)
+        assert r.timed_out is False
+        assert r.aborted is False
+
+    def test_timeout_sets_timed_out(self):
+        """Prevents: the silent-truncation hole — a timeout on an unsized
+        input can return only successes; the flag must still say so."""
+        import time
+
+        from pyarallel import parallel_map
+
+        def slow(x):
+            time.sleep(10)
+            return x
+
+        r = parallel_map(slow, range(8), workers=2, timeout=0.2)
+        assert r.timed_out is True
+        assert r.aborted is False
+
+    def test_max_errors_abort_sets_aborted(self):
+        from pyarallel import parallel_map
+
+        def boom(x):
+            raise ValueError("dead")
+
+        r = parallel_map(boom, range(50), workers=2, max_errors=3)
+        assert r.aborted is True
+        assert r.timed_out is False
+
+    def test_sequential_engine_sets_status_too(self):
+        """Prevents: debug mode diverging from the pool engines on the
+        status contract (one flag flips prod to sequential)."""
+        from pyarallel import parallel_map
+
+        def boom(x):
+            raise ValueError("dead")
+
+        r = parallel_map(boom, range(10), sequential=True, max_errors=2)
+        assert r.aborted is True
+
+    async def test_async_engine_sets_status_too(self):
+        from pyarallel import async_parallel_map
+
+        async def boom(x):
+            raise ValueError("dead")
+
+        r = await async_parallel_map(boom, range(50), concurrency=2, max_errors=3)
+        assert r.aborted is True
+        assert r.timed_out is False

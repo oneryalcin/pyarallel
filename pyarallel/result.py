@@ -118,11 +118,24 @@ class ParallelResult[R]:
 
     Iterating or calling ``.values()`` raises ``ExceptionGroup``
     if any task failed — you always see errors, never silently.
+
+    ``timed_out`` / ``aborted`` report how the run *ended*. They exist
+    because per-item failure markers cannot always carry that fact: an
+    unsized input that hits the total ``timeout=`` returns only the
+    items actually pulled from the source — possibly all successes —
+    and the status flag is the one reliable signal that the result is
+    a truncation, not a completion.
     """
 
-    __slots__ = ("_entries",)
+    __slots__ = ("_entries", "_timed_out", "_aborted")
 
-    def __init__(self, entries: list[Any]) -> None:
+    def __init__(
+        self,
+        entries: list[Any],
+        *,
+        timed_out: bool = False,
+        aborted: bool = False,
+    ) -> None:
         # A leaked unfilled slot must fail loudly here, not surface later
         # as a silent "success" value from .values()/.ok.
         if any(e is _PENDING for e in entries):
@@ -130,6 +143,8 @@ class ParallelResult[R]:
                 "internal error: unfilled result slot leaked into ParallelResult"
             )
         self._entries = entries
+        self._timed_out = timed_out
+        self._aborted = aborted
 
     # --- Introspection ---
 
@@ -137,6 +152,16 @@ class ParallelResult[R]:
     def ok(self) -> bool:
         """True when every task succeeded."""
         return not any(isinstance(e, _Failure) for e in self._entries)
+
+    @property
+    def timed_out(self) -> bool:
+        """True when the run stopped on the total ``timeout=`` deadline."""
+        return self._timed_out
+
+    @property
+    def aborted(self) -> bool:
+        """True when the run stopped early via ``max_errors``."""
+        return self._aborted
 
     def values(self) -> list[R]:
         """All results in input order. Raises if any task failed."""

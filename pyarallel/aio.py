@@ -462,7 +462,7 @@ async def _async_collected_map_windowed(
         if store is not None:
             store.close()
 
-    return ParallelResult(results)
+    return ParallelResult(results, timed_out=timed_out, aborted=aborted)
 
 
 async def async_parallel_starmap[R](

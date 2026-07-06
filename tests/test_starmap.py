@@ -175,3 +175,58 @@ class TestAsyncStarmap:
 
         result = await add.starmap([(1, 2), (3, 4)])
         assert list(result) == [3, 7]
+
+
+class TestStarmapLaziness:
+    """v0.6: sync starmap wraps fn instead of packing items into a list,
+    so the engine's lazy-input contract holds for starmap too."""
+
+    def test_generator_of_tuples_not_materialized(self):
+        """Prevents: the packing list-comp returning — it consumed whole
+        generators before the engine ever saw them."""
+        import threading
+
+        from pyarallel import parallel_starmap
+
+        produced = []
+        started = threading.Event()
+        release = threading.Event()
+        holder = {}
+
+        def pairs():
+            for i in range(100):
+                produced.append(i)
+                yield (i, i)
+
+        def track_add(a, b):
+            if a == 1:
+                started.set()
+            release.wait(timeout=5)
+            return a + b
+
+        def run():
+            holder["result"] = parallel_starmap(track_add, pairs(), workers=2)
+
+        t = threading.Thread(target=run)
+        t.start()
+        assert started.wait(timeout=5)
+        time.sleep(0.2)
+        assert len(produced) <= 4  # window = 2 * workers
+        release.set()
+        t.join(timeout=10)
+        assert not t.is_alive()
+        assert list(holder["result"]) == [i * 2 for i in range(100)]
+
+    def test_sized_input_keeps_exact_progress_total(self):
+        """Prevents: sized tuple lists losing their len() (and thus true
+        progress totals) to a lazy wrapper."""
+        from pyarallel import parallel_starmap
+
+        totals = []
+        parallel_starmap(
+            _add,
+            [(1, 2), (3, 4), (5, 6)],
+            workers=2,
+            on_progress=lambda done, total: totals.append(total),
+        )
+        assert totals == [3, 3, 3]
