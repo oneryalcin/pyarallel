@@ -12,7 +12,7 @@ results = parallel_map(
     items,                           # Any iterable
     *,
     workers=None,                    # Number of parallel workers
-    executor="thread",               # "thread" or "process"
+    executor="thread",               # "thread", "process", or "interpreter" (3.14+)
     rate_limit=None,                 # RateLimit spec, shared Limiter, or ops/second
     timeout=None,                    # Total timeout in seconds
     on_progress=None,                # callback(completed, total)
@@ -36,7 +36,7 @@ results = parallel_map(
 | `fn` | `Callable` | required | Function to apply to each item |
 | `items` | `Iterable` | required | Any iterable (list, generator, range, set, ...) |
 | `workers` | `int \| None` | `None` | Number of parallel workers. `None` lets the executor choose |
-| `executor` | `"thread" \| "process"` | `"thread"` | Thread pool or process pool |
+| `executor` | `"thread" \| "process" \| "interpreter"` | `"thread"` | Thread pool, process pool, or (Python 3.14+) sub-interpreter pool. Interpreter follows the process rules — importable module-level functions, no shared limiter, no contextvars — and C extensions without subinterpreter support (numpy among them) fail with `ImportError` inside workers |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting (float = ops/second). Pass a shared `Limiter` to draw from one budget across calls |
 | `timeout` | `float \| None` | `None` | Total wall-clock timeout in seconds. Sets `result.timed_out` on expiry; the source is never drained after a stop |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback `(completed, total)`. For unsized iterables, `total` is items seen so far |
@@ -46,7 +46,7 @@ results = parallel_map(
 | `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires `checkpoint=` |
 | `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Unrun items are marked `Aborted` |
 | `sequential` | `bool` | `False` | Run every item inline in the calling thread — no pool, real stack traces, working breakpoints. `workers` is ignored |
-| `worker_init` | `Callable[[], None] \| None` | `None` | Run once per worker before it takes tasks (one DB connection / model per worker). Must be picklable for `executor="process"` |
+| `worker_init` | `Callable[[], None] \| None` | `None` | Run once per worker before it takes tasks (one DB connection / model per worker). Must be picklable for `executor="process"`; for `executor="interpreter"` it must be a module-level function in an importable module |
 | `max_tasks_per_worker` | `int \| None` | `None` | Recycle each process worker after N tasks (native-leak guard). Requires `executor="process"` |
 
 ### Examples
@@ -113,8 +113,8 @@ globals or thread-locals for per-worker state.
 
 `max_tasks_per_worker=` recycles each **process** worker after N tasks —
 the standard guard against native-library memory leaks. With
-`executor="thread"` it raises `ValueError` (explicit beats silent
-ignore).
+`executor="thread"` or `executor="interpreter"` it raises `ValueError`
+(explicit beats silent ignore — only process pools recycle workers).
 
 ### Early Abort with `max_errors`
 
@@ -228,7 +228,7 @@ def fn(item): ...
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `workers` | `int \| None` | `None` | Default worker count for `.map()` |
-| `executor` | `"thread" \| "process"` | `"thread"` | Default executor type |
+| `executor` | `"thread" \| "process" \| "interpreter"` | `"thread"` | Default executor type |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Default rate limiting |
 
 ### Usage
@@ -344,7 +344,7 @@ Same as `parallel_map` except no `timeout` or `on_progress` (results stream as t
 | `fn` | `Callable` | required | Function to apply to each item |
 | `items` | `Iterable` | required | Any iterable |
 | `workers` | `int \| None` | `None` | Number of parallel workers (stdlib default when `None`) |
-| `executor` | `"thread" \| "process"` | `"thread"` | Thread pool or process pool |
+| `executor` | `"thread" \| "process" \| "interpreter"` | `"thread"` | Thread pool, process pool, or (3.14+) sub-interpreter pool — see [parallel_map](#parallel_map) |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting |
 | `batch_size` | `int \| None` | `None` | Maximum items in flight (default `2 × workers`) |
 | `retry` | `Retry \| None` | `None` | Per-item retry |

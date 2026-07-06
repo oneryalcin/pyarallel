@@ -32,7 +32,12 @@ from concurrent.futures import (
 from pathlib import Path
 from typing import Any, Literal, TypedDict
 
-from ._procexec import _call_resolved, _call_resolved_args, _resolve_process_target
+from ._procexec import (
+    _call_resolved,
+    _call_resolved_args,
+    _load_process_target,
+    _resolve_process_target,
+)
 from ._run import (
     _mark_timeout_indices,
     _progress_total,
@@ -55,7 +60,7 @@ from .result import (
     _Outcome,
 )
 
-ExecutorType = Literal["thread", "process"]
+ExecutorType = Literal["thread", "process", "interpreter"]
 
 
 class SyncMapOptions(TypedDict, total=False):
@@ -164,8 +169,10 @@ def _validate_common(
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if workers is not None and workers < 1:
         raise ValueError(f"workers must be >= 1, got {workers}")
-    if executor not in ("thread", "process"):
-        raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
+    if executor not in ("thread", "process", "interpreter"):
+        raise ValueError(
+            f'executor must be "thread", "process", or "interpreter", got {executor!r}'
+        )
 
 
 def _validate_worker_options(
@@ -173,18 +180,43 @@ def _validate_worker_options(
     worker_init: Callable[[], None] | None,
     max_tasks_per_worker: int | None,
 ) -> None:
-    """Validation for the worker-lifecycle options (fail fast, fail loud)."""
+    """Validation for the pool path (fail fast, fail loud).
+
+    Called only when a pool will actually be built — ``sequential=True``
+    skips it, so a production config with ``executor="interpreter"``
+    stays one flag away from inline debugging on any supported Python.
+    """
+    if executor == "interpreter" and sys.version_info < (3, 14):
+        raise ValueError(
+            'executor="interpreter" requires Python 3.14+ '
+            "(concurrent.futures.InterpreterPoolExecutor); this is Python "
+            f"{sys.version_info.major}.{sys.version_info.minor}"
+        )
     if max_tasks_per_worker is not None:
         if executor != "process":
             raise ValueError(
-                "max_tasks_per_worker requires executor='process' — thread "
-                "workers have no per-worker task budget"
+                "max_tasks_per_worker requires executor='process' — only "
+                f"process pools recycle workers, {executor!r} workers have "
+                "no per-worker task budget"
             )
         if max_tasks_per_worker < 1:
             raise ValueError(
                 f"max_tasks_per_worker must be >= 1, got {max_tasks_per_worker}"
             )
-    if worker_init is not None and executor == "process":
+    if worker_init is not None and executor == "interpreter":
+        # Interpreter workers re-import worker_init by (module, qualname)
+        # after mirroring the parent's sys.path — so it must be a named
+        # module-level function. A __main__ one would pickle fine by
+        # reference, then break the pool: sub-interpreters get a fresh,
+        # empty __main__.
+        resolved = _resolve_process_target(worker_init)
+        if resolved is None or resolved[0] == "__main__":
+            raise ValueError(
+                "worker_init for executor='interpreter' must be a "
+                "module-level function in an importable module — not a "
+                "lambda, closure, partial, or anything defined in __main__."
+            )
+    elif worker_init is not None and executor == "process":
         try:
             pickle.dumps(worker_init)
         except Exception as exc:
@@ -192,6 +224,25 @@ def _validate_worker_options(
                 "worker_init cannot be pickled for executor='process' — "
                 "use a module-level function, not a lambda or closure."
             ) from exc
+
+
+def _interpreter_worker_init(
+    paths: list[str],
+    init_module: str | None,
+    init_qualname: str | None,
+) -> None:
+    """Runs first in each interpreter worker, before any task.
+
+    Mirrors the parent's ``sys.path`` — exactly what multiprocessing
+    spawn does for process workers — so targets importable only via a
+    runtime path addition (pytest, app servers) resolve here too. The
+    user's worker_init is shipped as (module, qualname) and resolved
+    *after* the path is set: pickled by reference it would need the
+    import to succeed before this initializer ran.
+    """
+    sys.path[:] = paths
+    if init_module is not None and init_qualname is not None:
+        _load_process_target(init_module, init_qualname)()
 
 
 def _make_pool(
@@ -203,6 +254,30 @@ def _make_pool(
     """Build the executor pool with the worker-lifecycle options applied."""
     if executor == "thread":
         return ThreadPoolExecutor(max_workers=workers, initializer=worker_init)
+    if executor == "interpreter":
+        # The version check (not the executor check) is what lets mypy
+        # prune this branch when type-checking at the 3.12 floor.
+        if sys.version_info >= (3, 14):
+            from concurrent.futures import InterpreterPoolExecutor
+
+            init_module = init_qualname = None
+            if worker_init is not None:
+                resolved = _resolve_process_target(worker_init)
+                if resolved is None:
+                    raise AssertionError(
+                        "unreachable — gated in _validate_worker_options"
+                    )
+                init_module, init_qualname = resolved
+            return InterpreterPoolExecutor(
+                max_workers=workers,
+                initializer=functools.partial(
+                    _interpreter_worker_init,
+                    list(sys.path),
+                    init_module,
+                    init_qualname,
+                ),
+            )
+        raise AssertionError("unreachable — gated in _validate_worker_options")
     return ProcessPoolExecutor(
         max_workers=workers,
         initializer=worker_init,
@@ -238,7 +313,9 @@ def _effective_workers(workers: int | None, executor: ExecutorType) -> int:
     """
     if workers is not None:
         return workers
-    if executor == "thread":
+    if executor in ("thread", "interpreter"):
+        # InterpreterPoolExecutor subclasses ThreadPoolExecutor and inherits
+        # its default — window sizing must match pool reality.
         return min(32, (os.cpu_count() or 1) + 4)  # ThreadPoolExecutor default
     return os.cpu_count() or 1  # ProcessPoolExecutor default
 
@@ -261,18 +338,31 @@ def _build_task_fn(
     workers still honor server-mandated waits as their own retry delay.
     """
     task_fn = fn
-    if executor == "process":
+    if executor in ("process", "interpreter"):
         if retry is not None:
             try:
                 pickle.dumps(retry)
             except Exception as exc:
                 raise ValueError(
-                    "This Retry cannot be pickled for executor='process' — "
-                    "its retry_if/wait_from callables must be module-level "
+                    f"This Retry cannot be pickled for executor={executor!r} "
+                    "— its retry_if/wait_from callables must be module-level "
                     "functions, not lambdas or closures. Alternatively use "
                     "executor='thread'."
                 ) from exc
         resolved = _resolve_process_target(fn)
+        if (
+            executor == "interpreter"
+            and resolved is not None
+            and resolved[0] == "__main__"
+        ):
+            # Process workers survive this (spawn bootstraps the script as
+            # __main__); a sub-interpreter gets a fresh empty __main__ and
+            # every item would fail with the same AttributeError.
+            raise ValueError(
+                f"{fn.__qualname__} is defined in __main__, which "
+                "interpreter workers cannot see — move it into an "
+                "importable module, or use executor='process'."
+            )
         if resolved is not None:
             module_name, qualname = resolved
             task_fn = functools.partial(
@@ -319,7 +409,12 @@ def parallel_map[T, R](
         workers: Number of parallel workers. Defaults to ``None`` which lets
             the executor decide — ``min(32, cpu_count+4)`` for threads,
             ``cpu_count()`` for processes.
-        executor: ``"thread"`` for I/O-bound, ``"process"`` for CPU-bound.
+        executor: ``"thread"`` for I/O-bound, ``"process"`` for CPU-bound,
+            ``"interpreter"`` (Python 3.14+) for pure-Python CPU-bound work
+            without process overhead — process rules apply (importable
+            module-level functions, no shared limiter, no contextvars), and
+            C extensions that don't support subinterpreters (numpy among
+            them) fail with ``ImportError`` inside workers.
         rate_limit: ``RateLimit`` spec, a plain number (ops per second), or
             a shared ``Limiter`` instance to draw from one budget across
             multiple calls.
@@ -809,7 +904,7 @@ def parallel_starmap[R](
         def add(a, b): return a + b
         parallel_starmap(add, [(1, 2), (3, 4)])  # [3, 7]
     """
-    if executor == "process":
+    if executor in ("process", "interpreter"):
         resolved = _resolve_process_target(fn)
         if resolved is not None:
             module_name, qualname = resolved

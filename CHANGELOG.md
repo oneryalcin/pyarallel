@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased — v0.7
+
+**The parallelism-future bets.** Free-threaded CPython proven per-commit,
+and a third executor for Python 3.14+.
+
+- New: `executor="interpreter"` (Python 3.14+, PEP 734
+  `InterpreterPoolExecutor`) — true CPU parallelism for pure-Python work
+  on standard GIL builds, in one OS process, with ~30 ms workers instead
+  of fork/spawn. Process constraint rules apply (importable module-level
+  functions, picklable retry, no shared limiter, no contextvars), plus
+  two interpreter-only rules: `__main__`-defined functions and
+  `worker_init` are rejected upfront with an actionable error
+  (sub-interpreters cannot see the parent's `__main__`), and
+  `max_tasks_per_worker` is rejected (no worker recycling). Workers
+  mirror the parent's `sys.path` — same behavior as multiprocessing
+  spawn — so targets importable via runtime path additions resolve.
+  Known boundary: C extensions without subinterpreter support (numpy
+  among them) fail with `ImportError` inside workers; use
+  `executor="process"` for those.
+- The version gate lives on the pool path only: `sequential=True` with
+  `executor="interpreter"` still runs inline on 3.12/3.13 — production
+  configs stay one flag away from debuggable.
+- `ExecutorType` widened to
+  `Literal["thread", "process", "interpreter"]` — downstream code
+  matching exhaustively on it will see the new member.
+- CI now tests 3.14 and free-threaded 3.13t/3.14t (suite runs with the
+  GIL off; a guard step fails the job if the GIL is silently re-enabled).
+  New `test` dependency group for minimal installs.
+- Docs: free-threading note (measured 2.4× CPU-bound at 4 workers on
+  3.14t vs 1.0× under the GIL); interpreter executor guidance.
+
+Plan and review history:
+[v0.7 Plan](docs/development/plans/v0.7-free-threaded-and-interpreters.md).
+
 ## 0.6.0 — 2026-07-06
 
 **One engine for every execution path.** All collected maps — sync and

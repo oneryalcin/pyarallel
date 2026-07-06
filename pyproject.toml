@@ -74,3 +74,7 @@ dev = [
 
 [tool.mypy]
 strict = true
+# Type-check at the requires-python floor on every CI job. Also load-bearing:
+# mypy prunes `sys.version_info >= (3, 14)` branches, so the
+# InterpreterPoolExecutor import type-checks even where typeshed predates it.
+python_version = "3.12"
