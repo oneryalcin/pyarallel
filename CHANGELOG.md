@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — v0.7
+## 0.7.0 — 2026-07-06
 
 **The parallelism-future bets.** Free-threaded CPython proven per-commit,
 and a third executor for Python 3.14+.
@@ -30,6 +30,9 @@ and a third executor for Python 3.14+.
   New `test` dependency group for minimal installs.
 - Docs: free-threading note (measured 2.4× CPU-bound at 4 workers on
   3.14t vs 1.0× under the GIL); interpreter executor guidance.
+- Docs: new comparison page (vs the tenacity+ThreadPoolExecutor
+  hand-roll, aiometer, mpire, joblib — including when *not* to use
+  pyarallel) and two new recipes (batch LLM calls, CPU-bound fan-out).
 
 Plan and review history:
 [v0.7 Plan](docs/development/plans/v0.7-free-threaded-and-interpreters.md).
