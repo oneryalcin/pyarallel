@@ -131,8 +131,22 @@ Takes the same `ordered=` and `on_progress=` options as `parallel_iter`:
 `ordered=True` yields in input order with a reorder buffer counted
 inside the window; `on_progress(done, total)` fires per completed item.
 
-Breaking out of the loop cancels in-flight tasks (async tasks, unlike
-threads, are genuinely cancellable).
+To stop early, close the generator — unlike sync generators, a bare
+`break` does **not** finalize an async generator promptly (Python defers
+it to event-loop shutdown, so tasks keep running). Wrap the stream in
+`contextlib.aclosing`:
+
+```python
+from contextlib import aclosing
+
+async with aclosing(async_parallel_iter(fetch, urls)) as stream:
+    async for item in stream:
+        if enough(item):
+            break   # aclosing cancels in-flight tasks right here
+```
+
+Async tasks, unlike threads, are genuinely cancellable — once the
+generator is closed, in-flight work stops.
 
 Also available as `.stream()` on `@async_parallel` decorated functions:
 

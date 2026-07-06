@@ -97,9 +97,18 @@ Composes with `timeout=` (whichever fires first wins, each marking its
 own failure type) and with `checkpoint=` — completed successes are
 already persisted, so the aborted job resumes exactly where it stopped.
 Streaming APIs take `max_errors` too: the stream simply ends after the
-Nth failure is yielded, with no placeholder items (in `ordered=True`
+Nth failure is yielded, with no placeholder items. In `ordered=True`
 mode the ending failure is still delivered in input order — admission
-has stopped, so the wait is bounded by the window).
+has stopped, so the wait is bounded to the window in *items*, but not
+in time: a task that never completes blocks the ordered stream, exactly
+as it blocks every other sync call (threads cannot be cancelled). Put
+timeouts inside your function, or use the default unordered mode for
+the promptest abort on a dead API. Completed-but-unyielded successes
+behind the ending failure are discarded.
+
+Note: with `max_errors` set, `batch_size` acts as the admission window
+(no barrier between chunks) — the same meaning it has for the streaming
+APIs, not the chunked meaning of the plain collected path.
 
 The input source is **never consumed after the stop** — a blocking or
 infinite generator stays untouched. Sized inputs get one `Aborted`

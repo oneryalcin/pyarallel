@@ -231,7 +231,10 @@ def parallel_map[T, R](
             ``Aborted`` — distinguishable from real failures. The source
             is never consumed after the stop: sized inputs get one
             ``Aborted`` entry per unseen item, unsized inputs return a
-            result covering only the items actually pulled.
+            result covering only the items actually pulled. Note that
+            with ``max_errors`` set, ``batch_size`` becomes the admission
+            window (no barrier between chunks) — the same meaning it has
+            for the streaming APIs.
 
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
@@ -617,8 +620,14 @@ def parallel_iter[T, R](
     ``ordered=True`` the stream still ends only after the Nth failure is
     yielded *in input order* — failures that completed out of order wait
     for the items ahead of them to finish first. Admission has already
-    stopped by then, so the extra wait is bounded by the in-flight
-    window, never by unseen input.
+    stopped by then, so the extra wait is bounded to the in-flight window
+    in *items* — but not in time: a task that never completes blocks the
+    ordered stream, exactly as it blocks every other call in this
+    library. Put timeouts inside your function (sync) or use
+    ``task_timeout`` (async); for the promptest abort on a dead API, use
+    the default unordered mode. Completed-but-unyielded successes behind
+    the ending failure are discarded — order cannot be preserved and
+    delivered past a stop.
 
     Breaking out of the loop closes the generator: submission stops and
     not-yet-started tasks are cancelled. Tasks already running in a

@@ -6,6 +6,7 @@ API costs tens of calls, not thousands. Admission bounds are measured with
 instrumented counters, never just asserted.
 """
 
+import asyncio
 import threading
 import time
 
@@ -471,3 +472,82 @@ class TestMidPlanReviewFindings:
         assert [r.index for r in results] == list(range(len(results)))
         assert sum(1 for r in results if not r.ok) == 3
         assert calls.n <= 1 + 8 + WINDOW_SLACK  # admission stopped at window
+
+
+class TestAdversarialDesignFindings:
+    """Regression tests from the Sonnet adversarial design review."""
+
+    def test_poison_source_with_slow_tasks_raises_promptly(self):
+        """Sonnet [major]: a poison items iterator on the sync windowed
+        path used to wait out the whole in-flight window (shutdown with
+        wait=True) before the error could surface."""
+
+        def poison():
+            yield 1
+            yield 2
+            raise RuntimeError("boom")
+
+        def slow(x):
+            time.sleep(1.0)
+            return x
+
+        start = time.monotonic()
+        with pytest.raises(RuntimeError, match="boom"):
+            parallel_map(slow, poison(), workers=2, max_errors=5)
+        # Old behavior: ~1.0s (drained the running tasks). Fixed: prompt.
+        assert time.monotonic() - start < 0.8
+
+    async def test_async_ordered_abort_unblocks_via_task_timeout(self):
+        """Sonnet [critical, triaged]: a never-completing head-of-line item
+        blocks an ordered abort — inherent to uncancellable work, same as
+        every sync API. The documented escape hatch is task_timeout: the
+        hung head becomes a failure, the gap fills, the stream ends."""
+        from pyarallel import async_parallel_iter
+
+        async def hung_head_then_dead(x):
+            if x == 0:
+                await asyncio.sleep(30)  # would hang the stream un-timeboxed
+                return x
+            raise ConnectionError("down")
+
+        start = time.monotonic()
+        results = []
+        async for item in async_parallel_iter(
+            hung_head_then_dead,
+            range(1000),
+            concurrency=4,
+            ordered=True,
+            max_errors=3,
+            task_timeout=0.3,
+        ):
+            results.append(item)
+        elapsed = time.monotonic() - start
+
+        assert elapsed < 5.0  # terminated, did not wait for the 30s sleep
+        assert not results[0].ok  # the hung head timed out into a failure
+        assert isinstance(results[0].error, TimeoutError)
+        assert sum(1 for r in results if not r.ok) == 3
+
+    async def test_async_rate_limited_dead_api_cost_is_bounded(self):
+        """Sonnet [drift note]: the async engines have no mid-fill peek —
+        by design, since filling never blocks and abort cancels tasks
+        still waiting on limiter tokens before they can call the API.
+        This measures that the cost bound actually holds."""
+        calls = Counter()
+
+        async def dead(x):
+            calls.bump()
+            raise ConnectionError("down")
+
+        start = time.monotonic()
+        result = await async_parallel_map(
+            dead,
+            range(1000),
+            concurrency=8,
+            max_errors=1,
+            rate_limit=RateLimit(10, "second"),
+        )
+        elapsed = time.monotonic() - start
+        assert not result.ok
+        assert calls.n <= 5  # cancelled while queued on the limiter
+        assert elapsed < 2.0

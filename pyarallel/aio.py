@@ -322,6 +322,9 @@ async def _async_collected_map_windowed(
 
     try:
         while True:
+            # No mid-fill absorption here (unlike the sync twin): task
+            # creation never blocks — limiter waits happen inside tasks,
+            # which are cancelled on abort before they can call the API.
             while not aborted and len(in_flight) < window and _submit_next():
                 pass
             if not in_flight:
@@ -434,12 +437,25 @@ async def async_parallel_iter[T, R](
     ``ordered=True`` the stream still ends only after the Nth failure is
     yielded *in input order* — failures that completed out of order wait
     for the items ahead of them to finish first. Admission has already
-    stopped by then, so the extra wait is bounded by the in-flight
-    window, never by unseen input.
+    stopped by then, so the extra wait is bounded to the in-flight window
+    in *items* — but not in time: a task that never completes blocks the
+    ordered stream, exactly as it blocks every other call in this
+    library. Put timeouts inside your function (sync) or use
+    ``task_timeout`` (async); for the promptest abort on a dead API, use
+    the default unordered mode. Completed-but-unyielded successes behind
+    the ending failure are discarded — order cannot be preserved and
+    delivered past a stop.
 
-    Breaking out of the loop closes the generator: submission stops and
-    in-flight tasks are cancelled (async tasks, unlike threads, are
-    genuinely cancellable).
+    Cleanup requires closing the generator: unlike sync generators,
+    ``break`` alone does **not** finalize an async generator promptly —
+    Python defers it to the event loop's shutdown. Wrap the stream in
+    ``contextlib.aclosing`` (or call ``await stream.aclose()``) to stop
+    submission and cancel in-flight tasks the moment you stop consuming::
+
+        async with contextlib.aclosing(async_parallel_iter(fn, items)) as s:
+            async for item in s:
+                if found(item):
+                    break  # aclosing cancels in-flight tasks here
     """
     if batch_size is not None and batch_size < 1:
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
@@ -483,6 +499,10 @@ async def async_parallel_iter[T, R](
         # The engine invariant: in_flight + buffered never exceeds the
         # window. Gating admission on the sum (not on completions) is what
         # keeps ordered mode bounded when a straggler blocks the buffer.
+        #
+        # No mid-fill failure peek here (unlike the sync driver): filling
+        # never blocks — limiter waits happen inside tasks, which are
+        # cancelled on abort before they can call the API.
         if max_errors is not None and failures >= max_errors:
             return  # aborting — no new work
         while len(in_flight) + len(buffered) < window and _submit_next():
