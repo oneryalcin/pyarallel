@@ -11,12 +11,13 @@ requirement that plain parallelism gets wrong: rotation is *not
 idempotent*. Rotate the same secret twice mid-flight and you invalidate
 the copy a running service just picked up — an outage you caused. So a
 crash at secret 4,000 of 10,000 must resume at 4,000 and **never**
-re-rotate the 3,999 already done. Vault also rate-limits with
-`429 + Retry-After`, and a cascade of rotation failures should stop the
-job before it takes services down.
+re-rotate the 3,999 already done. Vault also rate-limits (HTTP 429), and
+a cascade of rotation failures should stop the job before it takes
+services down.
 
 ```python
 import hvac
+from hvac.exceptions import RateLimitExceeded, InternalServerError
 from pyarallel import parallel_map, Limiter, RateLimit, Retry
 
 client = hvac.Client(url=VAULT_ADDR, token=VAULT_TOKEN)
@@ -30,24 +31,19 @@ def rotate(secret_path):
     notify_consumers(secret_path)   # tell services to reload
     return secret_path
 
-def is_throttled(exc):
-    return getattr(exc, "status_code", None) == 429
-
-def retry_after(exc):
-    headers = getattr(exc, "headers", None) or {}
-    value = headers.get("Retry-After")
-    return float(value) if value else None
-
 secret_paths = list_secrets_to_rotate()   # thousands
 
 result = parallel_map(
     rotate, secret_paths,
     workers=6,
     rate_limit=Limiter(RateLimit(100, "minute")),
+    # hvac raises RateLimitExceeded for HTTP 429 (a VaultError subclass).
+    # It does NOT expose the response headers, so Retry-After can't be read
+    # from the exception — exponential backoff is the honest fallback.
     retry=Retry(
-        attempts=3,
-        retry_if=is_throttled,
-        wait_from=retry_after,
+        attempts=4,
+        backoff=2.0,
+        on=(RateLimitExceeded, InternalServerError),
     ),
     checkpoint="rotation.ckpt",
     checkpoint_key=lambda p: p,     # the whole point: never rotate a path twice

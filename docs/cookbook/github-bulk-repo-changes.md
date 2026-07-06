@@ -31,15 +31,26 @@ def add_codeowners(repo_full_name):
     )
     return repo_full_name
 
-def is_secondary_limit(exc):
-    # Secondary/abuse limits are 403 or 429; primary is 403 with a
-    # rate-limit-remaining of 0. Retry both — fail fast on 404/422.
-    return isinstance(exc, GithubException) and exc.status in (403, 429)
-
-def retry_after(exc):
+def is_rate_limit(exc):
+    # Retry ONLY rate limits — never a plain permission/scope 403, which
+    # will fail identically on every retry. A rate-limit 403/429 carries
+    # a Retry-After header, an exhausted x-ratelimit-remaining, or an
+    # "abuse"/"secondary rate limit" message; a bad-scope 403 carries none.
+    if not isinstance(exc, GithubException) or exc.status not in (403, 429):
+        return False
     headers = getattr(exc, "headers", None) or {}
-    value = headers.get("retry-after")
-    return float(value) if value else None
+    if headers.get("retry-after") or headers.get("x-ratelimit-remaining") == "0":
+        return True
+    message = str(getattr(exc, "data", "")).lower()
+    return "secondary rate limit" in message or "abuse" in message
+
+def github_wait(exc):
+    headers = getattr(exc, "headers", None) or {}
+    if headers.get("retry-after"):                       # secondary limit, told when
+        return float(headers["retry-after"])
+    if headers.get("x-ratelimit-remaining") == "0" and headers.get("x-ratelimit-reset"):
+        return max(0.0, float(headers["x-ratelimit-reset"]) - time.time())  # primary: wait for reset
+    return 60.0                                          # secondary, no header: GitHub says wait >= 60s
 
 repos = [r.full_name for r in gh.get_organization("my-org").get_repos()]
 
@@ -53,8 +64,8 @@ result = parallel_map(
     retry=Retry(
         attempts=4,
         backoff=2.0,
-        retry_if=is_secondary_limit,
-        wait_from=retry_after,          # one worker's Retry-After pauses the whole pool
+        retry_if=is_rate_limit,
+        wait_from=github_wait,          # one worker's throttle wait pauses the whole pool
     ),
     checkpoint="codeowners.ckpt",
     checkpoint_key=lambda name: name,   # resume by repo — never re-mutate a done one
@@ -69,11 +80,14 @@ for idx, exc in result.failures():
 
 Why each policy earns its place:
 
-- **`wait_from=retry_after`** — GitHub's docs literally instruct you to
-  honor `Retry-After` on secondary limits. Pyarallel applies it
-  *pool-wide*: one worker's throttle signal pauses the shared limiter, so
-  all eight back off together instead of each discovering the block
-  separately and making the abuse detection angrier.
+- **`wait_from=github_wait`** — GitHub's docs are specific: honor
+  `Retry-After` when present, wait until `x-ratelimit-reset` when the
+  primary budget is exhausted, and back off at least 60s on a secondary
+  limit with no header. `retry_if` deliberately does *not* retry a plain
+  permission 403 — that would fail identically on every attempt. Pyarallel
+  applies the wait *pool-wide*: one worker's throttle signal pauses the
+  shared limiter, so all eight back off together instead of each
+  discovering the block separately and making abuse detection angrier.
 - **`checkpoint_key=lambda name: name`** — a mutation must never run
   twice. Keyed by repo name, a resumed run skips every repo already
   changed, even if the input list was reordered.

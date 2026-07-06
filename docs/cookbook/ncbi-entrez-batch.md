@@ -47,7 +47,13 @@ result = parallel_map(
     checkpoint="gene_summaries.ckpt",   # kernel dies at 30k? rerun resumes
 )
 
-summaries = {gid: s for (gid, s) in zip(gene_ids, result.values())}
+# .successes() yields (index, value) and never raises — collect what
+# worked and inspect the rest separately. (result.values() would raise an
+# ExceptionGroup the moment a single ID fails permanently, discarding the
+# whole batch — not what you want over tens of thousands of records.)
+summaries = {gene_ids[idx]: s for idx, s in result.successes()}
+for idx, exc in result.failures():
+    log_failed(gene_ids[idx], exc)
 ```
 
 A later job against the same key — say pulling full records for the
@@ -79,12 +85,18 @@ flight and writes each record as it arrives:
 from pyarallel import parallel_iter
 
 for item in parallel_iter(fetch_genbank, gene_ids, rate_limit=ncbi,
-                          checkpoint="genbank.ckpt", batch_size=100):
+                          batch_size=100):
     if item.ok:
         write_fasta(item.value)
     else:
         log_failed(item.index, item.error)
 ```
+
+Note: `checkpoint=` is a `parallel_map` feature — the streaming engine
+doesn't take it (you're writing each record to disk as it arrives, so
+resume is your sink's job: skip IDs whose FASTA already exists). For a
+resumable *and* memory-bounded run, `parallel_map` with `checkpoint=`
+over a `batch_size` window is usually the better fit.
 
 The same shape works for any hard-rate-limited scientific API where the
 budget is per-key and jobs run long: UniProt, Ensembl, PubChem,
