@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -29,3 +29,29 @@ jobs:
         run: uv run pytest -q
       - name: Docs (strict)
         run: uv run mkdocs build --strict
+
+  # Free-threaded builds run the test suite with the GIL off. Test deps
+  # only: the dev group cannot build on 3.13t (cffi, via mkdocs-material),
+  # and lint/type/docs are ABI-independent — they already run above.
+  free-threaded:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13t", "3.14t"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # --no-default-groups --group test, NOT --only-group: --only-group
+      # omits the project itself and the suite collects nothing.
+      - name: Install (project + test group)
+        run: uv sync --no-default-groups --group test
+      # Start-of-job sanity check: fail loudly if setup resolved a standard
+      # build or a dependency re-enabled the GIL — a green job on the wrong
+      # interpreter would be testing nothing.
+      - name: GIL guard
+        run: uv run python -c "import sys; assert not sys._is_gil_enabled(), 'GIL is enabled on a free-threaded job'"
+      - name: Tests
+        run: uv run pytest -q

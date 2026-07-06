@@ -15,6 +15,12 @@ Best for **I/O-bound** work where tasks spend most time waiting:
 results = parallel_map(fetch_url, urls, workers=20, executor="thread")
 ```
 
+!!! note "Free-threaded Python"
+    On free-threaded builds (3.13t/3.14t) threads parallelize CPU-bound
+    work too — a 4-worker CPU-bound map measured 2.4× over sequential
+    where the GIL build measured 1.0×. CI runs pyarallel's full suite
+    with the GIL off on both builds.
+
 ### Processes (`executor="process"`)
 
 Best for **CPU-bound** work that needs true parallelism:

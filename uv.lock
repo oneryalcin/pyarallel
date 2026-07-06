@@ -830,6 +830,10 @@ dev = [
     { name = "ruff" },
     { name = "twine" },
 ]
+test = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
 
 [package.metadata]
 
@@ -845,6 +849,10 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.23" },
     { name = "ruff", specifier = ">=0.15.0" },
     { name = "twine", specifier = ">=6.0.0" },
+]
+test = [
+    { name = "pytest", specifier = ">=8.3.4" },
+    { name = "pytest-asyncio", specifier = ">=0.23" },
 ]
 
 [[package]]
