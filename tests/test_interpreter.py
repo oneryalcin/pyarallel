@@ -295,6 +295,41 @@ class TestInterpreterValidation:
             parallel_map(fn, [1], executor="interpreter")
 
     @requires_314
+    def test_main_target_rejected_upfront_starmap(self):
+        """Prevents: starmap's pre-resolution wrapper hiding the target's
+        qualname so a __main__ function slips past the upfront check into
+        the per-item failure storm (Codex adversarial, implementation
+        round)."""
+
+        def fn(a, b):
+            return a + b
+
+        fn.__module__ = "__main__"
+        fn.__qualname__ = "fn"
+        with pytest.raises(ValueError, match="__main__"):
+            parallel_starmap(fn, [(1, 2)], executor="interpreter")
+
+    def test_main_target_sequential_starmap_runs_inline(self):
+        """Prevents: the starmap __main__ rejection firing for
+        sequential=True, where the run is inline and __main__ is visible."""
+
+        def fn(a, b):
+            return a + b
+
+        fn.__module__ = "__main__"
+        fn.__qualname__ = "fn"
+        main_mod = sys.modules["__main__"]
+        # A real script's __main__ actually holds the function — mirror that.
+        main_mod.fn = fn  # type: ignore[attr-defined]
+        try:
+            result = parallel_starmap(
+                fn, [(1, 2)], executor="interpreter", sequential=True
+            )
+            assert list(result) == [3]
+        finally:
+            del main_mod.fn  # type: ignore[attr-defined]
+
+    @requires_314
     def test_max_tasks_per_worker_rejected(self):
         """Prevents: the option being silently ignored while the user
         believes worker recycling happens."""

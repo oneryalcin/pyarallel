@@ -320,6 +320,23 @@ def _effective_workers(workers: int | None, executor: ExecutorType) -> int:
     return os.cpu_count() or 1  # ProcessPoolExecutor default
 
 
+def _reject_interpreter_main_target(
+    fn: Callable[..., Any], resolved: tuple[str, str] | None
+) -> None:
+    """Reject a ``__main__``-defined target upfront for interpreter workers.
+
+    Process workers survive these (spawn bootstraps the script as
+    ``__main__``); a sub-interpreter gets a fresh empty ``__main__`` and
+    every item would fail with the same AttributeError.
+    """
+    if resolved is not None and resolved[0] == "__main__":
+        raise ValueError(
+            f"{fn.__qualname__} is defined in __main__, which "
+            "interpreter workers cannot see — move it into an "
+            "importable module, or use executor='process'."
+        )
+
+
 def _build_task_fn(
     fn: Callable[..., Any],
     executor: ExecutorType,
@@ -350,19 +367,8 @@ def _build_task_fn(
                     "executor='thread'."
                 ) from exc
         resolved = _resolve_process_target(fn)
-        if (
-            executor == "interpreter"
-            and resolved is not None
-            and resolved[0] == "__main__"
-        ):
-            # Process workers survive this (spawn bootstraps the script as
-            # __main__); a sub-interpreter gets a fresh empty __main__ and
-            # every item would fail with the same AttributeError.
-            raise ValueError(
-                f"{fn.__qualname__} is defined in __main__, which "
-                "interpreter workers cannot see — move it into an "
-                "importable module, or use executor='process'."
-            )
+        if executor == "interpreter":
+            _reject_interpreter_main_target(fn, resolved)
         if resolved is not None:
             module_name, qualname = resolved
             task_fn = functools.partial(
@@ -906,6 +912,11 @@ def parallel_starmap[R](
     """
     if executor in ("process", "interpreter"):
         resolved = _resolve_process_target(fn)
+        # The wrapper below hides fn's qualname from _build_task_fn, so the
+        # interpreter __main__ rejection must happen here. Sequential runs
+        # inline where __main__ is visible — no rejection there.
+        if executor == "interpreter" and not sequential:
+            _reject_interpreter_main_target(fn, resolved)
         if resolved is not None:
             module_name, qualname = resolved
             return parallel_map(
