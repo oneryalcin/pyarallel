@@ -1,7 +1,8 @@
 """Async engine: mirror of the sync API.
 
-Uses ``asyncio.TaskGroup`` for structured concurrency and
-``asyncio.Semaphore`` for concurrency control.
+One windowed collected-map engine plus a streaming twin, both driven by
+``asyncio.wait(FIRST_COMPLETED)``; ``asyncio.Semaphore`` caps
+concurrency inside the admission window.
 """
 
 from __future__ import annotations
@@ -14,15 +15,13 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 from ._plan import (
-    _append_timeout_failures,
     _mark_timeout_indices,
-    _plan_collected_map,
     _progress_total,
     _timeout_failure,
     _total_if_known,
     _validate_max_errors,
 )
-from .checkpoint import CheckpointError, _open_checkpoint
+from .checkpoint import _open_checkpoint
 from .limiter import Limiter, _as_limiter
 from .policies import RateLimit, Retry
 from .result import (
@@ -154,17 +153,22 @@ async def async_parallel_map[T, R](
             multiple calls.
         timeout: Total wall-clock timeout in seconds for the whole
             operation — the mirror of the sync ``timeout``. On expiry,
-            unfinished tasks are cancelled and their slots (plus any
-            unseen lazy input) are marked with ``TimeoutError`` failures;
-            everything that completed keeps its result.
+            unfinished tasks are cancelled and the result's ``timed_out``
+            flag is set; unfinished sized slots are marked with
+            ``TimeoutError``, while unsized inputs return a shorter
+            result — the source is never drained after a stop.
+            Everything that completed keeps its result.
         task_timeout: Per-task timeout in seconds (each individual task).
         on_progress: ``callback(completed, total)`` after each task.
-            When ``items`` has no known length and ``batch_size`` is set,
-            ``total`` is the number of items seen so far rather than the
-            final input size.
-        batch_size: Process items in chunks. With ``batch_size`` set,
-            unsized iterables (for example generators) are consumed lazily
-            one batch at a time.
+            When ``items`` has no known length, ``total`` is the number
+            of items seen so far rather than the final input size — a
+            progress bar over a generator reads 100% on every tick;
+            pass a sized input for a real total.
+        batch_size: The admission window — the maximum number of tasks
+            created but not yet resolved (default ``2 × concurrency``).
+            It is a memory/lookahead bound, not a chunk size: there are
+            no barriers, and input is consumed lazily, one window ahead,
+            so generators are never materialized.
         retry: ``Retry`` object for per-item retry with backoff.
         checkpoint: Path to a checkpoint file (created if missing, SQLite).
             Completed item results are stored there; rerunning the same
@@ -181,13 +185,14 @@ async def async_parallel_map[T, R](
             position. Requires ``checkpoint=``. Duplicate keys raise
             ``CheckpointError``; the item fingerprint check still applies.
         max_errors: Abort after this many failures (counted after retries
-            are exhausted). Tasks are then created through a bounded
-            window rather than all upfront, so a dead API costs tens of
-            calls, not thousands. Items that never ran are marked with
-            ``Aborted`` — distinguishable from real failures. The source
-            is never consumed after the stop: sized inputs get one
-            ``Aborted`` entry per unseen item, unsized inputs return a
-            result covering only the items actually pulled.
+            are exhausted). Because admission is windowed, a dead API
+            costs the abort-trigger point plus one window of calls, not
+            thousands. Items that never ran are marked with ``Aborted``
+            — distinguishable from real failures — and the result's
+            ``aborted`` flag is set. The source is never consumed after
+            the stop: sized inputs get one ``Aborted`` entry per unseen
+            item, unsized inputs return a result covering only the items
+            actually pulled.
 
     Returns:
         ``ParallelResult`` — same container as the sync API.
@@ -200,113 +205,23 @@ async def async_parallel_map[T, R](
     if checkpoint_key is not None and checkpoint is None:
         raise ValueError("checkpoint_key requires checkpoint= to be set")
 
-    if max_errors is not None:
-        return await _async_collected_map_windowed(
-            fn,
-            items,
-            concurrency=concurrency,
-            rate_limit=rate_limit,
-            timeout=timeout,
-            task_timeout=task_timeout,
-            on_progress=on_progress,
-            batch_size=batch_size,
-            retry=retry,
-            checkpoint=checkpoint,
-            checkpoint_key=checkpoint_key,
-            max_errors=max_errors,
-        )
-
-    plan = _plan_collected_map(items, batch_size)
-    if plan.total == 0:
-        return ParallelResult([])
-    results = plan.results
-
-    if timeout is not None and timeout <= 0:
-        # Mirror the sync contract: an already-expired deadline admits no
-        # work at all. asyncio.timeout() alone cannot guarantee that —
-        # it cancels only at the first suspension point, after tasks
-        # would already have been created.
-        _mark_timeout_indices(results, range(len(results)), timeout)
-        _append_timeout_failures(results, plan.remaining, timeout)
-        return ParallelResult(results)
-
-    semaphore = asyncio.Semaphore(concurrency)
-    limiter = _as_limiter(rate_limit)
-    completed = 0
-
-    store = (
-        _open_checkpoint(checkpoint, fn, checkpoint_key)
-        if checkpoint is not None
-        else None
+    return await _async_collected_map(
+        fn,
+        items,
+        concurrency=concurrency,
+        rate_limit=rate_limit,
+        timeout=timeout,
+        task_timeout=task_timeout,
+        on_progress=on_progress,
+        batch_size=batch_size,
+        retry=retry,
+        checkpoint=checkpoint,
+        checkpoint_key=checkpoint_key,
+        max_errors=max_errors,
     )
 
-    async def _run(i: int, item: Any) -> None:
-        nonlocal completed
-        async with semaphore:
-            if limiter:
-                await limiter.wait_async()
-            outcome = await _async_execute_outcome(
-                fn, item, retry, task_timeout=task_timeout, limiter=limiter
-            )
-            if outcome.error is not None:
-                results[i] = _Failure(outcome.error)
-            else:
-                results[i] = outcome.value
-                # A checkpoint write failure raises CheckpointError
-                # (aborting the TaskGroup) instead of mislabeling a
-                # genuine success as an item failure.
-                if store is not None:
-                    store.put(i, outcome.value)
-            completed += 1
-            if on_progress:
-                on_progress(completed, _progress_total(plan.total, results))
 
-    async def _consume() -> None:
-        nonlocal completed
-        for batch in plan.batches:
-            if batch_size is not None:
-                results.extend([_PENDING] * len(batch))
-            async with asyncio.TaskGroup() as tg:
-                for i, item in batch:
-                    if store is not None:
-                        cached = store.lookup(i, item)
-                        if cached is not None:
-                            results[i] = cached[0]
-                            completed += 1
-                            if on_progress:
-                                on_progress(
-                                    completed, _progress_total(plan.total, results)
-                                )
-                            continue
-                    tg.create_task(_run(i, item))
-
-    try:
-        if timeout is not None:
-            async with asyncio.timeout(timeout):
-                await _consume()
-        else:
-            await _consume()
-    except* CheckpointError as eg:
-        # The TaskGroup wraps child exceptions in an ExceptionGroup; re-raise
-        # the CheckpointError plainly so `except CheckpointError` works the
-        # same for sync and async callers, preserving its original cause.
-        error = eg.exceptions[0]
-        raise error from error.__cause__
-    except* TimeoutError:
-        # asyncio.timeout expiry — the TaskGroup has already cancelled its
-        # children. Mirror of the sync contract: mark unfinished slots and
-        # unseen lazy input with the same failure text.
-        assert timeout is not None
-        _mark_timeout_indices(results, range(len(results)), timeout)
-        _append_timeout_failures(results, plan.remaining, timeout)
-    finally:
-        if store is not None:
-            store.close()
-
-    return ParallelResult(results)
-
-
-async def _async_collected_map_windowed(
+async def _async_collected_map(
     fn: Callable[..., Awaitable[Any]],
     items: Iterable[Any],
     *,
@@ -319,12 +234,15 @@ async def _async_collected_map_windowed(
     retry: Retry | None,
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
-    max_errors: int,
+    max_errors: int | None,
 ) -> ParallelResult[Any]:
-    """Async collected map with bounded admission — the ``max_errors`` engine.
+    """The async collected-map engine: bounded admission through a window.
 
-    Mirrors the sync version: creating every task upfront would let a
-    dead API burn thousands of calls before the Nth failure is observed.
+    Async twin of ``core._collected_map`` — one engine for every
+    collected map. Lazy input, at most ``window`` unresolved tasks, the
+    source never touched after a stop; the window is also what makes
+    ``max_errors`` cheap (abort-trigger plus one window, not thousands
+    of upfront task creations).
     """
     window = batch_size if batch_size is not None else 2 * concurrency
     semaphore = asyncio.Semaphore(concurrency)
@@ -387,7 +305,7 @@ async def _async_collected_map_windowed(
         if error is not None:
             results[idx] = _Failure(error)
             failures += 1
-            if failures >= max_errors:
+            if max_errors is not None and failures >= max_errors:
                 aborted = True
         else:
             results[idx] = outcome.value

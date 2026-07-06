@@ -296,6 +296,54 @@ class TestAsyncBatch:
         await async_parallel_map(track, range(20), concurrency=3, batch_size=5)
         assert max_concurrent <= 5  # batch_size caps in-flight tasks
 
+    async def test_async_plain_map_does_not_materialize_generator(self):
+        """Prevents: silent return of upfront materialization on the
+        async plain path (no batch_size, no max_errors) — window must
+        default to 2 x concurrency."""
+        import asyncio
+
+        from pyarallel import async_parallel_map
+
+        produced = []
+        release = asyncio.Event()
+
+        def items():
+            for i in range(100):
+                produced.append(i)
+                yield i
+
+        async def track(x):
+            await release.wait()
+            return x
+
+        async def run():
+            return await async_parallel_map(track, items(), concurrency=2)
+
+        task = asyncio.ensure_future(run())
+        await asyncio.sleep(0.2)  # give a broken engine time to over-consume
+        assert len(produced) <= 4  # window = 2 * concurrency
+        release.set()
+        result = await asyncio.wait_for(task, timeout=10)
+        assert list(result) == list(range(100))
+
+    async def test_async_source_error_propagates_without_hanging(self):
+        """Prevents: a wedged event loop when the input iterator raises
+        mid-run on the async plain path."""
+        import pytest
+
+        from pyarallel import async_parallel_map
+
+        def poison():
+            yield 1
+            yield 2
+            raise ValueError("bad source")
+
+        async def identity(x):
+            return x
+
+        with pytest.raises(ValueError, match="bad source"):
+            await async_parallel_map(identity, poison(), concurrency=2)
+
     async def test_async_batch_consumes_generator_lazily(self):
         import asyncio
 
