@@ -37,6 +37,7 @@ nav:
     - Roadmap: development/roadmap.md
     - v0.5.0 Plan: development/plans/v0.5.0.md
     - v0.6 Engine Unification Plan: development/plans/v0.6-engine-unification.md
+    - v0.6 Ledger Refactor Plan: development/plans/v0.6-ledger-refactor.md
 
 markdown_extensions:
   - admonition
