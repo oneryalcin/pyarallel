@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Docs: the single-page real-world guide is now a **Cookbook** — one
+  recipe per page (each independently searchable/linkable), with four new
+  recipes for workloads where repeating work is expensive or the rate
+  budget is shared: bulk GitHub repo changes across an org, Docker
+  registry tag cleanup, secrets rotation (identity-keyed resume so a
+  crash never double-rotates), and batch NCBI/Entrez fetches. The old
+  `user-guide/real-world-patterns/` URL redirects to the cookbook.
+- Docs: publish `llms.txt` so AI assistants can ingest and cite the docs.
+
 ## 0.7.0 — 2026-07-06
 
 **The parallelism-future bets.** Free-threaded CPython proven per-commit,
