@@ -15,8 +15,9 @@ results = parallel_map(process, items, workers=8, on_progress=my_progress)
 
 If `items` has a known length, `total` is the final input size. If `items` is
 an unsized iterable (for example a generator), input is consumed lazily and
-`total` is the number of items discovered so far — a percentage bar reads
-100% on every tick. Pass a sized input when you need a real total.
+`total` is the number of items *admitted* so far — one window ahead of
+completions, growing as the run progresses, so a percentage over it is
+meaningless. Pass a sized input when you need a real total.
 
 Works with both `parallel_map` and `.map()`:
 

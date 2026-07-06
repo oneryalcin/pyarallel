@@ -119,12 +119,13 @@ class ParallelResult[R]:
     Iterating or calling ``.values()`` raises ``ExceptionGroup``
     if any task failed — you always see errors, never silently.
 
-    ``timed_out`` / ``aborted`` report how the run *ended*. They exist
-    because per-item failure markers cannot always carry that fact: an
-    unsized input that hits the total ``timeout=`` returns only the
-    items actually pulled from the source — possibly all successes —
-    and the status flag is the one reliable signal that the result is
-    a truncation, not a completion.
+    ``timed_out`` / ``aborted`` report how the run *ended* — at most one
+    is set (the first stop reason wins). They exist because per-item
+    failure markers cannot always carry that fact: an unsized input
+    that hits the total ``timeout=`` returns only the items actually
+    pulled from the source — possibly all successes — and the status
+    flag is the one reliable signal that the result is a truncation,
+    not a completion.
     """
 
     __slots__ = ("_entries", "_timed_out", "_aborted")
@@ -212,7 +213,11 @@ class ParallelResult[R]:
         return len(self._entries) > 0
 
     def __repr__(self) -> str:
-        if self.ok:
+        # A truncated run must not print like a complete one — the flags
+        # appear in the repr precisely because .ok can be True on timeout.
+        status = ", timed_out" if self._timed_out else ""
+        status += ", aborted" if self._aborted else ""
+        if self.ok and not status:
             return f"ParallelResult({list(self._entries)})"
         s, f = len(self.successes()), len(self.failures())
-        return f"ParallelResult({s} ok, {f} failed)"
+        return f"ParallelResult({s} ok, {f} failed{status})"

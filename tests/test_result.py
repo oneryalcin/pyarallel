@@ -266,3 +266,35 @@ class TestRunStatus:
         r = await async_parallel_map(boom, range(50), concurrency=2, max_errors=3)
         assert r.aborted is True
         assert r.timed_out is False
+
+
+class TestRunStatusExclusivityAndRepr:
+    """Round 2 review (v0.6): the flags are exclusive (first stop reason
+    wins) and visible in the repr — a truncated run must not log like a
+    complete one."""
+
+    def test_repr_shows_timed_out_on_all_success_truncation(self):
+        r = ParallelResult([1, 2, 3], timed_out=True)
+        assert "timed_out" in repr(r)
+
+    def test_repr_shows_aborted(self):
+        r = ParallelResult([1, _Failure(ValueError("x"))], aborted=True)
+        assert "aborted" in repr(r)
+
+    def test_repr_unchanged_for_clean_runs(self):
+        assert repr(ParallelResult([1, 2])) == "ParallelResult([1, 2])"
+
+    def test_engine_timeout_reports_timed_out_not_aborted(self):
+        """With both timeout= and max_errors= configured, a deadline stop
+        must not also claim an abort."""
+        import time
+
+        from pyarallel import parallel_map
+
+        def slow(x):
+            time.sleep(10)
+            return x
+
+        r = parallel_map(slow, range(20), workers=2, max_errors=5, timeout=0.2)
+        assert r.timed_out is True
+        assert r.aborted is False

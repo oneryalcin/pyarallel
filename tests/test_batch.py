@@ -244,6 +244,29 @@ class TestUnifiedPlainPath:
         with pytest.raises(ValueError, match="bad source"):
             parallel_map(lambda x: x, poison(), workers=2)
 
+    async def test_async_source_timeout_error_propagates_as_input_error(self):
+        """Prevents: a TimeoutError raised by the source iterator being
+        repackaged as deadline expiry (AssertionError with timeout=None,
+        fabricated timed_out result with timeout set)."""
+        import pytest
+
+        from pyarallel import async_parallel_map
+
+        def timing_out_source():
+            yield 1
+            raise TimeoutError("upstream read timed out")
+
+        async def identity(x):
+            return x
+
+        with pytest.raises(TimeoutError, match="upstream read"):
+            await async_parallel_map(identity, timing_out_source(), concurrency=2)
+
+        with pytest.raises(TimeoutError, match="upstream read"):
+            await async_parallel_map(
+                identity, timing_out_source(), concurrency=2, timeout=30.0
+            )
+
     def test_timeout_beats_rate_limit_pacing_on_plain_path(self):
         """Prevents: the v0.5 bypassed-timeout bug returning via the
         routing change — a driver blocked in limiter pacing must still

@@ -319,9 +319,10 @@ def parallel_map[T, R](
             never drained after a stop.
         on_progress: ``callback(completed, total)`` fired after each task.
             When ``items`` has no known length, ``total`` is the number
-            of items seen so far rather than the final input size — a
-            progress bar over a generator reads 100% on every tick;
-            pass a sized input for a real total.
+            of items *admitted* so far (one window ahead of
+            completions) — it grows as the run progresses, so a
+            percentage over it is meaningless; pass a sized input for a
+            real total.
         batch_size: The admission window — the maximum number of items
             submitted but not yet resolved (default ``2 × workers``).
             It is a memory/lookahead bound, not a chunk size: there are
@@ -374,6 +375,14 @@ def parallel_map[T, R](
     tasks — each item runs under a fresh copy of the submitting thread's
     context, so correlation IDs survive and writes inside tasks stay
     isolated. Process workers are skipped (contexts don't pickle).
+
+    If the input iterable itself raises mid-run, the error propagates
+    promptly: queued work is cancelled, but tasks already running cannot
+    be interrupted and may complete — side effects included — in the
+    background. If you need no-work-after-error guarantees, materialize
+    the input first (``list(items)``) so source errors cannot happen
+    mid-run, or use ``async_parallel_map`` (async tasks are cancelled
+    and awaited).
 
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
@@ -479,6 +488,12 @@ def _collected_map(
     def _submit_next() -> bool:
         nonlocal completed, timed_out
         while True:
+            # Cached checkpoint hits consume real time (lookup + key_fn)
+            # without ever reaching a wait — the deadline must bind here
+            # too, or a checkpoint-heavy run ignores timeout= entirely.
+            if deadline is not None and time.monotonic() >= deadline:
+                timed_out = True
+                return False
             try:
                 item = next(source)
             except StopIteration:
@@ -549,7 +564,10 @@ def _collected_map(
                     done_now, _pending_now = wait(in_flight, timeout=0)
                     for future in done_now:
                         _absorb(future, in_flight.pop(future))
-            if timed_out:
+            # A mid-fill abort must stop here — falling through to the
+            # blocking wait would delay the abort by a task completion
+            # (or repackage it as a timeout if the deadline fires first).
+            if timed_out or aborted:
                 break
             if not in_flight:
                 break
@@ -595,14 +613,21 @@ def _collected_map(
                     _Failure(Aborted(reason)) for _ in range(total - len(results))
                 )
     finally:
-        # An escaping exception (e.g. CheckpointError from store.put) must
-        # also stop the engine cold — cancel, don't drain the window.
+        # Every stop — timeout, abort, or an escaping driver error
+        # (source iterator, checkpoint write, progress callback) —
+        # cancels queued work and returns promptly. Running tasks cannot
+        # be interrupted and may complete in the background; waiting for
+        # them instead was tried and rejected (Round 2): a single hung
+        # task would block the error from ever surfacing.
         stopped = timed_out or aborted or sys.exc_info()[0] is not None
         pool.shutdown(wait=not stopped, cancel_futures=stopped)
         if store is not None:
             store.close()
 
-    return ParallelResult(results, timed_out=timed_out, aborted=aborted)
+    # First stop reason wins: the flags are exclusive by construction.
+    return ParallelResult(
+        results, timed_out=timed_out, aborted=aborted and not timed_out
+    )
 
 
 def _sequential_collected_map(

@@ -1,6 +1,6 @@
 # API Reference: Async
 
-Pyarallel provides async-native parallel execution using `asyncio.TaskGroup` for structured concurrency and `asyncio.Semaphore` for concurrency control.
+Pyarallel provides async-native parallel execution: a windowed engine driven by `asyncio.wait` with `asyncio.Semaphore` for concurrency control — in-flight tasks are cancelled and awaited on errors and timeouts, so nothing is left running on the loop.
 
 ## `async_parallel_map`
 
@@ -90,8 +90,8 @@ total.
 
 When `items` is unsized (for example a generator), input consumption is
 lazy — one window ahead, never materialized — and `total` is the number
-of items discovered so far, not a guaranteed final total: a progress bar
-reads 100% on every tick. Pass a sized input for a real total.
+of items *admitted* so far, growing as the run progresses: a percentage
+over it is meaningless. Pass a sized input for a real total.
 
 ---
 

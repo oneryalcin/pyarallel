@@ -161,9 +161,10 @@ async def async_parallel_map[T, R](
         task_timeout: Per-task timeout in seconds (each individual task).
         on_progress: ``callback(completed, total)`` after each task.
             When ``items`` has no known length, ``total`` is the number
-            of items seen so far rather than the final input size — a
-            progress bar over a generator reads 100% on every tick;
-            pass a sized input for a real total.
+            of items *admitted* so far (one window ahead of
+            completions) — it grows as the run progresses, so a
+            percentage over it is meaningless; pass a sized input for a
+            real total.
         batch_size: The admission window — the maximum number of tasks
             created but not yet resolved (default ``2 × concurrency``).
             It is a memory/lookahead bound, not a chunk size: there are
@@ -255,6 +256,9 @@ async def _async_collected_map(
     failures = 0
     aborted = False
     timed_out = False
+    # asyncio.timeout() enforces the deadline at await points only; this
+    # mirror of it lets the synchronous cached-admission loop bind too.
+    deadline = (time.monotonic() + timeout) if timeout is not None else None
 
     store = (
         _open_checkpoint(checkpoint, fn, checkpoint_key)
@@ -275,8 +279,14 @@ async def _async_collected_map(
             on_progress(completed, _progress_total(total, results))
 
     def _submit_next() -> bool:
-        nonlocal completed
+        nonlocal completed, timed_out
         while True:
+            # Cached checkpoint hits consume real time (lookup + key_fn)
+            # without ever reaching an await, so asyncio.timeout() cannot
+            # preempt them — the deadline must bind here too.
+            if deadline is not None and time.monotonic() >= deadline:
+                timed_out = True
+                return False
             try:
                 item = next(source)
             except StopIteration:
@@ -323,7 +333,7 @@ async def _async_collected_map(
             # which are cancelled on abort before they can call the API.
             while not aborted and len(in_flight) < window and _submit_next():
                 pass
-            if not in_flight:
+            if timed_out or not in_flight:
                 break
             done, _pending = await asyncio.wait(
                 in_flight, return_when=asyncio.FIRST_COMPLETED
@@ -334,18 +344,24 @@ async def _async_collected_map(
                 break
 
     try:
-        try:
-            if timeout is not None and timeout <= 0:
-                # Already expired: admit no work (asyncio.timeout alone
-                # cancels only at the first suspension point).
-                timed_out = True
-            elif timeout is not None:
-                async with asyncio.timeout(timeout):
-                    await _drive()
-            else:
-                await _drive()
-        except TimeoutError:
+        if timeout is not None and timeout <= 0:
+            # Already expired: admit no work (asyncio.timeout alone
+            # cancels only at the first suspension point).
             timed_out = True
+        elif timeout is not None:
+            scope = asyncio.timeout(timeout)
+            try:
+                async with scope:
+                    await _drive()
+            except TimeoutError:
+                # Only our own deadline is a timeout-stop. A TimeoutError
+                # raised by the source iterator itself is an input error
+                # and must propagate, not be repackaged as expiry.
+                if not scope.expired():
+                    raise
+                timed_out = True
+        else:
+            await _drive()
 
         if timed_out:
             assert timeout is not None
@@ -380,7 +396,11 @@ async def _async_collected_map(
         if store is not None:
             store.close()
 
-    return ParallelResult(results, timed_out=timed_out, aborted=aborted)
+    # First stop reason wins: a failure salvaged after the deadline must
+    # not also report the run as aborted — the flags are exclusive.
+    return ParallelResult(
+        results, timed_out=timed_out, aborted=aborted and not timed_out
+    )
 
 
 async def async_parallel_starmap[R](
