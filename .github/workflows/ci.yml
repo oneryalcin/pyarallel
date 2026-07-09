@@ -25,6 +25,12 @@ jobs:
           uv run ruff format --check pyarallel tests
       - name: Type check (strict, package + typing assertions)
         run: uv run mypy pyarallel tests/typing_assertions.py
+      # Second checker, one matrix entry: the unary .map() item typing is
+      # a both-checkers contract (v0.8 plan A1). Deliberately unpinned —
+      # a new pyright breaking inference is exactly what this catches.
+      - name: Type check (pyright, typing assertions)
+        if: matrix.python-version == '3.12'
+        run: uvx pyright tests/typing_assertions.py
       - name: Tests
         run: uv run pytest -q
       - name: Docs (strict)
@@ -57,3 +63,54 @@ jobs:
         run: uv run --no-sync python -c "import sys; assert not sys._is_gil_enabled(), 'GIL is enabled on a free-threaded job'"
       - name: Tests
         run: uv run --no-sync pytest -q
+
+  # The process executor's fork/spawn split and checkpoint file handling
+  # are documented as platform-dependent but were Ubuntu-only-tested
+  # (v0.8 plan item 8). One Python each, focused subset — Ubuntu keeps
+  # the full matrix above.
+  os-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Install (project + test group)
+        run: uv sync --no-default-groups --group test
+      - name: Smoke tests (engine, process executor, checkpoint, results)
+        run: uv run --no-sync pytest -q tests/test_parallel_map.py tests/test_parity.py tests/test_checkpoint.py tests/test_result.py tests/test_run_status.py tests/test_starmap.py
+
+  # The artifact users install is not the repo checkout: build wheel +
+  # sdist, clean-install the wheel into a bare venv, import it, run a
+  # real call, and type-check against the *installed* package (py.typed
+  # must ship for mypy to see any types at all).
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Build wheel + sdist
+        run: uv build
+      - name: Clean-install wheel and smoke it
+        run: |
+          uv venv /tmp/smoke --python 3.12
+          uv pip install --python /tmp/smoke/bin/python dist/*.whl
+          /tmp/smoke/bin/python -c "
+          import pyarallel
+          from pyarallel import parallel_map, RunStatus
+          r = parallel_map(lambda x: x * 2, [1, 2, 3])
+          assert r.values() == [2, 4, 6], r
+          assert r.status is RunStatus.COMPLETED
+          print('installed', pyarallel.__version__, 'OK')
+          "
+      - name: py.typed ships and types resolve from the installed package
+        run: |
+          test -f "$(/tmp/smoke/bin/python -c 'import pyarallel, os; print(os.path.dirname(pyarallel.__file__))')/py.typed"
+          printf 'from pyarallel import parallel_map\nfrom typing import assert_type\nfrom pyarallel import ParallelResult\ndef f(x: int) -> str: return str(x)\nassert_type(parallel_map(f, [1]), ParallelResult[str])\n' > /tmp/probe.py
+          uvx --with dist/*.whl mypy --strict /tmp/probe.py

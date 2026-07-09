@@ -1,0 +1,46 @@
+# Release to PyPI via trusted publishing (OIDC) — no API tokens, no
+# laptop uploads. Triggered by pushing a version tag; the tag must match
+# the package version, and the artifacts get PEP 740 attestations.
+#
+# One-time PyPI setup (project maintainer): pypi.org → pyarallel →
+# Publishing → add GitHub publisher: owner=oneryalcin, repo=pyarallel,
+# workflow=release.yml, environment=pypi.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Tag matches package version
+        run: |
+          PKG=$(uv run --no-project --with . python -c "import pyarallel; print(pyarallel.__version__)")
+          TAG="${GITHUB_REF_NAME#v}"
+          test "$PKG" = "$TAG" || { echo "tag v$TAG != package $PKG"; exit 1; }
+      - name: Build
+        run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write   # OIDC for trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        # attestations are on by default with trusted publishing
