@@ -67,11 +67,18 @@ if results.timed_out:
             print(f"Item {idx} timed out")
 ```
 
-`results.timed_out` is the reliable expiry signal. For sized inputs
-every unfinished slot is also marked with a `TimeoutError` failure; an
-unsized input (a generator) instead returns a **shorter** result
-covering only the items actually pulled — the source is never drained
-after a stop, so a blocking or infinite generator stays untouched.
+`results.timed_out` (i.e. `results.status is RunStatus.TIMED_OUT`) is
+the reliable expiry signal. For sized inputs every unfinished slot is
+also marked with a `TimeoutError` failure; an unsized input (a
+generator) instead returns a **shorter** result covering only the items
+actually pulled — the source is never drained after a stop, so a
+blocking or infinite generator stays untouched.
+
+A timed-out run is never `ok` (v0.8) — even when every *returned* item
+succeeded, the run is a truncation, and `.values()`/iteration/indexing
+raise `TimeoutError` rather than passing a partial list off as the
+whole. Consume partial results deliberately with `.successes()` or
+`.ok_values()`.
 
 ### Per-Task Timeout (async)
 
@@ -350,7 +357,10 @@ failed_items = [items[idx] for idx, _ in result.failures()]
 retry_result = parallel_map(process, failed_items, workers=2)
 ```
 
-When you iterate or call `.values()`, failures raise an `ExceptionGroup`:
+When you iterate or call `.values()`, failures raise an `ExceptionGroup`
+— and each sub-exception carries its item index as a PEP 678 note, so
+provenance survives without changing exception types (`except*
+ConnectionError` still matches):
 
 ```python
 try:
@@ -358,5 +368,11 @@ try:
 except ExceptionGroup as eg:
     print(f"{len(eg.exceptions)} tasks failed")
     for exc in eg.exceptions:
-        print(f"  {type(exc).__name__}: {exc}")
+        print(f"  {type(exc).__name__}: {exc}")   # notes show "item index N"
 ```
+
+A *truncated* run (`timeout=` hit, or `max_errors` abort) raises from
+those same accessors even when every returned item succeeded — a
+partial list must never read as the whole. `result.status` says how the
+run ended; `.successes()` / `.ok_values()` are the deliberate
+partial-result paths.

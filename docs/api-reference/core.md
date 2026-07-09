@@ -16,7 +16,7 @@ results = parallel_map(
     rate_limit=None,                 # RateLimit spec, shared Limiter, or ops/second
     timeout=None,                    # Total timeout in seconds
     on_progress=None,                # callback(completed, total)
-    window_size=None,                 # Lazy batch consumption for unsized iterables
+    window_size=None,                # Admission window: max unresolved items
     retry=None,                      # Retry(attempts=3, backoff=1.0)
     checkpoint=None,                 # Path to a resume file (SQLite)
     checkpoint_key=None,             # Stable per-item identity for resume
@@ -42,7 +42,7 @@ results = parallel_map(
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback `(completed, total)`. For unsized iterables, `total` is items seen so far |
 | `window_size` | `int \| None` | `None` | Admission window: max items submitted but unresolved (default `2 × workers`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
-| `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun. **Contains pickle: treat the file like code** — never resume from a file you didn't create ([details](../user-guide/advanced-features.md#checkpoint--resume)) |
+| `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun. **Contains pickle: treat the file like code** — never resume from a file you didn't create ([details](../user-guide/advanced-features.md#checkpoint-resume)) |
 | `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires `checkpoint=` |
 | `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Unrun items are marked `Aborted` |
 | `sequential` | `bool` | `False` | Run every item inline in the calling thread — no pool, real stack traces, working breakpoints. `workers` is ignored |
@@ -447,29 +447,37 @@ for item in parallel_iter(process, items, workers=4):
 
 ## `ParallelResult`
 
-Container for parallel execution results. Behaves like a `list` when all tasks succeed. Provides structured access when some fail.
+Container for parallel execution results. Behaves like a `list` when the
+run completed and all tasks succeeded. Provides structured access
+otherwise.
 
-`timed_out`/`aborted` report how the run *ended* — the reliable signal
-when per-item markers can't carry it: an unsized input that hits
-`timeout=` returns only the items actually pulled (possibly all
-successes), and the flag is what distinguishes that truncation from a
-completed run.
+`.status` (a `RunStatus`: `COMPLETED` / `TIMED_OUT` / `ABORTED`) reports
+how the run *ended* — the reliable signal when per-item markers can't
+carry it: an unsized input that hits `timeout=` returns only the items
+actually pulled (possibly all successes), and the status is what
+distinguishes that truncation from a completed run. Since v0.8, **a
+truncated run is never `ok`** and its "whole result" accessors —
+`.values()`, iteration, indexing — raise (`TimeoutError` / `Aborted`)
+instead of quietly returning a partial list. Use `.successes()` /
+`.ok_values()` to consume partial results deliberately.
 
 ### Properties and Methods
 
 | Member | Returns | Description |
 |---|---|---|
-| `.ok` | `bool` | `True` if every task succeeded |
-| `.timed_out` | `bool` | `True` when the run stopped on the total `timeout=` deadline |
-| `.aborted` | `bool` | `True` when the run stopped early via `max_errors` |
-| `.values()` | `list[R]` | All results in order. Raises `ExceptionGroup` on failure |
+| `.ok` | `bool` | `True` when the run **completed** and every task succeeded |
+| `.status` | `RunStatus` | How the run ended: `COMPLETED`, `TIMED_OUT`, or `ABORTED` |
+| `.complete` | `bool` | Source exhausted, every item resolved — independent of failures: a run can be complete and not ok |
+| `.timed_out` | `bool` | Derived: `status is RunStatus.TIMED_OUT` |
+| `.aborted` | `bool` | Derived: `status is RunStatus.ABORTED` |
+| `.values()` | `list[R]` | All results in order. Raises `ExceptionGroup` on failure, `TimeoutError`/`Aborted` on truncation |
 | `.ok_values()` | `list[R]` | Values of successful tasks only, in input order. Never raises |
 | `.successes()` | `list[tuple[int, R]]` | `(index, value)` for each success |
 | `.failures()` | `list[tuple[int, Exception]]` | `(index, exception)` for each failure |
-| `.raise_on_failure()` | `None` | Raises `ExceptionGroup` if any task failed |
-| `len(result)` | `int` | Total number of tasks |
-| `result[i]` | `R` | Index into values (raises on failure) |
-| `list(result)` | `list[R]` | Iterate values (raises on failure) |
+| `.raise_on_failure()` | `None` | Raises `ExceptionGroup` if any task failed; each sub-exception carries its item index as a PEP 678 note (`except*` matching untouched) |
+| `len(result)` | `int` | Number of tasks with a result entry |
+| `result[i]` | `R` | Index into values (raises on failure/truncation) |
+| `list(result)` | `list[R]` | Iterate values (raises on failure/truncation) |
 | `bool(result)` | `bool` | `True` if any tasks were submitted |
 
 ### Example

@@ -18,7 +18,7 @@ results = await async_parallel_map(
     timeout=None,                    # Total wall-clock timeout (mirror of sync)
     task_timeout=None,               # Per-task timeout in seconds
     on_progress=None,                # callback(completed, total)
-    window_size=None,                 # Lazy batch consumption for unsized iterables
+    window_size=None,                # Admission window: max unresolved items
     retry=None,                      # Retry(attempts=3, backoff=1.0)
     checkpoint=None,                 # Path to a resume file (SQLite)
     checkpoint_key=None,             # Stable per-item identity for resume
