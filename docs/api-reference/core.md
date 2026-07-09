@@ -470,7 +470,7 @@ instead of quietly returning a partial list. Use `.successes()` /
 | `.complete` | `bool` | Source exhausted, every item resolved — independent of failures: a run can be complete and not ok |
 | `.timed_out` | `bool` | Derived: `status is RunStatus.TIMED_OUT` |
 | `.aborted` | `bool` | Derived: `status is RunStatus.ABORTED` |
-| `.values()` | `list[R]` | All results in order. Raises `ExceptionGroup` on failure, `TimeoutError`/`Aborted` on truncation |
+| `.values()` | `list[R]` | All results in order. Raises `TimeoutError`/`Aborted` on truncation (checked first), `ExceptionGroup` on failure |
 | `.ok_values()` | `list[R]` | Values of successful tasks only, in input order. Never raises |
 | `.successes()` | `list[tuple[int, R]]` | `(index, value)` for each success |
 | `.failures()` | `list[tuple[int, Exception]]` | `(index, exception)` for each failure |

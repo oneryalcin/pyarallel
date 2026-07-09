@@ -99,7 +99,7 @@ pip install pyarallel
 - **Process executor** — CPU-bound work: `executor="process"`, with `worker_init=` and `max_tasks_per_worker=`
 - **Interpreter executor** (Python 3.14+) — `executor="interpreter"`: true CPU parallelism for pure-Python work without process overhead (PEP 734)
 - **Contextvars propagation** — correlation IDs survive into thread workers
-- **Decorator API** — `@parallel` / `@async_parallel` with `.map()`, `.starmap()`, `.stream()` — typed options via `Unpack[TypedDict]`, and single-arg functions bind their item type (`fetch.map([1])` is a type error when `fetch` takes `str` — in mypy *and* pyright)
+- **Decorator API** — `@parallel` / `@async_parallel` with `.map()`, `.starmap()`, `.stream()` — typed options via `Unpack[TypedDict]`, and single-arg named functions bind their item type (`fetch.map([1])` is a type error when `fetch` takes `str` — in mypy *and* pyright)
 
 ## Quick Start
 

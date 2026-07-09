@@ -12,6 +12,7 @@ v0.6 engine unification deleted.)
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 from typing import Any
 
@@ -60,6 +61,19 @@ def _validate_max_errors(max_errors: int | None) -> None:
     """Shared max_errors validation for sync and async entry points."""
     if max_errors is not None and max_errors < 1:
         raise ValueError(f"max_errors must be >= 1, got {max_errors}")
+
+
+def _validate_timeout(value: float | None, name: str) -> None:
+    """Reject NaN/inf/negative deadlines for sync and async entry points.
+
+    NaN is the silent killer: every deadline comparison is False, so
+    ``timeout=float("nan")`` disables the safety net while the run
+    reports COMPLETED. ``inf`` is a redundant spelling of None and
+    negative is nonsense — same finite/nonnegative rule as the policy
+    objects (v0.8).
+    """
+    if value is not None and (not math.isfinite(value) or value < 0):
+        raise ValueError(f"{name} must be >= 0 and finite (or None), got {value}")
 
 
 def _total_if_known(items: Iterable[Any]) -> int | None:

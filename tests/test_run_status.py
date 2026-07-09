@@ -154,3 +154,82 @@ class TestTruncatedAccessRaisesClearly:
         with pytest.raises(TimeoutError):
             r[0]  # ...but positional access must not pretend completeness
         assert r.ok_values() == [0]  # the explicit partial accessor works
+
+
+class TestTimeoutNumericValidation:
+    """v0.8 review: timeout=float("nan") silently disabled the deadline
+    (NaN compares False against every monotonic check) while the run
+    reported COMPLETED — the safety net gone with no signal."""
+
+    def test_nan_timeout_rejected_sync(self):
+        with pytest.raises(ValueError):
+            parallel_map(_double, [1], timeout=float("nan"))
+
+    def test_inf_timeout_rejected_sync(self):
+        with pytest.raises(ValueError):
+            parallel_map(_double, [1], timeout=float("inf"))
+
+    def test_negative_timeout_rejected_sync(self):
+        with pytest.raises(ValueError):
+            parallel_map(_double, [1], timeout=-1.0)
+
+    async def test_nan_timeout_rejected_async(self):
+        async def afn(x):
+            return x
+
+        with pytest.raises(ValueError):
+            await async_parallel_map(afn, [1], timeout=float("nan"))
+
+    async def test_nan_task_timeout_rejected_async(self):
+        async def afn(x):
+            return x
+
+        with pytest.raises(ValueError):
+            await async_parallel_map(afn, [1], task_timeout=float("nan"))
+
+    async def test_explicit_concurrency_none_rejected_async(self):
+        """v0.8 review: after the presence-sentinel change an explicit
+        concurrency=None reached `concurrency < 1` and crashed with a
+        bare TypeError; must be a clear ValueError (and a type error)."""
+
+        async def afn(x):
+            return x
+
+        with pytest.raises(ValueError):
+            await async_parallel_map(afn, [1], concurrency=None)  # type: ignore[arg-type]
+
+
+class TestTruncationRaisesBeforeFailures:
+    """v0.8 review (Codex): sized truncations carry placeholder failure
+    markers, so failures-first ordering raised ExceptionGroup for sized
+    inputs but TimeoutError for unsized ones — two exception surfaces
+    for the same event. Truncation is checked first, uniformly."""
+
+    def test_sized_timeout_raises_timeout_error_not_group(self):
+        import time
+
+        def slow(x):
+            time.sleep(5)
+            return x
+
+        r = parallel_map(slow, [1, 2], workers=2, timeout=0.1)
+        assert r.status is RunStatus.TIMED_OUT
+        assert r.failures()  # sized: placeholder markers exist...
+        with pytest.raises(TimeoutError):
+            r.values()  # ...but the raise is the truncation, not the group
+
+    def test_aborted_run_raises_aborted(self):
+        """The Aborted branch is live (was dead code under the old
+        ordering — aborted runs always carry failures)."""
+        from pyarallel import Aborted
+
+        r = parallel_map(_fail_even, list(range(100)), workers=1, max_errors=2)
+        assert r.status is RunStatus.ABORTED
+        with pytest.raises(Aborted):
+            r.values()
+
+    def test_completed_with_failures_still_raises_group(self):
+        r = parallel_map(_fail_even, [1, 2, 3, 4])
+        assert r.complete
+        with pytest.raises(ExceptionGroup):
+            r.values()

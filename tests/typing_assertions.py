@@ -107,6 +107,26 @@ def check_unary_item_typing() -> None:
     assert_type(concat.starmap([(1, "x")]), ParallelResult[bytes])
 
 
+def check_known_typing_limitations() -> None:
+    """Documented narrowings (v0.8 plan A1) — pinned so a checker
+    upgrade changing them is noticed, not silently shipped.
+
+    - Unannotated lambdas through the factory spelling confuse both
+      checkers: mypy collapses the wrapper to Any (no checking at all);
+      pyright leaves T unsolved and false-positives on the lambda body.
+      Use a def; the suppression below keeps the pyright CI step green.
+    - functools.partial: pyright binds the remaining parameter
+      (Unary[int, int]); mypy collapses the item type to Any — a
+      mypy-specific hole, so no negative assertion is possible here.
+    """
+    _lam = parallel()(lambda x: x * 2)  # pyright: ignore[reportOperatorIssue]
+
+    import functools
+
+    _padd = parallel()(functools.partial(add, 5))
+    _padd.map([1])  # OK in both; mypy would also accept wrong types (Any)
+
+
 @async_parallel(concurrency=8)
 async def fetch_many(url: str) -> bytes:
     return b""
@@ -122,9 +142,11 @@ async def check_async_decorator() -> None:
 
 
 def check_decorator_option_keys() -> None:
-    """Phase 7 contract: the Unpack[TypedDict] surfaces accept every
-    engine option, keep `| None` (explicit None = inherit), and reject
-    unknown keys at type-check time."""
+    """The Unpack[TypedDict] surfaces accept every engine option and
+    reject unknown keys at type-check time. v0.8: presence is the
+    inherit/override sentinel — an explicitly passed None *overrides*;
+    options with no valid None value (executor, concurrency) don't
+    admit None in their types."""
     limiter = Limiter(RateLimit(10))
 
     assert_type(

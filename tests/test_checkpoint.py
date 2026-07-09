@@ -673,3 +673,37 @@ class TestFilePermissions:
         ckpt.chmod(0o644)  # user made it shared on purpose
         parallel_map(_ckpt_double, [1, 2], checkpoint=str(ckpt))
         assert stat.S_IMODE(ckpt.stat().st_mode) == 0o644
+
+
+class TestSymlinkRejection:
+    """v0.8 adversarial review: O_EXCL reports a dangling symlink as
+    "existing" (EEXIST per POSIX), which the original suppress treated
+    as reuse — SQLite then followed the link and created the target
+    with default permissions. A planted symlink means attacker-chosen
+    pickle on resume; it must fail closed."""
+
+    def test_dangling_symlink_fails_closed(self, tmp_path):
+        import os
+        import sys
+
+        if sys.platform == "win32":
+            pytest.skip("symlink semantics")
+        link = tmp_path / "run.ckpt"
+        target = tmp_path / "elsewhere.db"
+        os.symlink(target, link)
+        with pytest.raises(CheckpointError):
+            parallel_map(_ckpt_double, [1], checkpoint=str(link))
+        assert not target.exists()  # nothing created through the link
+
+    def test_symlink_to_existing_file_fails_closed(self, tmp_path):
+        import os
+        import sys
+
+        if sys.platform == "win32":
+            pytest.skip("symlink semantics")
+        real = tmp_path / "real.ckpt"
+        parallel_map(_ckpt_double, [1], checkpoint=str(real))
+        link = tmp_path / "link.ckpt"
+        os.symlink(real, link)
+        with pytest.raises(CheckpointError):
+            parallel_map(_ckpt_double, [1], checkpoint=str(link))

@@ -26,6 +26,7 @@ from ._run import (
     _timeout_failure,
     _total_if_known,
     _validate_max_errors,
+    _validate_timeout,
 )
 from .checkpoint import _open_checkpoint
 from .limiter import Limiter, _as_limiter
@@ -47,7 +48,7 @@ class AsyncMapOptions(TypedDict, total=False):
     ``.map()`` surface. An unpassed key inherits the decorator
     default; an explicitly passed key — even ``None`` — overrides."""
 
-    concurrency: int | None
+    concurrency: int
     rate_limit: Limiter | RateLimit | float | None
     timeout: float | None
     task_timeout: float | None
@@ -62,7 +63,7 @@ class AsyncMapOptions(TypedDict, total=False):
 class AsyncStarmapOptions(TypedDict, total=False):
     """Per-call options of ``async_parallel_starmap`` (no checkpoint)."""
 
-    concurrency: int | None
+    concurrency: int
     rate_limit: Limiter | RateLimit | float | None
     timeout: float | None
     task_timeout: float | None
@@ -74,7 +75,7 @@ class AsyncStarmapOptions(TypedDict, total=False):
 class AsyncStreamOptions(TypedDict, total=False):
     """Per-call options of ``async_parallel_iter`` — ``.stream()``."""
 
-    concurrency: int | None
+    concurrency: int
     rate_limit: Limiter | RateLimit | float | None
     task_timeout: float | None
     window_size: int | None
@@ -208,8 +209,10 @@ async def async_parallel_map[T, R](
     """
     if window_size is not None and window_size < 1:
         raise ValueError(f"window_size must be >= 1, got {window_size}")
-    if concurrency < 1:
+    if not isinstance(concurrency, int) or concurrency < 1:
         raise ValueError(f"concurrency must be >= 1, got {concurrency}")
+    _validate_timeout(timeout, "timeout")
+    _validate_timeout(task_timeout, "task_timeout")
     _validate_max_errors(max_errors)
     if checkpoint_key is not None and checkpoint is None:
         raise ValueError("checkpoint_key requires checkpoint= to be set")
@@ -509,8 +512,9 @@ async def async_parallel_iter[T, R](
     """
     if window_size is not None and window_size < 1:
         raise ValueError(f"window_size must be >= 1, got {window_size}")
-    if concurrency < 1:
+    if not isinstance(concurrency, int) or concurrency < 1:
         raise ValueError(f"concurrency must be >= 1, got {concurrency}")
+    _validate_timeout(task_timeout, "task_timeout")
     _validate_max_errors(max_errors)
 
     window = window_size if window_size is not None else 2 * concurrency

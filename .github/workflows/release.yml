@@ -24,6 +24,12 @@ jobs:
           PKG=$(uv run --no-project --with . python -c "import pyarallel; print(pyarallel.__version__)")
           TAG="${GITHUB_REF_NAME#v}"
           test "$PKG" = "$TAG" || { echo "tag v$TAG != package $PKG"; exit 1; }
+      # A tag on a red commit must not ship (v0.8 review): the tests gate
+      # the publish even though CI also runs them on push.
+      - name: Tests
+        run: |
+          uv sync --no-default-groups --group test
+          uv run --no-sync pytest -q
       - name: Build
         run: uv build
       - uses: actions/upload-artifact@v4

@@ -206,7 +206,15 @@ class ParallelResult[R]:
         return self._status is RunStatus.ABORTED
 
     def _raise_if_truncated(self) -> None:
-        """Truncated runs have no 'all results' to hand out."""
+        """Truncated runs have no 'all results' to hand out.
+
+        Checked BEFORE per-item failures (v0.8 review): sized truncations
+        carry placeholder failure markers, and failures-first would raise
+        an ``ExceptionGroup`` for those while unsized truncations raised
+        ``TimeoutError`` — two surfaces for the same event. Truncation is
+        the louder fact; the exception message routes to the partial
+        accessors, and ``.failures()`` still has the per-item detail.
+        """
         if self._status is RunStatus.TIMED_OUT:
             raise TimeoutError(
                 f"run timed out after {len(self._entries)} items — the "
@@ -223,11 +231,12 @@ class ParallelResult[R]:
     def values(self) -> list[R]:
         """All results in input order.
 
-        Raises if any task failed or the run was truncated — a partial
-        list must never read as the whole.
+        Raises if the run was truncated (``TimeoutError`` / ``Aborted``)
+        or any task failed (``ExceptionGroup``) — a partial list must
+        never read as the whole. Truncation is checked first.
         """
-        self.raise_on_failure()
         self._raise_if_truncated()
+        self.raise_on_failure()
         return list(self._entries)
 
     def successes(self) -> list[tuple[int, R]]:
@@ -253,7 +262,11 @@ class ParallelResult[R]:
 
         Each sub-exception carries its item index as a PEP 678 note —
         provenance without changing exception types, so
-        ``except* ConnectionError`` matching is untouched.
+        ``except* ConnectionError`` matching is untouched. Notes mutate
+        the stored exception objects: repeated calls don't duplicate a
+        note, but the same exception *instance* raised for items in two
+        different runs accumulates a note per run — raise fresh
+        exceptions per item if that matters.
         """
         fails = self.failures()
         if fails:
@@ -277,8 +290,8 @@ class ParallelResult[R]:
     @overload
     def __getitem__(self, index: slice) -> list[R]: ...
     def __getitem__(self, index: int | slice) -> R | list[R]:
-        self.raise_on_failure()
         self._raise_if_truncated()
+        self.raise_on_failure()
         return self._entries[index]
 
     def __len__(self) -> int:

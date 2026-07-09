@@ -45,6 +45,7 @@ from ._run import (
     _timeout_failure,
     _total_if_known,
     _validate_max_errors,
+    _validate_timeout,
 )
 from .checkpoint import _open_checkpoint
 from .limiter import Limiter, _as_limiter
@@ -163,9 +164,13 @@ def _execute_outcome(
 
 
 def _validate_common(
-    workers: int | None, executor: str, window_size: int | None
+    workers: int | None,
+    executor: str,
+    window_size: int | None,
+    timeout: float | None = None,
 ) -> None:
     """Shared argument validation for the sync entry points."""
+    _validate_timeout(timeout, "timeout")
     if window_size is not None and window_size < 1:
         raise ValueError(f"window_size must be >= 1, got {window_size}")
     if workers is not None and workers < 1:
@@ -501,7 +506,7 @@ def parallel_map[T, R](
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
     """
-    _validate_common(workers, executor, window_size)
+    _validate_common(workers, executor, window_size, timeout)
     _validate_max_errors(max_errors)
     if not sequential:
         # Debug mode ignores the pool entirely — a process-configured call

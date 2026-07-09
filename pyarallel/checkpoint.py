@@ -33,13 +33,13 @@ and are safely recomputed.
 from __future__ import annotations
 
 import base64
-import contextlib
 import functools
 import hashlib
 import inspect
 import os
 import pickle
 import sqlite3
+import stat
 import types
 from collections.abc import Callable
 from pathlib import Path
@@ -52,19 +52,35 @@ def _create_secure(path: str | Path) -> None:
     A checkpoint contains pickle — anyone who can write it can execute
     code in the resuming process, and anyone who can read it sees the
     results. Creating restrictively (not chmod-after-open) closes the
-    creation-time exposure window; ``O_EXCL`` also refuses to follow a
-    symlink planted at the path. An *existing* file is left exactly as
-    found — its permissions may be intentional. On Windows the mode is
-    advisory; rely on directory ACLs there.
+    creation-time exposure window. An *existing* regular file is left
+    exactly as found — its permissions may be intentional. On Windows
+    the mode is advisory; rely on directory ACLs there.
+
+    A symlink at the path — dangling or not — fails closed: ``O_EXCL``
+    reports it as "existing" (EEXIST even for a dangling link, per
+    POSIX), and following it would hand SQLite an attacker-chosen
+    target, so it is rejected rather than reused. (v0.8 review: the
+    original O_NOFOLLOW-only version silently followed dangling links.)
 
     This does not defend against a checkpoint directory writable by
     others (documented: keep checkpoints out of /tmp-like locations) —
     SQLite's -wal/-shm sidecars inherit the database file's permissions.
     """
     flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
-    # An existing file is reused as-is; its permissions are never touched.
-    with contextlib.suppress(FileExistsError):
+    try:
         os.close(os.open(path, flags, 0o600))
+    except FileExistsError:
+        # Existing path: reuse only a regular file (permissions never
+        # touched). A symlink or other special file is not a checkpoint.
+        st = os.lstat(path)
+        if not stat.S_ISREG(st.st_mode):
+            raise CheckpointError(
+                f"Checkpoint path {str(path)!r} is not a regular file "
+                "(symlink or special file). Refusing to open it — a "
+                "checkpoint contains pickle, and following a planted "
+                "link would load attacker-chosen code. Remove the link "
+                "or choose a different path."
+            ) from None
 
 
 class CheckpointError(RuntimeError):

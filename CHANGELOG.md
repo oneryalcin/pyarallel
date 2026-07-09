@@ -24,14 +24,39 @@ review trail: `docs/development/plans/v0.8-honest-contract.md`.
 - Decorator per-call **`None` now overrides** the decorator default
   instead of silently inheriting: `fetch.map(urls, rate_limit=None)`
   turns the decorator's rate limit off. Unpassed options inherit as
-  before. `executor=None` (previously a no-op spelling of "inherit") is
-  now a type error.
+  before. `executor=None` / `concurrency=None` (previously no-op
+  spellings of "inherit") are now type errors with clear runtime
+  `ValueError`s.
+
+  ⚠️ **Audit call sites that pass computed `None`s.** The common idiom
+
+  ```python
+  rl = user_limit or None            # "no override" ... in 0.7
+  fetch.map(urls, rate_limit=rl)     # 0.8: DISABLES rate limiting
+  ```
+
+  inherited the decorator's rate limit in 0.7 and **silently disables
+  it** in 0.8 — full-speed calls against a throttled API, discovered
+  via 429s in production, not test failures. Same for `retry=None`
+  (retries off). To mean "inherit", don't pass the keyword:
+
+  ```python
+  opts = {} if user_limit is None else {"rate_limit": user_limit}
+  fetch.map(urls, **opts)
+  ```
 - `ItemResult(error=None)` — previously constructed a fake success — now
   raises `ValueError`; an explicitly passed `error` must be an
   `Exception` instance.
 - `RateLimit` / `Retry` reject NaN, infinite, and negative numerics at
   construction (`RateLimit(float("nan"))` was silently accepted and
-  poisoned the bucket math).
+  poisoned the bucket math). Same rule on the engines: `timeout=` /
+  `task_timeout=` must be finite and >= 0 (`timeout=float("nan")`
+  silently disabled the deadline).
+- `.values()`/iteration/indexing check truncation **before** per-item
+  failures: a timed-out sized run raises `TimeoutError` (not an
+  `ExceptionGroup` of placeholder markers), an aborted run raises
+  `Aborted` — one exception surface per event, regardless of input
+  sizing. `.failures()` keeps the per-item detail.
 
 **New:**
 
