@@ -46,10 +46,10 @@ print("Example 2: Per-call overrides")
 print("=" * 50)
 
 start = time.time()
-results = process_item.map(range(8), workers=2, batch_size=4)
+results = process_item.map(range(8), workers=2, window_size=4)
 duration = time.time() - start
 
-print(f"Results with workers=2 and batch_size=4: {list(results)}")
+print(f"Results with workers=2 and window_size=4: {list(results)}")
 print(f"Elapsed: {duration:.2f} seconds")
 print()
 
@@ -99,6 +99,6 @@ print()
 print("Summary")
 print("=" * 50)
 print("1. Put reusable defaults on the decorator.")
-print("2. Override workers, batch_size, and timeout on each .map(...) call.")
+print("2. Override workers, window_size, and timeout on each .map(...) call.")
 print("3. Use Retry(...) for transient failures.")
 print("4. Use RateLimit(...) to control request rate.")

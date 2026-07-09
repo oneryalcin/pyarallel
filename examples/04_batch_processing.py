@@ -3,7 +3,7 @@
 Batch Processing
 ================
 
-This example demonstrates memory control with batch_size on .map(...).
+This example demonstrates memory control with window_size on .map(...).
 
 Run with: python examples/04_batch_processing.py
 """
@@ -52,14 +52,14 @@ def process_file(file_id):
     return {"file_id": file_id, "lines_processed": len(processed_lines)}
 
 
-def benchmark_batch_size(batch_size, total_items=80):
+def benchmark_window_size(window_size, total_items=80):
     @parallel(workers=4)
     def process_item(item_id):
         time.sleep(0.005)
         return item_id * 2
 
     start = time.time()
-    results = process_item.map(range(total_items), batch_size=batch_size)
+    results = process_item.map(range(total_items), window_size=window_size)
     assert len(results) == total_items
     return time.time() - start
 
@@ -69,7 +69,7 @@ def main():
     print("=" * 50)
 
     start = time.time()
-    results = process_record.map(range(40), batch_size=10)
+    results = process_record.map(range(40), window_size=10)
     duration = time.time() - start
 
     print(f"Processed {len(results)} records in {duration:.2f} seconds")
@@ -79,16 +79,16 @@ def main():
     print("Example 2: Batch size comparison")
     print("=" * 50)
 
-    for batch_size in [1, 5, 10, 20, 40]:
-        duration = benchmark_batch_size(batch_size)
-        print(f"Batch size {batch_size:2d}: {duration:.2f} seconds")
+    for window_size in [1, 5, 10, 20, 40]:
+        duration = benchmark_window_size(window_size)
+        print(f"Batch size {window_size:2d}: {duration:.2f} seconds")
     print()
 
     print("Example 3: Large dataset processing")
     print("=" * 50)
 
     start = time.time()
-    chunk_results = process_large_chunk.map(range(20), batch_size=5)
+    chunk_results = process_large_chunk.map(range(20), window_size=5)
     duration = time.time() - start
     total_size = sum(r["size_kb"] for r in chunk_results)
 
@@ -101,7 +101,7 @@ def main():
     print("=" * 50)
 
     start = time.time()
-    users = fetch_and_enrich_user.map(range(100), batch_size=20)
+    users = fetch_and_enrich_user.map(range(100), window_size=20)
     duration = time.time() - start
 
     print(f"Fetched and enriched {len(users)} users")
@@ -113,7 +113,7 @@ def main():
     print("=" * 50)
 
     start = time.time()
-    file_results = process_file.map(range(40), batch_size=10)
+    file_results = process_file.map(range(40), window_size=10)
     duration = time.time() - start
     total_lines = sum(r["lines_processed"] for r in file_results)
 
@@ -124,7 +124,7 @@ def main():
 
     print("Summary")
     print("=" * 50)
-    print("1. Pass batch_size to .map(...) to limit in-flight work.")
+    print("1. Pass window_size to .map(...) to limit in-flight work.")
     print("2. Smaller batches reduce peak memory.")
     print("3. Larger batches can improve throughput for tiny tasks.")
     print("4. Batching works with both thread and process executors.")

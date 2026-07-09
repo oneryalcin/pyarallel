@@ -236,13 +236,13 @@ failure is yielded, with no placeholder items for unseen input.
 ## The Admission Window
 
 Every API — collected and streaming — admits work through a bounded
-window: at most `batch_size` items (default `2 × workers`) are
+window: at most `window_size` items (default `2 × workers`) are
 submitted but unresolved at any moment. Input is consumed lazily, one
 window ahead, so generators are never materialized:
 
 ```python
 # At most 500 items in flight instead of the default 2 x workers
-results = parallel_map(process, huge_list, workers=8, batch_size=500)
+results = parallel_map(process, huge_list, workers=8, window_size=500)
 ```
 
 There are no chunks and no barriers — a slow item never stalls the
@@ -296,7 +296,7 @@ for item in process.stream(huge_list):
 ```
 
 The engine keeps a bounded window of items in flight (default
-`2 × workers`; set `batch_size` to change it). Input is consumed lazily —
+`2 × workers`; set `window_size` to change it). Input is consumed lazily —
 generators are never materialized — and a slow item delays only itself:
 there are no batch barriers. Breaking out of the loop stops submission
 and cancels not-yet-started tasks; tasks already running in a worker

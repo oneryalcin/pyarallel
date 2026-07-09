@@ -112,7 +112,7 @@ print("Example 5: Batching plus rate limiting")
 print("=" * 50)
 
 start = time.time()
-results = fetch_large_dataset.map(range(20), batch_size=5)
+results = fetch_large_dataset.map(range(20), window_size=5)
 duration = time.time() - start
 
 print(f"Fetched {len(results)} pages in {duration:.2f} seconds")
@@ -125,4 +125,4 @@ print("=" * 50)
 print("1. Use a numeric rate limit for requests/second.")
 print("2. Use RateLimit(count, 'minute' | 'hour') for longer windows.")
 print("3. Put reusable defaults on the decorator.")
-print("4. Pass batch_size on .map(...) when you need memory control.")
+print("4. Pass window_size on .map(...) when you need memory control.")

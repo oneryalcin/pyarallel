@@ -39,7 +39,7 @@ decisively better than hand-rolling for API fan-out?*
 - `sequential=True` — debug mode: run inline, no pool, real stack traces
 - Contextvars propagate into thread workers (correlation IDs survive)
 - `worker_init=` / `max_tasks_per_worker=` — worker lifecycle control
-- `batch_size` — the in-flight admission window, one meaning across every API (v0.6)
+- `window_size` — the in-flight admission window, one meaning across every API (v0.6)
 - Progress callbacks via `on_progress` (collected and streaming)
 - Timeout support (`timeout` total on sync *and* async, `task_timeout` async per-task)
 - Instance method support via descriptor protocol
@@ -176,7 +176,7 @@ near-pass-through implementation, guarded by version check.
 The plain collected path batched with a barrier while the `max_errors`
 path admitted through a window (documented coupling, flagged in the
 v0.5 design review). Now unified: every non-sequential path runs
-through one windowed engine, `batch_size` means one thing everywhere
+through one windowed engine, `window_size` means one thing everywhere
 (the in-flight admission window), input is always lazy, the source is
 never drained after a stop, and `ParallelResult.timed_out`/`.aborted`
 report how a run ended. Contract and review history:
@@ -230,7 +230,7 @@ library, not a distributed computing framework.
 - **Smart scheduling** (priority queues, deadlines, DAGs) — use Celery,
   Airflow, or Prefect.
 - **Dead letter queues** — message queue concept, not a parallelization concern.
-- **Resource monitoring** (memory, CPU, disk, network) — OS-level. `batch_size`
+- **Resource monitoring** (memory, CPU, disk, network) — OS-level. `window_size`
   is the right abstraction for memory control.
 - **Resource-aware scheduling** — adaptive worker counts based on system load
   is autoscaling, a different problem domain. Set `workers` explicitly.

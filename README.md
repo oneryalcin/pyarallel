@@ -165,7 +165,7 @@ def fetch(url):
 
 fetch("http://example.com")          # normal call — returns dict
 fetch.map(urls)                      # parallel — returns ParallelResult
-fetch.stream(urls, batch_size=500)   # streaming — yields ItemResult
+fetch.stream(urls, window_size=500)   # streaming — yields ItemResult
 
 @async_parallel(concurrency=10)
 async def fetch_async(url):
@@ -185,7 +185,7 @@ from pyarallel import parallel_iter
 def transform(row):
     return {"id": row["id"], "name": row["name"].strip().title()}
 
-for item in parallel_iter(transform, ten_million_rows, batch_size=1000):
+for item in parallel_iter(transform, ten_million_rows, window_size=1000):
     if item.ok:
         db.save(item.value)
     else:
