@@ -597,12 +597,42 @@ results = parallel_map(
 )
 ```
 
-### Server-Driven Backoff
+### `Retry.for_http()` — the prewired HTTP policy
+
+The 429/`Retry-After` dance is one call (v0.9):
+
+```python
+results = parallel_map(
+    call_api, ids,
+    rate_limit=limiter,   # a shared Limiter
+    retry=Retry.for_http(on=(httpx.HTTPStatusError,)),
+)
+```
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `on` | `tuple[type[Exception], ...]` | required | Exception types to consider |
+| `statuses` | `set[int]` | `{429, 503}` | Retry only these HTTP statuses. Members of `on` carrying no status (connection errors) are always retried |
+| `response` | `Callable[[Exception], Any] \| None` | `None` | How to find the response. Default duck-types: `exc.response` when present (httpx, requests), else the exception itself (aiohttp) |
+| `attempts` / `backoff` / `max_delay` / `jitter` / `max_server_wait` | — | as `Retry` | Passed through |
+
+What it handles that hand-rolls routinely get wrong:
+
+- **Both `Retry-After` dialects** — numeric seconds *and* HTTP-date
+  (`Retry-After: Fri, 10 Jul 2026 08:00:00 GMT`). Homemade parsers hit
+  the date form and either crash or retry instantly — a stampede.
+- **Malformed values fall back** to exponential backoff, never raise.
+- **No HTTP client import** — pure duck typing; works with httpx,
+  requests, and aiohttp exception shapes out of the box.
+- Returns a plain frozen `Retry`, so everything composes — including
+  the shared-limiter pause below, and process-executor pickling.
+
+### Server-Driven Backoff (under the hood)
 
 Real APIs speak 429 + `Retry-After`. `retry_if` decides retryability from the
 exception *instance*, and `wait_from` extracts the server-mandated wait — it
 replaces the backoff delay with no jitter and no `max_delay` cap, because the
-server knows better than we do:
+server knows better than we do. `Retry.for_http()` is exactly this, prewired:
 
 ```python
 def parse_retry_after(exc):

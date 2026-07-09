@@ -1,6 +1,7 @@
 """Tests for Retry — per-item retry with exponential backoff, jitter, and filtering."""
 
 import time
+from datetime import UTC
 
 import pytest
 
@@ -691,3 +692,154 @@ class TestRetryNumericValidation:
     def test_zero_backoff_allowed(self):
         """Immediate retry is a legitimate strategy (tests, local calls)."""
         assert Retry(backoff=0.0).backoff == 0.0
+
+
+class _FakeResponse:
+    def __init__(self, status_code, headers=None):
+        self.status_code = status_code
+        self.headers = headers or {}
+
+
+class _FakeHTTPError(Exception):
+    """httpx/requests shape: exception carries .response."""
+
+    def __init__(self, status_code, headers=None):
+        super().__init__(f"HTTP {status_code}")
+        self.response = _FakeResponse(status_code, headers)
+
+
+class _FakeAiohttpError(Exception):
+    """aiohttp shape: status/headers live on the exception itself."""
+
+    def __init__(self, status, headers=None):
+        super().__init__(f"HTTP {status}")
+        self.status = status
+        self.headers = headers or {}
+
+
+class TestForHttp:
+    """Retry.for_http() — the 429/Retry-After dance every cookbook recipe
+    hand-rolled (and hand-rolled wrong: date-form Retry-After crashed or
+    stampeded most homemade parsers). Zero HTTP-client imports: duck-typed
+    against httpx/requests (.response.status_code) and aiohttp (.status
+    on the exception) shapes."""
+
+    def test_retries_matching_status(self):
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        assert r._should_retry(_FakeHTTPError(429)) is True
+        assert r._should_retry(_FakeHTTPError(503)) is True
+
+    def test_does_not_retry_other_status(self):
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        assert r._should_retry(_FakeHTTPError(404)) is False
+        assert r._should_retry(_FakeHTTPError(401)) is False
+
+    def test_custom_statuses(self):
+        r = Retry.for_http(on=(_FakeHTTPError,), statuses={502, 504})
+        assert r._should_retry(_FakeHTTPError(502)) is True
+        assert r._should_retry(_FakeHTTPError(429)) is False
+
+    def test_type_filter_still_applies(self):
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        assert r._should_retry(ValueError("nope")) is False
+
+    def test_statusless_exception_in_on_is_retried(self):
+        """ConnectionError-style members of on= carry no response —
+        the type filter is the whole decision for them."""
+        r = Retry.for_http(on=(_FakeHTTPError, ConnectionError))
+        assert r._should_retry(ConnectionError("reset")) is True
+
+    def test_numeric_retry_after(self):
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        exc = _FakeHTTPError(429, {"Retry-After": "30"})
+        assert r._server_wait(exc) == 30.0
+
+    def test_date_form_retry_after(self):
+        from datetime import datetime, timedelta
+        from email.utils import format_datetime
+
+        future = datetime.now(UTC) + timedelta(seconds=120)
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        exc = _FakeHTTPError(429, {"Retry-After": format_datetime(future, usegmt=True)})
+        wait = r._server_wait(exc)
+        assert wait is not None
+        assert 100 < wait <= 121  # ~120s, minus parse latency
+
+    def test_past_date_clamps_to_zero(self):
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        exc = _FakeHTTPError(429, {"Retry-After": "Fri, 10 Jul 2020 08:00:00 GMT"})
+        assert r._server_wait(exc) == 0.0
+
+    def test_malformed_retry_after_falls_back_to_backoff(self):
+        """Garbage in the header must mean 'use exponential backoff'
+        (None), never a crash or an instant-retry stampede."""
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        exc = _FakeHTTPError(429, {"Retry-After": "soonish"})
+        assert r._server_wait(exc) is None
+
+    def test_missing_header_falls_back(self):
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        assert r._server_wait(_FakeHTTPError(429)) is None
+
+    def test_aiohttp_shape(self):
+        """No .response attribute: the exception itself is the response."""
+        r = Retry.for_http(on=(_FakeAiohttpError,))
+        assert r._should_retry(_FakeAiohttpError(429)) is True
+        assert r._should_retry(_FakeAiohttpError(404)) is False
+        exc = _FakeAiohttpError(429, {"Retry-After": "15"})
+        assert r._server_wait(exc) == 15.0
+
+    def test_plain_dict_headers_case_insensitive(self):
+        """aiohttp-style plain dicts are case-SENSITIVE — both spellings
+        must be tried (verified: dict.get('retry-after') misses
+        'Retry-After')."""
+        r = Retry.for_http(on=(_FakeAiohttpError,))
+        exc = _FakeAiohttpError(429, {"retry-after": "15"})
+        assert r._server_wait(exc) == 15.0
+
+    def test_explicit_response_extractor(self):
+        r = Retry.for_http(on=(_FakeHTTPError,), response=lambda exc: exc.response)
+        assert r._should_retry(_FakeHTTPError(429)) is True
+
+    def test_server_wait_still_clamped(self):
+        """max_server_wait still applies — a hostile date-form header a
+        year out must not pin a worker."""
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        exc = _FakeHTTPError(429, {"Retry-After": "Fri, 09 Jul 2027 08:00:00 GMT"})
+        assert r._server_wait(exc) == 600.0  # default max_server_wait
+
+    def test_is_a_plain_retry(self):
+        """for_http returns a normal frozen Retry — everything composes
+        (attempts, backoff, limiter pause) with zero new machinery."""
+        r = Retry.for_http(on=(_FakeHTTPError,), attempts=5, backoff=2.0)
+        assert isinstance(r, Retry)
+        assert r.attempts == 5
+        assert r.backoff == 2.0
+
+    def test_pickles_for_process_executor(self):
+        """Default predicate/extractor must survive pickling — retry
+        rides into process workers (existing constraint, tested for
+        plain Retry in TestProcessExecutorRetryPickling)."""
+        import pickle
+
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        r2 = pickle.loads(pickle.dumps(r))
+        assert r2._should_retry(_FakeHTTPError(429)) is True
+        assert r2._server_wait(_FakeHTTPError(429, {"Retry-After": "9"})) == 9.0
+
+
+class TestForHttpEndToEnd:
+    def test_end_to_end_retries_429_then_succeeds(self):
+        calls = {"n": 0}
+
+        def flaky(x):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise _FakeHTTPError(429, {"Retry-After": "0"})
+            return x
+
+        r = parallel_map(
+            flaky, [1], retry=Retry.for_http(on=(_FakeHTTPError,), backoff=0.0)
+        )
+        assert r.ok
+        assert calls["n"] == 2

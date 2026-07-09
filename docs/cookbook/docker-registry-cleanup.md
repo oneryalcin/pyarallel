@@ -42,23 +42,16 @@ def delete_manifest(tag):
     r.raise_for_status()
     return tag.name
 
-def is_throttled(exc):
-    return isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 429
-
-def retry_after(exc):
-    value = exc.response.headers.get("retry-after")
-    return float(value) if value else None
-
 stale_tags = find_stale_tags(REPO)   # thousands
 
 result = parallel_map(
     delete_manifest, stale_tags,
     workers=4,
     rate_limit=RateLimit(100, "minute"),   # stay UNDER the limit, don't discover it via 429
-    retry=Retry(
+    retry=Retry.for_http(                  # only 429s retried; Retry-After honored
         attempts=3,
-        retry_if=is_throttled,
-        wait_from=retry_after,             # honor the registry's Retry-After
+        on=(httpx.HTTPStatusError,),
+        statuses={429},
     ),
     checkpoint="cleanup.ckpt",             # crash partway? the rerun resumes
     checkpoint_key=lambda t: t.digest,     # idempotent by digest — never re-delete

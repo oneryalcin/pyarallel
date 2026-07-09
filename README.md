@@ -87,7 +87,7 @@ pip install pyarallel
 - **Rate limiting** — token bucket with burst, per-second/minute/hour: `rate_limit=RateLimit(100, "minute", burst=20)`
 - **Shared quota** — one `Limiter` instance across calls and functions when the budget belongs to an API key: `rate_limit=Limiter(RateLimit(100, "minute"))`
 - **Retry with backoff** — per-item, exponential, jitter, exception filtering: `retry=Retry(attempts=3, on=(ConnectionError,))`
-- **Server-driven backoff** — honor 429 + `Retry-After`: `retry=Retry(retry_if=..., wait_from=...)`; the wait also pauses the shared limiter so one throttled task slows the whole pool
+- **Server-driven backoff** — `retry=Retry.for_http(on=(httpx.HTTPStatusError,))`: 429/503 + `Retry-After` (numeric *and* HTTP-date form) prewired, no client import; the wait also pauses the shared limiter so one throttled task slows the whole pool. Custom policies via `retry_if=`/`wait_from=`
 - **Checkpoint/resume** — `checkpoint="run.ckpt"`: a crash at item 40,000 resumes instead of restarting from zero; `checkpoint_key=lambda u: u.id` keys rows by identity so evolving inputs keep completed work
 - **Early abort** — `max_errors=10`: a dead API costs tens of calls, not thousands; unrun items are marked `Aborted`, partial results returned
 - **One windowed engine** — every API (collected and streaming, sync and async) admits work through a bounded in-flight window: lazy input, generators never materialized, no batch barriers, a straggler never stalls the items behind it
@@ -225,6 +225,7 @@ Async mirrors: `async_parallel_map`, `async_parallel_starmap`, `async_parallel_i
 | `RateLimit(count, per, burst)` | `RateLimit(100, "minute", burst=20)` |
 | `Limiter(rate_limit)` | shared budget: `Limiter(RateLimit(100, "minute"))` |
 | `Retry(attempts, backoff, on, retry_if, wait_from)` | `Retry(attempts=3, on=(ConnectionError,))` |
+| `Retry.for_http(on, statuses)` | HTTP prewired: `Retry.for_http(on=(httpx.HTTPStatusError,))` |
 | `checkpoint=` | resumable runs: `checkpoint="run.ckpt"` |
 
 Works with instance methods and static methods via `@parallel` decorator — see [full docs](https://oneryalcin.github.io/pyarallel/).

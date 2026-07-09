@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- New: **`Retry.for_http()`** — the 429/`Retry-After` dance, prewired
+  and dependency-free. Handles both header dialects (numeric seconds
+  *and* HTTP-date — homemade parsers routinely crash or stampede on the
+  date form), falls back to exponential backoff on malformed values,
+  and duck-types the response (httpx/requests `.response`, aiohttp's
+  exception-is-the-response) with no HTTP client import. `statuses=`
+  defaults to `{429, 503}`; statusless exceptions in `on=` (connection
+  errors) are retried on the type filter alone. Returns a plain frozen
+  `Retry`, so the shared-limiter pause and process-executor pickling
+  compose unchanged. Cookbook recipes (LLM batch, embeddings, Docker
+  registry) now use it; the GitHub recipe documents why its
+  header-aware 403 logic can't (status alone can't distinguish
+  throttling from no-permission).
+
 ## 0.8.0 — 2026-07-10 — the honest-contract release
 
 One deliberate contract-breaking release before 1.0: everywhere the
