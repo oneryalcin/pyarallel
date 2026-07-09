@@ -643,3 +643,33 @@ class TestCorruptedRow:
 
         with pytest.raises(CheckpointError):
             parallel_map(_ckpt_double, [1, 2, 3], checkpoint=str(ckpt))
+
+
+class TestFilePermissions:
+    """v0.8 review: a checkpoint is pickle — anyone who can write it
+    executes code in the resuming process. New files must be created
+    0o600 at creation time (no chmod-after-open exposure window);
+    existing files keep whatever permissions the user set."""
+
+    def test_new_checkpoint_is_owner_only(self, tmp_path):
+        import stat
+        import sys
+
+        if sys.platform == "win32":
+            pytest.skip("POSIX permission bits")
+        ckpt = tmp_path / "run.ckpt"
+        parallel_map(_ckpt_double, [1], checkpoint=str(ckpt))
+        mode = stat.S_IMODE(ckpt.stat().st_mode)
+        assert mode == 0o600
+
+    def test_existing_file_permissions_untouched(self, tmp_path):
+        import stat
+        import sys
+
+        if sys.platform == "win32":
+            pytest.skip("POSIX permission bits")
+        ckpt = tmp_path / "run.ckpt"
+        parallel_map(_ckpt_double, [1], checkpoint=str(ckpt))
+        ckpt.chmod(0o644)  # user made it shared on purpose
+        parallel_map(_ckpt_double, [1, 2], checkpoint=str(ckpt))
+        assert stat.S_IMODE(ckpt.stat().st_mode) == 0o644

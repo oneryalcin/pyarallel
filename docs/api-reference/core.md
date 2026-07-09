@@ -42,7 +42,7 @@ results = parallel_map(
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback `(completed, total)`. For unsized iterables, `total` is items seen so far |
 | `window_size` | `int \| None` | `None` | Admission window: max items submitted but unresolved (default `2 × workers`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
-| `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
+| `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun. **Contains pickle: treat the file like code** — never resume from a file you didn't create ([details](../user-guide/advanced-features.md#checkpoint--resume)) |
 | `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires `checkpoint=` |
 | `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Unrun items are marked `Aborted` |
 | `sequential` | `bool` | `False` | Run every item inline in the calling thread — no pool, real stack traces, working breakpoints. `workers` is ignored |

@@ -197,6 +197,18 @@ Safety guards, stated honestly:
 - Checkpoint files from pyarallel < 0.5 fail closed — delete and rerun.
 - Items and results must be picklable; a result that cannot be
   checkpointed aborts the run with `CheckpointError`.
+- A corrupted row raises `CheckpointError` with delete-to-start-fresh
+  instructions, never a raw unpickling error.
+
+!!! danger "Checkpoint files are code, not data"
+    Rows are stored as **pickle** — resuming from a checkpoint executes
+    whatever its pickle streams contain. Anyone who can *write* the file
+    can run code in your process on the next resume. Never resume from a
+    file you didn't create; never accept one from an untrusted source
+    (a bug report, a shared bucket). Pyarallel creates new checkpoint
+    files owner-only (`0o600`, POSIX) and leaves existing files'
+    permissions alone — but a directory writable by others (`/tmp`-like
+    locations) is not a safe home for one regardless.
 
 Available on `parallel_map`, `async_parallel_map`, and `.map()`.
 
