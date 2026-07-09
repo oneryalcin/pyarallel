@@ -341,3 +341,18 @@ class TestFailureProvenance:
         except* ConnectionError:
             matched = True
         assert matched
+
+
+class TestProvenanceNoteIdempotence:
+    """v0.8 review follow-up: raise_on_failure() mutates the stored
+    exceptions (PEP 678 notes) — calling it twice must not append the
+    same index note twice."""
+
+    def test_repeated_calls_do_not_duplicate_notes(self):
+        r = ParallelResult([10, _Failure(ValueError("bad"))])
+        for _ in range(3):
+            with pytest.raises(ExceptionGroup):
+                r.raise_on_failure()
+        (idx, exc) = r.failures()[0]
+        notes = [n for n in exc.__notes__ if "item index" in n]
+        assert len(notes) == 1

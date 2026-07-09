@@ -72,6 +72,11 @@ def triple(x: int) -> str:
     return str(x * 3)
 
 
+@parallel
+def concat(a: int, b: str) -> bytes:
+    return b""
+
+
 def check_decorator() -> None:
     assert_type(double(5), int)  # normal call keeps its signature
     assert_type(double.map([1, 2]), ParallelResult[int])
@@ -82,6 +87,26 @@ def check_decorator() -> None:
     double("nope")  # type: ignore[arg-type]  # wrong call arg is still an error
 
 
+def check_unary_item_typing() -> None:
+    """v0.8: single-parameter functions bind the item type on .map()
+    and .stream() — in the bare AND factory decorator spellings.
+    Multi-parameter functions fall back to Iterable[Any] (a precise
+    .starmap() is not expressible from a ParamSpec — prototyped in the
+    v0.8 plan; *Ts inside a ParamSpec list is invalid in both checkers)."""
+    # positive: correct item types accepted, R flows through
+    assert_type(double.map([1, 2]), ParallelResult[int])  # bare
+    assert_type(triple.map([1]), ParallelResult[str])  # factory
+    assert_type(next(iter(triple.stream([1]))), ItemResult[str])
+
+    # negative: wrong item types rejected
+    double.map(["wrong"])  # type: ignore[list-item]  # str is not int
+    triple.map(["wrong"])  # type: ignore[list-item]
+    triple.stream(["wrong"])  # type: ignore[list-item]
+
+    # multi-parameter: loose fallback — accepted, and starmap works
+    assert_type(concat.starmap([(1, "x")]), ParallelResult[bytes])
+
+
 @async_parallel(concurrency=8)
 async def fetch_many(url: str) -> bytes:
     return b""
@@ -90,6 +115,10 @@ async def fetch_many(url: str) -> bytes:
 async def check_async_decorator() -> None:
     assert_type(await fetch_many("u"), bytes)
     assert_type(await fetch_many.map(["u"]), ParallelResult[bytes])
+
+    # v0.8 unary item typing, async side
+    await fetch_many.map([1])  # type: ignore[list-item]  # int is not str
+    fetch_many.stream([1])  # type: ignore[list-item]
 
 
 def check_decorator_option_keys() -> None:

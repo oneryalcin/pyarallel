@@ -116,3 +116,41 @@ class TestStatusUnrepresentable:
 
     def test_default_status_is_completed(self):
         assert ParallelResult([1]).status is RunStatus.COMPLETED
+
+
+class TestTruncatedAccessRaisesClearly:
+    """v0.8 review follow-up: on a truncated all-success run, every
+    'whole result' accessor — values(), iteration, indexing — must raise
+    a clear run-incomplete error, not return quietly and not raise a
+    misleading (empty) ExceptionGroup."""
+
+    def _truncated(self):
+        r = parallel_map(_double, (i for i in range(10)), timeout=0)
+        assert r.status is RunStatus.TIMED_OUT
+        assert not r.failures()  # all-success truncation — the sharp case
+        return r
+
+    def test_values_raises_timeout_not_exception_group(self):
+        with pytest.raises(TimeoutError) as excinfo:
+            self._truncated().values()
+        assert "not exhausted" in str(excinfo.value)
+        assert not isinstance(excinfo.value, ExceptionGroup)
+
+    def test_iteration_raises(self):
+        with pytest.raises(TimeoutError):
+            list(self._truncated())
+
+    def test_indexing_raises(self):
+        r = parallel_map(
+            _double,
+            (i for i in range(10)),
+            workers=1,
+            window_size=1,
+            timeout=0.3,
+            on_progress=lambda d, t: time.sleep(0.4),
+        )
+        assert r.status is RunStatus.TIMED_OUT
+        assert len(r) == 1  # one real success is in there...
+        with pytest.raises(TimeoutError):
+            r[0]  # ...but positional access must not pretend completeness
+        assert r.ok_values() == [0]  # the explicit partial accessor works
