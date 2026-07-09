@@ -70,7 +70,7 @@ Why each policy is there:
   run stops admitting work once the 20th post-retry failure lands — at
   most one admission window (default `2 × workers`) is still in flight —
   and returns partial results; the morning rerun resumes from the
-  checkpoint. Shrink `batch_size` to tighten that bound on expensive
+  checkpoint. Shrink `window_size` to tighten that bound on expensive
   calls, at some throughput cost.
 
 The recipe is client-agnostic: swap the `openai` call for

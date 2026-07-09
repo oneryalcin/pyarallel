@@ -85,7 +85,7 @@ flight and writes each record as it arrives:
 from pyarallel import parallel_iter
 
 for item in parallel_iter(fetch_genbank, gene_ids, rate_limit=ncbi,
-                          batch_size=100):
+                          window_size=100):
     if item.ok:
         write_fasta(item.value)
     else:
@@ -96,7 +96,7 @@ Note: `checkpoint=` is a `parallel_map` feature — the streaming engine
 doesn't take it (you're writing each record to disk as it arrives, so
 resume is your sink's job: skip IDs whose FASTA already exists). For a
 resumable *and* memory-bounded run, `parallel_map` with `checkpoint=`
-over a `batch_size` window is usually the better fit.
+over a `window_size` window is usually the better fit.
 
 The same shape works for any hard-rate-limited scientific API where the
 budget is per-key and jobs run long: UniProt, Ensembl, PubChem,

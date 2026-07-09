@@ -6,13 +6,24 @@ the wrappers are generic over the function's parameters and return type, so
 ``fetch.map(urls)`` is a ``ParallelResult`` of what ``fetch`` returns.
 Participates in the descriptor protocol so decorated instance methods work.
 
+Input typing (v0.8): single-parameter functions — the ``.map()`` case —
+get a specialized wrapper whose ``.map()``/``.stream()`` bind the item
+type: ``fetch.map([1])`` type-checks, ``fetch.map(["wrong"])`` doesn't,
+in both mypy and pyright. Multi-parameter functions fall back to
+``Iterable[Any]``: a precise ``.starmap()`` needs the parameter list as
+a tuple type, which neither checker can express from a ParamSpec
+(prototyped and rejected — ``*Ts`` is invalid inside a ParamSpec list).
+The runtime object is always the specialized class; only the static
+types differ.
+
 Per-call options are typed once per engine (``SyncMapOptions`` etc.,
 declared next to the engine functions) and threaded through with
 ``Unpack`` — the engine's explicit signature stays the source of truth,
 and a signature change no longer touches five hand-copied keyword lists.
-An explicit ``None`` for any option means "inherit the decorator
-default" (``_merge_opts`` skips ``None``); an explicit ``None`` cannot
-*override* a non-None decorator default — known, documented limitation.
+Keyword *presence* is the inherit/override sentinel (v0.8): an unpassed
+option inherits the decorator default; an explicitly passed option —
+even ``None`` — overrides it, so ``fetch.map(urls, rate_limit=None)``
+genuinely turns the decorator's rate limit off.
 """
 
 from __future__ import annotations
@@ -44,9 +55,14 @@ from .result import ItemResult, ParallelResult
 
 
 def _merge_opts(defaults: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
-    """Merge decorator defaults with per-call overrides (skip None values)."""
+    """Merge decorator defaults with per-call overrides.
+
+    Presence is the sentinel: *overrides* holds only the keywords the
+    caller actually passed (``**opts``), so an unpassed option inherits
+    and an explicit ``None`` overrides — no None-skipping.
+    """
     opts = dict(defaults)
-    opts.update({k: v for k, v in overrides.items() if v is not None})
+    opts.update(overrides)
     return opts
 
 
@@ -157,16 +173,55 @@ class _ParallelFunc[**P, R]:
         )
 
 
+class _UnaryParallelFunc[T, R](_ParallelFunc[[T], R]):
+    """``_ParallelFunc`` for single-parameter functions: the item type
+    binds, so ``.map()``/``.stream()`` check their inputs. No runtime
+    behaviour of its own — the decorator always constructs this class;
+    multi-parameter functions are simply *typed* as the base class.
+    """
+
+    def map(
+        self, items: Iterable[T], **opts: Unpack[SyncMapOptions]
+    ) -> ParallelResult[R]:
+        """Run this function over *items* in parallel."""
+        return _ParallelFunc.map(self, items, **opts)
+
+    def stream(
+        self, items: Iterable[T], **opts: Unpack[SyncStreamOptions]
+    ) -> Iterator[ItemResult[R]]:
+        """Yield ``ItemResult`` as tasks finish — constant memory."""
+        return _ParallelFunc.stream(self, items, **opts)
+
+
+class _ParallelDecorator:
+    """Returned by ``@parallel(...)`` — the overloaded ``__call__`` keeps
+    the unary item-type specialization in the factory spelling too."""
+
+    __slots__ = ("_kw",)
+
+    def __init__(self, kw: dict[str, Any]) -> None:
+        self._kw = kw
+
+    @overload
+    def __call__[T, R](self, fn: Callable[[T], R]) -> _UnaryParallelFunc[T, R]: ...
+    @overload
+    def __call__[**P, R](self, fn: Callable[P, R]) -> _ParallelFunc[P, R]: ...
+    def __call__(self, fn: Callable[..., Any]) -> Any:
+        return _UnaryParallelFunc(fn, **self._kw)
+
+
+@overload
+def parallel[T, R](fn: Callable[[T], R]) -> _UnaryParallelFunc[T, R]: ...
 @overload
 def parallel[**P, R](fn: Callable[P, R]) -> _ParallelFunc[P, R]: ...
 @overload
-def parallel[**P, R](
+def parallel(
     fn: None = None,
     *,
     workers: int | None = None,
     executor: ExecutorType = "thread",
     rate_limit: Limiter | RateLimit | float | None = None,
-) -> Callable[[Callable[P, R]], _ParallelFunc[P, R]]: ...
+) -> _ParallelDecorator: ...
 def parallel(
     fn: Callable[..., Any] | None = None,
     *,
@@ -179,6 +234,10 @@ def parallel(
     The decorated function **keeps its original behaviour**.
     Single calls return ``T``, not ``list[T]``.
     Call ``.map(items)`` for parallel execution.
+
+    Single-parameter functions get item-typed ``.map()``/``.stream()``
+    (``double.map(["x"])`` is a type error below); multi-parameter
+    functions fall back to ``Iterable[Any]``.
 
     Examples::
 
@@ -196,15 +255,14 @@ def parallel(
         double(5)             # 10
         double.map([1,2,3])   # ParallelResult([2, 4, 6])
     """
-
-    def decorator(fn: Callable[..., Any]) -> _ParallelFunc[..., Any]:
-        return _ParallelFunc(
-            fn, workers=workers, executor=executor, rate_limit=rate_limit
-        )
-
+    kw: dict[str, Any] = {
+        "workers": workers,
+        "executor": executor,
+        "rate_limit": rate_limit,
+    }
     if fn is not None:
-        return decorator(fn)
-    return decorator
+        return _UnaryParallelFunc(fn, **kw)
+    return _ParallelDecorator(kw)
 
 
 # ---------------------------------------------------------------------------
@@ -311,17 +369,57 @@ class _AsyncParallelFunc[**P, R]:
             yield item
 
 
+class _UnaryAsyncParallelFunc[T, R](_AsyncParallelFunc[[T], R]):
+    """``_AsyncParallelFunc`` for single-parameter functions — see
+    ``_UnaryParallelFunc``."""
+
+    async def map(
+        self, items: Iterable[T], **opts: Unpack[AsyncMapOptions]
+    ) -> ParallelResult[R]:
+        return await _AsyncParallelFunc.map(self, items, **opts)
+
+    async def stream(
+        self, items: Iterable[T], **opts: Unpack[AsyncStreamOptions]
+    ) -> AsyncIterator[ItemResult[R]]:
+        async for item in _AsyncParallelFunc.stream(self, items, **opts):
+            yield item
+
+
+class _AsyncParallelDecorator:
+    """Returned by ``@async_parallel(...)`` — see ``_ParallelDecorator``."""
+
+    __slots__ = ("_kw",)
+
+    def __init__(self, kw: dict[str, Any]) -> None:
+        self._kw = kw
+
+    @overload
+    def __call__[T, R](
+        self, fn: Callable[[T], Awaitable[R]]
+    ) -> _UnaryAsyncParallelFunc[T, R]: ...
+    @overload
+    def __call__[**P, R](
+        self, fn: Callable[P, Awaitable[R]]
+    ) -> _AsyncParallelFunc[P, R]: ...
+    def __call__(self, fn: Callable[..., Any]) -> Any:
+        return _UnaryAsyncParallelFunc(fn, **self._kw)
+
+
+@overload
+def async_parallel[T, R](
+    fn: Callable[[T], Awaitable[R]],
+) -> _UnaryAsyncParallelFunc[T, R]: ...
 @overload
 def async_parallel[**P, R](
     fn: Callable[P, Awaitable[R]],
 ) -> _AsyncParallelFunc[P, R]: ...
 @overload
-def async_parallel[**P, R](
+def async_parallel(
     fn: None = None,
     *,
     concurrency: int = 4,
     rate_limit: Limiter | RateLimit | float | None = None,
-) -> Callable[[Callable[P, Awaitable[R]]], _AsyncParallelFunc[P, R]]: ...
+) -> _AsyncParallelDecorator: ...
 def async_parallel(
     fn: Callable[..., Any] | None = None,
     *,
@@ -340,10 +438,7 @@ def async_parallel(
         data   = await fetch("http://example.com")       # normal call
         results = await fetch.map(["u1", "u2", "u3"])     # parallel
     """
-
-    def decorator(fn: Callable[..., Any]) -> _AsyncParallelFunc[..., Any]:
-        return _AsyncParallelFunc(fn, concurrency=concurrency, rate_limit=rate_limit)
-
+    kw: dict[str, Any] = {"concurrency": concurrency, "rate_limit": rate_limit}
     if fn is not None:
-        return decorator(fn)
-    return decorator
+        return _UnaryAsyncParallelFunc(fn, **kw)
+    return _AsyncParallelDecorator(kw)

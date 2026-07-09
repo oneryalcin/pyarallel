@@ -1,4 +1,4 @@
-"""Tests for batch_size — the in-flight admission window (v0.6: one
+"""Tests for window_size — the in-flight admission window (v0.6: one
 engine for all collected maps; there are no chunk barriers)."""
 
 import threading
@@ -10,29 +10,29 @@ from pyarallel import RateLimit, parallel_map
 
 
 class TestBatchBasic:
-    def test_batch_size_produces_correct_results(self):
+    def test_window_size_produces_correct_results(self):
         """Batching doesn't change the output — same results, same order."""
-        result = parallel_map(lambda x: x * 2, range(20), workers=4, batch_size=5)
+        result = parallel_map(lambda x: x * 2, range(20), workers=4, window_size=5)
         assert list(result) == [x * 2 for x in range(20)]
 
-    def test_batch_size_one_is_same_as_no_batch(self):
-        result = parallel_map(lambda x: x + 1, [10, 20, 30], workers=2, batch_size=1)
+    def test_window_size_one_is_same_as_no_batch(self):
+        result = parallel_map(lambda x: x + 1, [10, 20, 30], workers=2, window_size=1)
         assert list(result) == [11, 21, 31]
 
-    def test_batch_size_larger_than_items(self):
-        """batch_size > len(items) should just process everything in one batch."""
-        result = parallel_map(lambda x: x, [1, 2, 3], workers=2, batch_size=100)
+    def test_window_size_larger_than_items(self):
+        """window_size > len(items) should just process everything in one batch."""
+        result = parallel_map(lambda x: x, [1, 2, 3], workers=2, window_size=100)
         assert list(result) == [1, 2, 3]
 
-    def test_batch_size_equal_to_items(self):
-        result = parallel_map(lambda x: x, [1, 2, 3], workers=2, batch_size=3)
+    def test_window_size_equal_to_items(self):
+        result = parallel_map(lambda x: x, [1, 2, 3], workers=2, window_size=3)
         assert list(result) == [1, 2, 3]
 
 
 class TestBatchMemoryControl:
     def test_limits_concurrent_futures(self):
-        """The whole point of batching: only batch_size futures exist at once.
-        With 20 items and batch_size=5, at most 5 futures should be in-flight."""
+        """The whole point of batching: only window_size futures exist at once.
+        With 20 items and window_size=5, at most 5 futures should be in-flight."""
         max_concurrent = 0
         current = 0
         lock = threading.Lock()
@@ -47,8 +47,8 @@ class TestBatchMemoryControl:
                 current -= 1
             return x
 
-        parallel_map(track, range(20), workers=4, batch_size=5)
-        # At most batch_size items should have been submitted at once
+        parallel_map(track, range(20), workers=4, window_size=5)
+        # At most window_size items should have been submitted at once
         assert max_concurrent <= 5
 
     def test_all_items_processed(self):
@@ -61,11 +61,11 @@ class TestBatchMemoryControl:
                 seen.append(x)
             return x
 
-        result = parallel_map(collect, range(17), workers=3, batch_size=4)
+        result = parallel_map(collect, range(17), workers=3, window_size=4)
         assert sorted(seen) == list(range(17))
         assert list(result) == list(range(17))
 
-    def test_batch_size_consumes_generator_lazily(self):
+    def test_window_size_consumes_generator_lazily(self):
         produced = []
         started = threading.Event()
         release = threading.Event()
@@ -90,7 +90,7 @@ class TestBatchMemoryControl:
             return x
 
         def run():
-            holder["result"] = parallel_map(track, items(), workers=2, batch_size=2)
+            holder["result"] = parallel_map(track, items(), workers=2, window_size=2)
 
         t = threading.Thread(target=run)
         t.start()
@@ -111,7 +111,7 @@ class TestBatchErrorHandling:
                 raise ValueError("five")
             return x
 
-        result = parallel_map(fail_on_5, range(20), workers=4, batch_size=5)
+        result = parallel_map(fail_on_5, range(20), workers=4, window_size=5)
         assert not result.ok
         assert len(result.failures()) == 1
         assert len(result.successes()) == 19
@@ -122,7 +122,7 @@ class TestBatchErrorHandling:
                 raise ValueError(f"even: {x}")
             return x
 
-        result = parallel_map(fail_even, range(10), workers=3, batch_size=3)
+        result = parallel_map(fail_even, range(10), workers=3, window_size=3)
         assert len(result.failures()) == 5  # 0, 2, 4, 6, 8
         assert len(result.successes()) == 5  # 1, 3, 5, 7, 9
 
@@ -134,7 +134,7 @@ class TestBatchWithOtherFeatures:
             lambda x: x,
             range(12),
             workers=2,
-            batch_size=4,
+            window_size=4,
             on_progress=lambda d, t: progress.append((d, t)),
         )
         assert len(progress) == 12
@@ -146,7 +146,7 @@ class TestBatchWithOtherFeatures:
             lambda x: x,
             range(6),
             workers=4,
-            batch_size=3,
+            window_size=3,
             rate_limit=RateLimit(10, "second"),
         )
         elapsed = time.monotonic() - start
@@ -158,7 +158,7 @@ class TestBatchWithOtherFeatures:
             return x
 
         result = parallel_map(
-            slow, list(range(10)), workers=2, batch_size=3, timeout=0.1
+            slow, list(range(10)), workers=2, window_size=3, timeout=0.1
         )
         assert len(result) == 10
         assert len(result.failures()) == 10
@@ -171,7 +171,7 @@ class TestUnifiedPlainPath:
 
     def test_plain_map_does_not_materialize_generator(self):
         """Prevents: silent return of upfront list(items) materialization.
-        No batch_size, workers=2 -> default window 4: with all workers
+        No window_size, workers=2 -> default window 4: with all workers
         blocked, the source must not be consumed past the window."""
         produced = []
         started = threading.Event()
@@ -293,7 +293,7 @@ class TestAsyncBatch:
             return x * 2
 
         result = await async_parallel_map(
-            double, range(15), concurrency=3, batch_size=5
+            double, range(15), concurrency=3, window_size=5
         )
         assert list(result) == [x * 2 for x in range(15)]
 
@@ -316,12 +316,12 @@ class TestAsyncBatch:
                 current -= 1
             return x
 
-        await async_parallel_map(track, range(20), concurrency=3, batch_size=5)
-        assert max_concurrent <= 5  # batch_size caps in-flight tasks
+        await async_parallel_map(track, range(20), concurrency=3, window_size=5)
+        assert max_concurrent <= 5  # window_size caps in-flight tasks
 
     async def test_async_plain_map_does_not_materialize_generator(self):
         """Prevents: silent return of upfront materialization on the
-        async plain path (no batch_size, no max_errors) — window must
+        async plain path (no window_size, no max_errors) — window must
         default to 2 x concurrency."""
         import asyncio
 
@@ -397,7 +397,7 @@ class TestAsyncBatch:
 
         def run():
             holder["result"] = asyncio.run(
-                async_parallel_map(track, items(), concurrency=2, batch_size=2)
+                async_parallel_map(track, items(), concurrency=2, window_size=2)
             )
 
         t = threading.Thread(target=run)

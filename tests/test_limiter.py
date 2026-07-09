@@ -211,3 +211,17 @@ class TestWaitTimeout:
     def test_wait_without_budget_still_blocks_and_returns_true(self):
         limiter, _clock = make_limiter(rate=1000, burst=1)
         assert limiter.wait() is True
+
+
+class TestRateLimitNumericValidation:
+    """v0.8 review: RateLimit(float("nan")) passed the `count <= 0` check
+    (nan compares False to everything) and RateLimit(float("inf")) was
+    accepted — both poison the token-bucket math silently."""
+
+    def test_nan_count_rejected(self):
+        with pytest.raises(ValueError):
+            RateLimit(float("nan"))
+
+    def test_inf_count_rejected(self):
+        with pytest.raises(ValueError):
+            RateLimit(float("inf"))

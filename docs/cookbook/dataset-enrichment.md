@@ -55,7 +55,7 @@ result = parallel_map(
     dataset["text"],
     workers=8,
     rate_limit=RateLimit(100, "second"),
-    batch_size=500,
+    window_size=500,
 )
 
 dataset = dataset.add_column("predicted_sentiment", result.values())

@@ -66,11 +66,13 @@ class TestResume:
                 raise ValueError("crash mid-stream")
             return x * 2
 
-        first = parallel_map(work, (i for i in range(8)), batch_size=3, checkpoint=ckpt)
+        first = parallel_map(
+            work, (i for i in range(8)), window_size=3, checkpoint=ckpt
+        )
         assert not first.ok
 
         second = parallel_map(
-            work, (i for i in range(8)), batch_size=3, checkpoint=ckpt
+            work, (i for i in range(8)), window_size=3, checkpoint=ckpt
         )
         assert second.ok
         assert list(second) == [i * 2 for i in range(8)]
@@ -616,3 +618,92 @@ class TestCheckpointTimeoutInterplay:
 
 def _ckpt_double(x):
     return x * 2
+
+
+class TestCorruptedRow:
+    """v0.8 review: put() wraps failures in CheckpointError but the get()
+    path called pickle.loads bare — a corrupted value blob leaked a raw
+    unpickling exception instead of the actionable delete-to-start-fresh
+    error every other unusable-checkpoint case raises."""
+
+    def test_corrupted_value_blob_raises_checkpoint_error(self, tmp_path):
+        import sqlite3
+
+        ckpt = tmp_path / "run.ckpt"
+        first = parallel_map(_ckpt_double, [1, 2, 3], checkpoint=str(ckpt))
+        assert first.ok
+
+        conn = sqlite3.connect(ckpt)
+        conn.execute(
+            "UPDATE results SET value = ? WHERE key = 'i:1'",
+            (b"\x80\x99 not a pickle",),
+        )
+        conn.commit()
+        conn.close()
+
+        with pytest.raises(CheckpointError):
+            parallel_map(_ckpt_double, [1, 2, 3], checkpoint=str(ckpt))
+
+
+class TestFilePermissions:
+    """v0.8 review: a checkpoint is pickle — anyone who can write it
+    executes code in the resuming process. New files must be created
+    0o600 at creation time (no chmod-after-open exposure window);
+    existing files keep whatever permissions the user set."""
+
+    def test_new_checkpoint_is_owner_only(self, tmp_path):
+        import stat
+        import sys
+
+        if sys.platform == "win32":
+            pytest.skip("POSIX permission bits")
+        ckpt = tmp_path / "run.ckpt"
+        parallel_map(_ckpt_double, [1], checkpoint=str(ckpt))
+        mode = stat.S_IMODE(ckpt.stat().st_mode)
+        assert mode == 0o600
+
+    def test_existing_file_permissions_untouched(self, tmp_path):
+        import stat
+        import sys
+
+        if sys.platform == "win32":
+            pytest.skip("POSIX permission bits")
+        ckpt = tmp_path / "run.ckpt"
+        parallel_map(_ckpt_double, [1], checkpoint=str(ckpt))
+        ckpt.chmod(0o644)  # user made it shared on purpose
+        parallel_map(_ckpt_double, [1, 2], checkpoint=str(ckpt))
+        assert stat.S_IMODE(ckpt.stat().st_mode) == 0o644
+
+
+class TestSymlinkRejection:
+    """v0.8 adversarial review: O_EXCL reports a dangling symlink as
+    "existing" (EEXIST per POSIX), which the original suppress treated
+    as reuse — SQLite then followed the link and created the target
+    with default permissions. A planted symlink means attacker-chosen
+    pickle on resume; it must fail closed."""
+
+    def test_dangling_symlink_fails_closed(self, tmp_path):
+        import os
+        import sys
+
+        if sys.platform == "win32":
+            pytest.skip("symlink semantics")
+        link = tmp_path / "run.ckpt"
+        target = tmp_path / "elsewhere.db"
+        os.symlink(target, link)
+        with pytest.raises(CheckpointError):
+            parallel_map(_ckpt_double, [1], checkpoint=str(link))
+        assert not target.exists()  # nothing created through the link
+
+    def test_symlink_to_existing_file_fails_closed(self, tmp_path):
+        import os
+        import sys
+
+        if sys.platform == "win32":
+            pytest.skip("symlink semantics")
+        real = tmp_path / "real.ckpt"
+        parallel_map(_ckpt_double, [1], checkpoint=str(real))
+        link = tmp_path / "link.ckpt"
+        os.symlink(real, link)
+        with pytest.raises(CheckpointError):
+            parallel_map(_ckpt_double, [1], checkpoint=str(link))

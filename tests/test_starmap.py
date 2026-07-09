@@ -110,14 +110,14 @@ class TestStarmapWithOptions:
         )
         assert time.monotonic() - start >= 0.3
 
-    def test_with_batch_size(self):
+    def test_with_window_size(self):
         from pyarallel import parallel_starmap
 
         result = parallel_starmap(
             _add,
             [(i, i) for i in range(20)],
             workers=4,
-            batch_size=5,
+            window_size=5,
         )
         assert list(result) == [i * 2 for i in range(20)]
 

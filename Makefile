@@ -9,7 +9,7 @@ help:
 	@echo "  make lint        Run ruff check + mypy"
 	@echo "  make clean       Remove build artifacts"
 	@echo "  make build       Build package"
-	@echo "  make publish     Publish package to PyPI"
+	@echo "  make publish     (removed) push a v* tag — release.yml publishes via PyPI trusted publishing"
 
 test:
 	uv run pytest tests/ -v
@@ -39,7 +39,10 @@ clean:
 
 build:
 	$(MAKE) clean
-	uv run python -m build
+	uv build
 
-publish: build
-	uv run twine upload dist/*
+# Publishing happens in CI only (release.yml, PyPI trusted publishing +
+# attestations). Tag the release commit and push the tag:
+#   git tag v0.8.0 && git push origin v0.8.0
+publish:
+	@echo "make publish is retired — push a v* tag; release.yml publishes." && exit 1

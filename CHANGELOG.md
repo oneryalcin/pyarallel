@@ -1,6 +1,89 @@
 # Changelog
 
-## Unreleased
+## Unreleased (0.8.0) — the honest-contract release
+
+One deliberate contract-breaking release before 1.0: everywhere the
+public vocabulary lied, it now tells the truth. Full rationale and
+review trail: `docs/development/plans/v0.8-honest-contract.md`.
+
+**Breaking:**
+
+- `batch_size` → **`window_size`** everywhere. It was always the
+  admission window — the maximum number of unresolved items — never a
+  chunk size. Passing `batch_size=` now raises `TypeError`.
+  Migration: rename the keyword.
+- **`result.ok` is now honest**: `True` only when the run *completed*
+  (source exhausted) and every task succeeded. Previously an unsized
+  run that hit `timeout=` could return only successful items and report
+  `ok=True` — a silent truncation. `.values()`, iteration, and indexing
+  now raise (`TimeoutError`/`Aborted`) on truncated runs; use
+  `.successes()` / `.ok_values()` to consume partial results.
+- `ParallelResult` is constructed with `status=RunStatus.…` instead of
+  `timed_out=`/`aborted=` bools (constructor use is rare;
+  `.timed_out`/`.aborted` remain as derived read properties).
+- Decorator per-call **`None` now overrides** the decorator default
+  instead of silently inheriting: `fetch.map(urls, rate_limit=None)`
+  turns the decorator's rate limit off. Unpassed options inherit as
+  before. `executor=None` / `concurrency=None` (previously no-op
+  spellings of "inherit") are now type errors with clear runtime
+  `ValueError`s.
+
+  ⚠️ **Audit call sites that pass computed `None`s.** The common idiom
+
+  ```python
+  rl = user_limit or None            # "no override" ... in 0.7
+  fetch.map(urls, rate_limit=rl)     # 0.8: DISABLES rate limiting
+  ```
+
+  inherited the decorator's rate limit in 0.7 and **silently disables
+  it** in 0.8 — full-speed calls against a throttled API, discovered
+  via 429s in production, not test failures. Same for `retry=None`
+  (retries off). To mean "inherit", don't pass the keyword:
+
+  ```python
+  opts = {} if user_limit is None else {"rate_limit": user_limit}
+  fetch.map(urls, **opts)
+  ```
+- `ItemResult(error=None)` — previously constructed a fake success — now
+  raises `ValueError`; an explicitly passed `error` must be an
+  `Exception` instance.
+- `RateLimit` / `Retry` reject NaN, infinite, and negative numerics at
+  construction (`RateLimit(float("nan"))` was silently accepted and
+  poisoned the bucket math). Same rule on the engines: `timeout=` /
+  `task_timeout=` must be finite and >= 0 (`timeout=float("nan")`
+  silently disabled the deadline).
+- `.values()`/iteration/indexing check truncation **before** per-item
+  failures: a timed-out sized run raises `TimeoutError` (not an
+  `ExceptionGroup` of placeholder markers), an aborted run raises
+  `Aborted` — one exception surface per event, regardless of input
+  sizing. `.failures()` keeps the per-item detail.
+
+**New:**
+
+- `RunStatus` (`COMPLETED` / `TIMED_OUT` / `ABORTED`) exported;
+  `result.status` is the source of truth for how a run ended, and
+  `result.complete` reports source exhaustion independently of item
+  failures.
+- `raise_on_failure()` attaches each failure's item index as a PEP 678
+  note — provenance in tracebacks without changing exception types
+  (`except* ConnectionError` matching untouched).
+- Typed item binding: single-parameter functions get `.map()`/`.stream()`
+  that check their input types in both mypy and pyright, through both
+  decorator spellings. Multi-parameter `.starmap()` stays
+  `tuple[Any, ...]` (a ParamSpec cannot be bound to a tuple type —
+  prototyped, documented in the plan).
+- Checkpoint files are created `0o600` at creation time (POSIX; existing
+  files keep their permissions). Corrupted checkpoint rows raise
+  `CheckpointError` with delete-to-start-fresh instructions instead of
+  leaking raw unpickling errors. Docs now state the trust boundary:
+  checkpoints contain pickle — treat the file like code.
+- CI: wheel/sdist build + clean-install + py.typed gate, macOS/Windows
+  smoke lanes, pyright on the typing assertions. Releases publish via
+  PyPI trusted publishing (OIDC + attestations) on `v*` tags; manual
+  twine uploads retired. Version single-sourced from
+  `pyarallel/__init__.py`.
+
+### Also in this release
 
 - Docs: the single-page real-world guide is now a **Cookbook** — one
   recipe per page (each independently searchable/linkable), with four new

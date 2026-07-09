@@ -81,7 +81,7 @@ def tracked_work(x):
     return x * 2
 
 
-result = parallel_map(tracked_work, range(50), workers=4, batch_size=10)
+result = parallel_map(tracked_work, range(50), workers=4, window_size=10)
 check("batch correctness", list(result) == [x * 2 for x in range(50)])
 check(
     f"batch memory control (peak={peak_concurrent})",
@@ -236,7 +236,7 @@ async def run_async_tests():
 
     # Batch
     result = await async_parallel_map(
-        async_double, range(20), concurrency=3, batch_size=5
+        async_double, range(20), concurrency=3, window_size=5
     )
     check("async batch", list(result) == [x * 2 for x in range(20)])
 

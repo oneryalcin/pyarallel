@@ -67,11 +67,18 @@ if results.timed_out:
             print(f"Item {idx} timed out")
 ```
 
-`results.timed_out` is the reliable expiry signal. For sized inputs
-every unfinished slot is also marked with a `TimeoutError` failure; an
-unsized input (a generator) instead returns a **shorter** result
-covering only the items actually pulled — the source is never drained
-after a stop, so a blocking or infinite generator stays untouched.
+`results.timed_out` (i.e. `results.status is RunStatus.TIMED_OUT`) is
+the reliable expiry signal. For sized inputs every unfinished slot is
+also marked with a `TimeoutError` failure; an unsized input (a
+generator) instead returns a **shorter** result covering only the items
+actually pulled — the source is never drained after a stop, so a
+blocking or infinite generator stays untouched.
+
+A timed-out run is never `ok` (v0.8) — even when every *returned* item
+succeeded, the run is a truncation, and `.values()`/iteration/indexing
+raise `TimeoutError` rather than passing a partial list off as the
+whole. Consume partial results deliberately with `.successes()` or
+`.ok_values()`.
 
 ### Per-Task Timeout (async)
 
@@ -197,6 +204,18 @@ Safety guards, stated honestly:
 - Checkpoint files from pyarallel < 0.5 fail closed — delete and rerun.
 - Items and results must be picklable; a result that cannot be
   checkpointed aborts the run with `CheckpointError`.
+- A corrupted row raises `CheckpointError` with delete-to-start-fresh
+  instructions, never a raw unpickling error.
+
+!!! danger "Checkpoint files are code, not data"
+    Rows are stored as **pickle** — resuming from a checkpoint executes
+    whatever its pickle streams contain. Anyone who can *write* the file
+    can run code in your process on the next resume. Never resume from a
+    file you didn't create; never accept one from an untrusted source
+    (a bug report, a shared bucket). Pyarallel creates new checkpoint
+    files owner-only (`0o600`, POSIX) and leaves existing files'
+    permissions alone — but a directory writable by others (`/tmp`-like
+    locations) is not a safe home for one regardless.
 
 Available on `parallel_map`, `async_parallel_map`, and `.map()`.
 
@@ -236,13 +255,13 @@ failure is yielded, with no placeholder items for unseen input.
 ## The Admission Window
 
 Every API — collected and streaming — admits work through a bounded
-window: at most `batch_size` items (default `2 × workers`) are
+window: at most `window_size` items (default `2 × workers`) are
 submitted but unresolved at any moment. Input is consumed lazily, one
 window ahead, so generators are never materialized:
 
 ```python
 # At most 500 items in flight instead of the default 2 x workers
-results = parallel_map(process, huge_list, workers=8, batch_size=500)
+results = parallel_map(process, huge_list, workers=8, window_size=500)
 ```
 
 There are no chunks and no barriers — a slow item never stalls the
@@ -296,7 +315,7 @@ for item in process.stream(huge_list):
 ```
 
 The engine keeps a bounded window of items in flight (default
-`2 × workers`; set `batch_size` to change it). Input is consumed lazily —
+`2 × workers`; set `window_size` to change it). Input is consumed lazily —
 generators are never materialized — and a slow item delays only itself:
 there are no batch barriers. Breaking out of the loop stops submission
 and cancels not-yet-started tasks; tasks already running in a worker
@@ -338,7 +357,10 @@ failed_items = [items[idx] for idx, _ in result.failures()]
 retry_result = parallel_map(process, failed_items, workers=2)
 ```
 
-When you iterate or call `.values()`, failures raise an `ExceptionGroup`:
+When you iterate or call `.values()`, failures raise an `ExceptionGroup`
+— and each sub-exception carries its item index as a PEP 678 note, so
+provenance survives without changing exception types (`except*
+ConnectionError` still matches):
 
 ```python
 try:
@@ -346,5 +368,11 @@ try:
 except ExceptionGroup as eg:
     print(f"{len(eg.exceptions)} tasks failed")
     for exc in eg.exceptions:
-        print(f"  {type(exc).__name__}: {exc}")
+        print(f"  {type(exc).__name__}: {exc}")   # notes show "item index N"
 ```
+
+A *truncated* run (`timeout=` hit, or `max_errors` abort) raises from
+those same accessors even when every returned item succeeded — a
+partial list must never read as the whole. `result.status` says how the
+run ended; `.successes()` / `.ok_values()` are the deliberate
+partial-result paths.

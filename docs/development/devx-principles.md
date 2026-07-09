@@ -27,7 +27,7 @@ whenever possible. Parallel behavior should feel additive, not magical.
 
 ## 5. Document Tradeoffs Honestly
 
-Do not oversell behavior. If batching is lazy only with `batch_size`, say that.
+Do not oversell behavior. If batching is lazy only with `window_size`, say that.
 If progress totals are provisional for unsized iterables, say that. Trust comes
 from accuracy.
 

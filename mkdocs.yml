@@ -52,6 +52,7 @@ nav:
     - v0.6 Engine Unification Plan: development/plans/v0.6-engine-unification.md
     - v0.6 Ledger Refactor Plan: development/plans/v0.6-ledger-refactor.md
     - v0.7 Free-Threaded & Interpreters Plan: development/plans/v0.7-free-threaded-and-interpreters.md
+    - v0.8 Honest Contract Plan: development/plans/v0.8-honest-contract.md
 
 plugins:
   - search

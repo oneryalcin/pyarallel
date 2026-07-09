@@ -6,15 +6,33 @@ behaves like a list until something failed; then it forces you to look.
 
 from __future__ import annotations
 
+import enum
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, overload
 
 _MISSING = object()
 
 # Sentinel for "slot not yet filled" — distinct from a legitimate None return.
 # Lives here so ParallelResult can refuse to be built around a leaked one.
 _PENDING = object()
+
+
+class RunStatus(enum.Enum):
+    """How a run ended. One vocabulary for every engine, sync and async.
+
+    ``COMPLETED`` means the source was exhausted and every admitted item
+    resolved — items may still have *failed*; that is the meaningful
+    "completed but not ok" state. ``TIMED_OUT`` and ``ABORTED`` are
+    truncations: the source was not exhausted, and for unsized inputs
+    the missing items leave no per-item trace — the status is the one
+    reliable signal.
+    """
+
+    COMPLETED = "completed"
+    TIMED_OUT = "timed_out"
+    ABORTED = "aborted"
+    # CANCELLED joins in v0.9 with cooperative stop.
 
 
 class Aborted(RuntimeError):
@@ -97,6 +115,10 @@ class ItemResult[R]:
         has_error = error is not _MISSING
         if has_value == has_error:
             raise ValueError("Exactly one of value or error must be set")
+        # ItemResult(error=None) used to pass this check (the parameter
+        # *was* supplied) and build a fake success — .ok True, .value None.
+        if has_error and not isinstance(error, Exception):
+            raise ValueError(f"error must be an Exception instance, got {error!r}")
         object.__setattr__(self, "index", index)
         object.__setattr__(self, "value", value if has_value else None)
         object.__setattr__(self, "error", error if has_error else None)
@@ -116,26 +138,26 @@ class ParallelResult[R]:
     When some tasks failed, use ``.successes()``, ``.failures()``,
     or ``.raise_on_failure()`` for structured access.
 
-    Iterating or calling ``.values()`` raises ``ExceptionGroup``
-    if any task failed — you always see errors, never silently.
+    Iterating or calling ``.values()`` raises if any task failed
+    (``ExceptionGroup``) *or* the run was truncated (``TimeoutError`` /
+    ``Aborted``) — you always see problems, never silently.
 
-    ``timed_out`` / ``aborted`` report how the run *ended* — at most one
-    is set (the first stop reason wins). They exist because per-item
+    ``status`` reports how the run *ended* (``RunStatus``); ``timed_out``
+    / ``aborted`` are derived reads. The status exists because per-item
     failure markers cannot always carry that fact: an unsized input
     that hits the total ``timeout=`` returns only the items actually
     pulled from the source — possibly all successes — and the status
-    flag is the one reliable signal that the result is a truncation,
+    is the one reliable signal that the result is a truncation,
     not a completion.
     """
 
-    __slots__ = ("_entries", "_timed_out", "_aborted")
+    __slots__ = ("_entries", "_status")
 
     def __init__(
         self,
         entries: list[Any],
         *,
-        timed_out: bool = False,
-        aborted: bool = False,
+        status: RunStatus = RunStatus.COMPLETED,
     ) -> None:
         # A leaked unfilled slot must fail loudly here, not surface later
         # as a silent "success" value from .values()/.ok.
@@ -144,28 +166,76 @@ class ParallelResult[R]:
                 "internal error: unfilled result slot leaked into ParallelResult"
             )
         self._entries = entries
-        self._timed_out = timed_out
-        self._aborted = aborted
+        self._status = status
 
     # --- Introspection ---
 
     @property
     def ok(self) -> bool:
-        """True when every task succeeded."""
-        return not any(isinstance(e, _Failure) for e in self._entries)
+        """True when the run completed AND every task succeeded.
+
+        A truncated run (``TIMED_OUT`` / ``ABORTED``) is never ok, even
+        when every *returned* item succeeded — the items never pulled
+        from the source did not.
+        """
+        return self._status is RunStatus.COMPLETED and not any(
+            isinstance(e, _Failure) for e in self._entries
+        )
+
+    @property
+    def status(self) -> RunStatus:
+        """How the run ended — the source of truth."""
+        return self._status
+
+    @property
+    def complete(self) -> bool:
+        """True when the source was exhausted and every item resolved.
+
+        Independent of item failures: a run can be complete and not ok.
+        """
+        return self._status is RunStatus.COMPLETED
 
     @property
     def timed_out(self) -> bool:
         """True when the run stopped on the total ``timeout=`` deadline."""
-        return self._timed_out
+        return self._status is RunStatus.TIMED_OUT
 
     @property
     def aborted(self) -> bool:
         """True when the run stopped early via ``max_errors``."""
-        return self._aborted
+        return self._status is RunStatus.ABORTED
+
+    def _raise_if_truncated(self) -> None:
+        """Truncated runs have no 'all results' to hand out.
+
+        Checked BEFORE per-item failures (v0.8 review): sized truncations
+        carry placeholder failure markers, and failures-first would raise
+        an ``ExceptionGroup`` for those while unsized truncations raised
+        ``TimeoutError`` — two surfaces for the same event. Truncation is
+        the louder fact; the exception message routes to the partial
+        accessors, and ``.failures()`` still has the per-item detail.
+        """
+        if self._status is RunStatus.TIMED_OUT:
+            raise TimeoutError(
+                f"run timed out after {len(self._entries)} items — the "
+                "source was not exhausted, so these are partial results. "
+                "Use .successes() / .ok_values() to consume them."
+            )
+        if self._status is RunStatus.ABORTED:
+            raise Aborted(
+                f"run aborted (max_errors) after {len(self._entries)} "
+                "items — partial results. Use .successes() / .ok_values() "
+                "to consume them."
+            )
 
     def values(self) -> list[R]:
-        """All results in input order. Raises if any task failed."""
+        """All results in input order.
+
+        Raises if the run was truncated (``TimeoutError`` / ``Aborted``)
+        or any task failed (``ExceptionGroup``) — a partial list must
+        never read as the whole. Truncation is checked first.
+        """
+        self._raise_if_truncated()
         self.raise_on_failure()
         return list(self._entries)
 
@@ -188,21 +258,39 @@ class ParallelResult[R]:
         ]
 
     def raise_on_failure(self) -> None:
-        """Raise ``ExceptionGroup`` containing all task failures."""
+        """Raise ``ExceptionGroup`` containing all task failures.
+
+        Each sub-exception carries its item index as a PEP 678 note —
+        provenance without changing exception types, so
+        ``except* ConnectionError`` matching is untouched. Notes mutate
+        the stored exception objects: repeated calls don't duplicate a
+        note, but the same exception *instance* raised for items in two
+        different runs accumulates a note per run — raise fresh
+        exceptions per item if that matters.
+        """
         fails = self.failures()
         if fails:
             n = len(self._entries)
+            for i, e in fails:
+                note = f"pyarallel: item index {i}"
+                if note not in getattr(e, "__notes__", ()):
+                    e.add_note(note)
             raise ExceptionGroup(
                 f"{len(fails)} of {n} tasks failed",
                 [e for _, e in fails],
             )
 
-    # --- list-like interface (raises on failure) ---
+    # --- list-like interface (raises on failure/truncation) ---
 
     def __iter__(self) -> Iterator[R]:
         return iter(self.values())
 
-    def __getitem__(self, index: int | slice) -> Any:
+    @overload
+    def __getitem__(self, index: int) -> R: ...
+    @overload
+    def __getitem__(self, index: slice) -> list[R]: ...
+    def __getitem__(self, index: int | slice) -> R | list[R]:
+        self._raise_if_truncated()
         self.raise_on_failure()
         return self._entries[index]
 
@@ -213,10 +301,8 @@ class ParallelResult[R]:
         return len(self._entries) > 0
 
     def __repr__(self) -> str:
-        # A truncated run must not print like a complete one — the flags
-        # appear in the repr precisely because .ok can be True on timeout.
-        status = ", timed_out" if self._timed_out else ""
-        status += ", aborted" if self._aborted else ""
+        # A truncated run must not print like a complete one.
+        status = "" if self.complete else f", {self._status.value}"
         if self.ok and not status:
             return f"ParallelResult({list(self._entries)})"
         s, f = len(self.successes()), len(self.failures())

@@ -44,7 +44,7 @@ python examples/03_cpu_bound_processing.py
 
 ### 04_batch_processing.py
 
-Shows how to control memory by passing `batch_size` to `.map(...)`.
+Shows how to control memory by passing `window_size` to `.map(...)`.
 
 ```bash
 python examples/04_batch_processing.py
@@ -91,7 +91,7 @@ many = process_item.map([1, 2, 3, 4, 5])
 |-----------|-------|---------|
 | `workers` | `@parallel(...)` or `.map(...)` | `workers=4` |
 | `executor` | `@parallel(...)`, `.map(...)`, or `parallel_map(...)` | `executor="process"` |
-| `batch_size` | `.map(...)` | `batch_size=100` |
+| `window_size` | `.map(...)` | `window_size=100` |
 | `rate_limit` | `@parallel(...)` or `.map(...)` | `rate_limit=10` or `RateLimit(100, "minute")` |
 | `retry` | `.map(...)` or `parallel_map(...)` | `retry=Retry(attempts=3)` |
 | `timeout` | `.map(...)` or `parallel_map(...)` | `timeout=30.0` |

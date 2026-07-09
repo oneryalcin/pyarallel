@@ -166,3 +166,46 @@ class TestPreservedSignature:
             return x
 
         assert hasattr(f, "__wrapped__")
+
+
+class TestExplicitNoneOverride:
+    """v0.8 review: None meant "inherit the decorator default", so a
+    caller could never turn OFF a non-None decorator default per-call.
+    New contract: an unspecified option inherits; an explicit None
+    overrides (an internal sentinel distinguishes the two).
+
+    Note (v0.8 scope finding): decorator defaults only cover workers /
+    executor / rate_limit — retry etc. are per-call-only. Widening the
+    default surface is a v0.9 question, not part of this contract fix.
+    """
+
+    def test_explicit_rate_limit_none_disables_decorator_limit(self):
+        import time
+
+        from pyarallel import RateLimit, parallel
+
+        @parallel(workers=4, rate_limit=RateLimit(2, "second"))
+        def work(x):
+            return x
+
+        start = time.monotonic()
+        r = work.map([1, 2, 3, 4], rate_limit=None)  # explicit None: no pacing
+        elapsed = time.monotonic() - start
+        assert r.ok
+        # Paced at 2/s these 4 items take >= ~1.5s; unpaced they are instant.
+        assert elapsed < 0.5
+
+    def test_unspecified_still_inherits(self):
+        import time
+
+        from pyarallel import RateLimit, parallel
+
+        @parallel(workers=4, rate_limit=RateLimit(2, "second"))
+        def work(x):
+            return x
+
+        start = time.monotonic()
+        r = work.map([1, 2, 3, 4])  # inherit: paced
+        elapsed = time.monotonic() - start
+        assert r.ok
+        assert elapsed > 1.0

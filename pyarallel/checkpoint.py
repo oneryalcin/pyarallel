@@ -14,6 +14,12 @@ distinct rows. Files without ``schema_version = '2'`` (including v0.4-era
 positional files) fail closed with instructions to delete: one rule, no
 silent migration.
 
+SECURITY: checkpoint rows are pickle. Loading a checkpoint file executes
+whatever its pickle streams contain — treat checkpoint files like code,
+not data. Never resume from a file you didn't create; new files are
+created ``0o600`` (POSIX), and a directory writable by others is not a
+safe place for one.
+
 Constraints (documented, not hidden): items and results must be picklable;
 a result that cannot be checkpointed aborts the run with
 ``CheckpointError`` rather than mislabeling a successful item. Positional
@@ -30,12 +36,51 @@ import base64
 import functools
 import hashlib
 import inspect
+import os
 import pickle
 import sqlite3
+import stat
 import types
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+
+def _create_secure(path: str | Path) -> None:
+    """Create a new checkpoint file with 0o600 before SQLite touches it.
+
+    A checkpoint contains pickle — anyone who can write it can execute
+    code in the resuming process, and anyone who can read it sees the
+    results. Creating restrictively (not chmod-after-open) closes the
+    creation-time exposure window. An *existing* regular file is left
+    exactly as found — its permissions may be intentional. On Windows
+    the mode is advisory; rely on directory ACLs there.
+
+    A symlink at the path — dangling or not — fails closed: ``O_EXCL``
+    reports it as "existing" (EEXIST even for a dangling link, per
+    POSIX), and following it would hand SQLite an attacker-chosen
+    target, so it is rejected rather than reused. (v0.8 review: the
+    original O_NOFOLLOW-only version silently followed dangling links.)
+
+    This does not defend against a checkpoint directory writable by
+    others (documented: keep checkpoints out of /tmp-like locations) —
+    SQLite's -wal/-shm sidecars inherit the database file's permissions.
+    """
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        os.close(os.open(path, flags, 0o600))
+    except FileExistsError:
+        # Existing path: reuse only a regular file (permissions never
+        # touched). A symlink or other special file is not a checkpoint.
+        st = os.lstat(path)
+        if not stat.S_ISREG(st.st_mode):
+            raise CheckpointError(
+                f"Checkpoint path {str(path)!r} is not a regular file "
+                "(symlink or special file). Refusing to open it — a "
+                "checkpoint contains pickle, and following a planted "
+                "link would load attacker-chosen code. Remove the link "
+                "or choose a different path."
+            ) from None
 
 
 class CheckpointError(RuntimeError):
@@ -184,6 +229,7 @@ class _CheckpointStore:
     __slots__ = ("_conn",)
 
     def __init__(self, path: str | Path, signature: str) -> None:
+        _create_secure(path)
         self._conn = sqlite3.connect(path)
         try:
             self._conn.execute("PRAGMA journal_mode=WAL")
@@ -271,7 +317,15 @@ class _CheckpointStore:
         ).fetchone()
         if row is None or row[0] != fingerprint:
             return None
-        return (pickle.loads(row[1]),)
+        try:
+            return (pickle.loads(row[1]),)
+        except Exception as exc:
+            # A corrupted value blob must fail like every other unusable
+            # checkpoint — actionably — not leak a raw unpickling error.
+            raise CheckpointError(
+                f"Checkpoint row {key!r} is corrupted and cannot be read "
+                f"({exc}). Delete the file to start fresh."
+            ) from exc
 
     def put(self, key: str, fingerprint: bytes, value: Any) -> None:
         """Record a completed item.

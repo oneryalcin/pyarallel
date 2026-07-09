@@ -72,6 +72,11 @@ def triple(x: int) -> str:
     return str(x * 3)
 
 
+@parallel
+def concat(a: int, b: str) -> bytes:
+    return b""
+
+
 def check_decorator() -> None:
     assert_type(double(5), int)  # normal call keeps its signature
     assert_type(double.map([1, 2]), ParallelResult[int])
@@ -80,6 +85,46 @@ def check_decorator() -> None:
     assert_type(triple.starmap([(1,)]), ParallelResult[str])
 
     double("nope")  # type: ignore[arg-type]  # wrong call arg is still an error
+
+
+def check_unary_item_typing() -> None:
+    """v0.8: single-parameter functions bind the item type on .map()
+    and .stream() — in the bare AND factory decorator spellings.
+    Multi-parameter functions fall back to Iterable[Any] (a precise
+    .starmap() is not expressible from a ParamSpec — prototyped in the
+    v0.8 plan; *Ts inside a ParamSpec list is invalid in both checkers)."""
+    # positive: correct item types accepted, R flows through
+    assert_type(double.map([1, 2]), ParallelResult[int])  # bare
+    assert_type(triple.map([1]), ParallelResult[str])  # factory
+    assert_type(next(iter(triple.stream([1]))), ItemResult[str])
+
+    # negative: wrong item types rejected
+    double.map(["wrong"])  # type: ignore[list-item]  # str is not int
+    triple.map(["wrong"])  # type: ignore[list-item]
+    triple.stream(["wrong"])  # type: ignore[list-item]
+
+    # multi-parameter: loose fallback — accepted, and starmap works
+    assert_type(concat.starmap([(1, "x")]), ParallelResult[bytes])
+
+
+def check_known_typing_limitations() -> None:
+    """Documented narrowings (v0.8 plan A1) — pinned so a checker
+    upgrade changing them is noticed, not silently shipped.
+
+    - Unannotated lambdas through the factory spelling confuse both
+      checkers: mypy collapses the wrapper to Any (no checking at all);
+      pyright leaves T unsolved and false-positives on the lambda body.
+      Use a def; the suppression below keeps the pyright CI step green.
+    - functools.partial: pyright binds the remaining parameter
+      (Unary[int, int]); mypy collapses the item type to Any — a
+      mypy-specific hole, so no negative assertion is possible here.
+    """
+    _lam = parallel()(lambda x: x * 2)  # pyright: ignore[reportOperatorIssue]
+
+    import functools
+
+    _padd = parallel()(functools.partial(add, 5))
+    _padd.map([1])  # OK in both; mypy would also accept wrong types (Any)
 
 
 @async_parallel(concurrency=8)
@@ -91,11 +136,17 @@ async def check_async_decorator() -> None:
     assert_type(await fetch_many("u"), bytes)
     assert_type(await fetch_many.map(["u"]), ParallelResult[bytes])
 
+    # v0.8 unary item typing, async side
+    await fetch_many.map([1])  # type: ignore[list-item]  # int is not str
+    fetch_many.stream([1])  # type: ignore[list-item]
+
 
 def check_decorator_option_keys() -> None:
-    """Phase 7 contract: the Unpack[TypedDict] surfaces accept every
-    engine option, keep `| None` (explicit None = inherit), and reject
-    unknown keys at type-check time."""
+    """The Unpack[TypedDict] surfaces accept every engine option and
+    reject unknown keys at type-check time. v0.8: presence is the
+    inherit/override sentinel — an explicitly passed None *overrides*;
+    options with no valid None value (executor, concurrency) don't
+    admit None in their types."""
     limiter = Limiter(RateLimit(10))
 
     assert_type(
@@ -106,7 +157,7 @@ def check_decorator_option_keys() -> None:
             rate_limit=limiter,
             timeout=30.0,
             on_progress=lambda done, total: None,
-            batch_size=100,
+            window_size=100,
             retry=Retry(attempts=2),
             checkpoint="run.ckpt",
             checkpoint_key=lambda item: str(item),
@@ -117,8 +168,11 @@ def check_decorator_option_keys() -> None:
         ),
         ParallelResult[str],
     )
-    # Explicit None means "inherit the decorator default" — must type-check.
-    assert_type(triple.map([1], workers=None, executor=None), ParallelResult[str])
+    # v0.8: an explicitly passed option overrides the decorator default —
+    # workers=None is a valid override (engine auto-sizing); executor has
+    # no None value, so passing None must be a type error.
+    assert_type(triple.map([1], workers=None), ParallelResult[str])
+    triple.map([1], executor=None)  # type: ignore[arg-type]  # None not a value
 
     assert_type(
         triple.stream([1], ordered=True, max_errors=3, sequential=None),
