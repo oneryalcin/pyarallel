@@ -29,7 +29,7 @@ def _http_status(resp: Any) -> int | None:
     """``status_code`` (httpx/requests) or ``status`` (aiohttp), else None."""
     for attr in ("status_code", "status"):
         value = getattr(resp, attr, None)
-        if isinstance(value, int):
+        if isinstance(value, int) and not isinstance(value, bool):
             return value
     return None
 
@@ -55,9 +55,16 @@ def _retry_after_seconds(resp: Any) -> float | None:
         return None
     text = str(value).strip()
     try:
-        return max(0.0, float(text))
+        seconds = float(text)
     except ValueError:
-        pass
+        seconds = None
+    if seconds is not None:
+        # RFC 9110 delay-seconds is digits only: nan/inf/negative are
+        # malformed → backoff, not instant retry (nan) or a sleep(inf)
+        # OverflowError when max_server_wait=None trusts the server.
+        if math.isfinite(seconds) and seconds >= 0:
+            return seconds
+        return None
     try:
         dt = email.utils.parsedate_to_datetime(text)
     except ValueError:
@@ -230,7 +237,12 @@ class Retry:
         No HTTP client is imported. The response is found by duck
         typing: ``exc.response`` when present (httpx, requests),
         otherwise the exception itself (aiohttp puts ``status`` and
-        ``headers`` right on it). Pass ``response=`` to override.
+        ``headers`` right on it). Pass ``response=`` to override — but a
+        custom extractor must tolerate *every* type in *on*: one that
+        raises (e.g. ``lambda e: e.response`` meeting a
+        ``ConnectionError``) replaces the real exception in the failure
+        report and skips the retry. The default is getattr-based and
+        safe for any exception.
         Exceptions in *on* that carry no status at all (connection
         errors) are retried — the type filter is the whole decision
         for them.

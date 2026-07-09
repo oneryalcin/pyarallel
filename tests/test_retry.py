@@ -843,3 +843,33 @@ class TestForHttpEndToEnd:
         )
         assert r.ok
         assert calls["n"] == 2
+
+
+class TestForHttpMalformedNumerics:
+    """v0.9 adversarial review F1: 'nan' passed float() and max(0.0, nan)
+    returns nan's *first arg* trick → 0.0 → instant retry; 'inf' with
+    max_server_wait=None reached time.sleep(inf) → OverflowError that
+    masked the real 429. RFC 9110 delay-seconds is digits only —
+    non-finite/negative are malformed → backoff (None)."""
+
+    def test_nan_header_falls_back(self):
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        assert r._server_wait(_FakeHTTPError(429, {"Retry-After": "nan"})) is None
+
+    def test_inf_header_falls_back_even_untrusted(self):
+        r = Retry.for_http(on=(_FakeHTTPError,), max_server_wait=None)
+        assert r._server_wait(_FakeHTTPError(429, {"Retry-After": "inf"})) is None
+
+    def test_negative_header_falls_back(self):
+        r = Retry.for_http(on=(_FakeHTTPError,))
+        assert r._server_wait(_FakeHTTPError(429, {"Retry-After": "-5"})) is None
+
+    def test_bool_status_not_mistaken_for_code(self):
+        """.status = True must not read as HTTP status 1."""
+
+        class WeirdError(Exception):
+            status = True
+
+        r = Retry.for_http(on=(WeirdError,))
+        # statusless → type filter decides → retried
+        assert r._should_retry(WeirdError()) is True
