@@ -20,7 +20,7 @@ def transform(row):
     }
 
 output_buffer = []
-for item in parallel_iter(transform, fetch_rows(), workers=8, batch_size=500):
+for item in parallel_iter(transform, fetch_rows(), workers=8, window_size=500):
     if item.ok:
         output_buffer.append(item.value)
         if len(output_buffer) >= 1000:

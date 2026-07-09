@@ -1,0 +1,2305 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="Mehmet Oner Yalcin">
+      
+      
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/development/plans/v0.8-honest-contract/">
+      
+      
+        <link rel="prev" href="../v0.7-free-threaded-and-interpreters/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>v0.8 Honest Contract Plan - Pyarallel</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#v08-honest-contract" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Pyarallel
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              v0.8 Honest Contract Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Pyarallel
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cookbook
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cookbook
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/llm-batch-calls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch LLM Calls
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Embedding Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/dataset-enrichment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Enrichment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/web-scraping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web Scraping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/bulk-file-download/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bulk File Download
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/github-bulk-repo-changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bulk GitHub Repo Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/docker-registry-cleanup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker Registry Cleanup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/secrets-rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/streaming-etl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming ETL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/ncbi-entrez-batch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NCBI / Entrez Batch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/cpu-fanout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPU-Bound Fan-Out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/advanced-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/async/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Async
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/rate-limiting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rate Limiting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../devx-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DevX Principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.5.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5.0 Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.6-engine-unification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.6 Engine Unification Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.6-ledger-refactor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.6 Ledger Refactor Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.7-free-threaded-and-interpreters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.7 Free-Threaded & Interpreters Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#ground-truth-verified-against-070-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ground truth (verified against 0.7.0 source)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#work-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Work items
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Work items">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-batch_size-window_size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. batch_size → window_size
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-runstatus-corrected-ok" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. RunStatus + corrected .ok
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-result-invariant-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Result invariant hardening
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-decorator-typing-prototype-gate-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Decorator typing — prototype gate first
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-decorator-override-sentinel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Decorator override sentinel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-policy-numeric-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Policy numeric validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-checkpoint-trust-permissions-corruption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Checkpoint trust, permissions, corruption
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-ci-and-release-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. CI and release hardening
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-docs-and-metadata-honesty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Docs and metadata honesty
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequencing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequencing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicitly-deferred-to-v09-features-not-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicitly deferred to v0.9 (features, not contract)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deferred-to-design-spike-only-pre-freeze-check-no-shipping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deferred to design-spike-only (pre-freeze check, no shipping)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-amendments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review amendments
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Review amendments">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a1-typing-prototype-verdict-gate-resolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A1 — Typing prototype verdict (gate resolved)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a2-decorator-default-surface-scope-finding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A2 — Decorator default surface (scope finding)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a3-status-redesign-regression-pins-reviewer-follow-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A3 — Status-redesign regression pins (reviewer follow-up)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a4-checkpoint-permissions-approach-reviewer-follow-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A4 — Checkpoint permissions approach (reviewer follow-up)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a5-four-review-findings-codex-2-gpt-55-deep-code-review-adversarial-design-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A5 — Four-review findings (Codex ×2 gpt-5.5, deep code review, adversarial design review)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#ground-truth-verified-against-070-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ground truth (verified against 0.7.0 source)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#work-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Work items
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Work items">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-batch_size-window_size" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. batch_size → window_size
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-runstatus-corrected-ok" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. RunStatus + corrected .ok
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-result-invariant-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Result invariant hardening
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-decorator-typing-prototype-gate-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Decorator typing — prototype gate first
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-decorator-override-sentinel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Decorator override sentinel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6-policy-numeric-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Policy numeric validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#7-checkpoint-trust-permissions-corruption" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Checkpoint trust, permissions, corruption
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-ci-and-release-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. CI and release hardening
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#9-docs-and-metadata-honesty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Docs and metadata honesty
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sequencing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sequencing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicitly-deferred-to-v09-features-not-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicitly deferred to v0.9 (features, not contract)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deferred-to-design-spike-only-pre-freeze-check-no-shipping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deferred to design-spike-only (pre-freeze check, no shipping)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-amendments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review amendments
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Review amendments">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a1-typing-prototype-verdict-gate-resolved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A1 — Typing prototype verdict (gate resolved)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a2-decorator-default-surface-scope-finding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A2 — Decorator default surface (scope finding)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a3-status-redesign-regression-pins-reviewer-follow-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A3 — Status-redesign regression pins (reviewer follow-up)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a4-checkpoint-permissions-approach-reviewer-follow-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A4 — Checkpoint permissions approach (reviewer follow-up)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a5-four-review-findings-codex-2-gpt-55-deep-code-review-adversarial-design-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A5 — Four-review findings (Codex ×2 gpt-5.5, deep code review, adversarial design review)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="v08-honest-contract">v0.8 — Honest Contract<a class="headerlink" href="#v08-honest-contract" title="Permanent link">&para;</a></h1>
+<p>One deliberate contract-breaking release. Everything conceptually wrong with
+the public API gets fixed here, together, before 1.0 freezes it — per
+DevX principle #7 (pre-v1 is the time) and the external 1.0-readiness review
+(2026-07). No new features; v0.9 carries those.</p>
+<p><strong>Theme:</strong> the vocabulary must not lie. A parameter named <code>batch_size</code> that
+is an admission window, a <code>.ok</code> that is <code>True</code> on a truncated run, an
+<code>ItemResult</code> that can be constructed in an invalid state, a "fully typed"
+claim the decorators don't meet — each is a small dishonesty that compounds
+into distrust. v0.8 removes all of them at once.</p>
+<h2 id="ground-truth-verified-against-070-source">Ground truth (verified against 0.7.0 source)<a class="headerlink" href="#ground-truth-verified-against-070-source" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Finding</th>
+<th>Where</th>
+<th>Verified</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>batch_size</code> is documented as "the admission window — <em>not</em> a chunk size"; the name says chunking</td>
+<td><code>core.py:438</code>, devx-principles.md</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>.ok</code> can be <code>True</code> on a timed-out unsized run; the code documents the footgun in <code>__repr__</code> rather than fixing it</td>
+<td><code>result.py:122</code>, <code>result.py:217</code></td>
+<td>✓</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>ItemResult(0, error=None)</code> passes the exactly-one check (<code>has_error=True</code>) and builds a "success" with <code>value=None</code></td>
+<td><code>result.py:96-99</code></td>
+<td>✓</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>raise_on_failure()</code> discards item indices — the <code>ExceptionGroup</code> has no provenance</td>
+<td><code>result.py:190</code></td>
+<td>✓</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>ParallelResult.__getitem__</code> returns <code>Any</code></td>
+<td><code>result.py:205</code></td>
+<td>✓</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>RateLimit(float("nan"))</code> accepted (<code>nan &lt;= 0</code> is <code>False</code>); <code>inf</code> accepted; <code>Retry(backoff=-1)</code> and non-finite <code>max_delay</code> accepted — no validation at all</td>
+<td><code>policies.py:39-47</code>, <code>policies.py:96-103</code></td>
+<td>✓</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Decorator <code>None</code> means "inherit" — an explicit <code>None</code> cannot override a non-None decorator default (self-documented limitation)</td>
+<td><code>decorators.py:13-15</code>, <code>decorators.py:46</code></td>
+<td>✓</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Decorated <code>.map()</code> accepts <code>Iterable[Any]</code>; <code>.starmap()</code> accepts <code>tuple[Any, ...]</code> — input types unchecked despite the "fully typed" README claim</td>
+<td><code>decorators.py:71</code>, <code>decorators.py:77</code></td>
+<td>✓</td>
+</tr>
+<tr>
+<td>9</td>
+<td>Checkpoint <code>get()</code> calls <code>pickle.loads</code> bare — corrupted rows leak arbitrary unpickling exceptions (<code>put()</code> wraps; the read path doesn't)</td>
+<td><code>checkpoint.py:274</code></td>
+<td>✓</td>
+</tr>
+<tr>
+<td>10</td>
+<td>Checkpoint files execute pickle on open; no user-facing trust warning anywhere in docs</td>
+<td><code>checkpoint.py</code>, advanced-features.md</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>11</td>
+<td>CI is Ubuntu-only despite documented fork/spawn platform differences; wheel/sdist never built or clean-installed; publishing is manual <code>twine</code> from a laptop</td>
+<td><code>ci.yml:10</code>, <code>Makefile:40</code></td>
+<td>✓</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Roadmap says "Current (v0.5.0)"; package is 0.7.0</td>
+<td><code>roadmap.md:23</code></td>
+<td>✓</td>
+</tr>
+<tr>
+<td>13</td>
+<td>Version string duplicated: <code>pyproject.toml</code> + <code>pyarallel/__init__.py</code></td>
+<td>both</td>
+<td>✓</td>
+</tr>
+</tbody>
+</table>
+<h2 id="work-items">Work items<a class="headerlink" href="#work-items" title="Permanent link">&para;</a></h2>
+<h3 id="1-batch_size-window_size">1. <code>batch_size</code> → <code>window_size</code><a class="headerlink" href="#1-batch_size-window_size" title="Permanent link">&para;</a></h3>
+<p>Rename across all six public functions, the decorator <code>TypedDict</code>s, and every
+doc page. <code>window_size</code> over <code>max_in_flight</code>: in ordered streaming the bound
+is <code>len(in_flight) + len(reorder_buffer) &lt;= window</code> — completed-but-unyielded
+items consume the window, so "in flight" would be its own small lie. The
+implementation and docs already say "admission window" everywhere.</p>
+<p><strong>Break, don't alias.</strong> Passing <code>batch_size=</code> raises <code>TypeError: unexpected
+keyword argument</code> naturally. Rationale (amended per design review — the
+original "install base is small" argument was weak both ways): pre-1.0,
+breaking clarity beats carrying a two-name surface, and an alias would
+keep the dishonest name alive in tutorials and completions for another
+cycle. CHANGELOG carries a prominent migration line.</p>
+<h3 id="2-runstatus-corrected-ok">2. <code>RunStatus</code> + corrected <code>.ok</code><a class="headerlink" href="#2-runstatus-corrected-ok" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RunStatus</span><span class="p">(</span><span class="n">enum</span><span class="o">.</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">COMPLETED</span> <span class="o">=</span> <span class="s2">&quot;completed&quot;</span>    <span class="c1"># source exhausted, every item resolved</span>
+    <span class="n">TIMED_OUT</span> <span class="o">=</span> <span class="s2">&quot;timed_out&quot;</span>
+    <span class="n">ABORTED</span>   <span class="o">=</span> <span class="s2">&quot;aborted&quot;</span>      <span class="c1"># max_errors tripped</span>
+    <span class="c1"># CANCELLED reserved — cooperative stop lands in v0.9</span>
+</code></pre></div>
+<ul>
+<li><code>ParallelResult</code> constructor takes <code>status: RunStatus</code>, replacing the two
+  bools — the contradictory <code>timed_out=True, aborted=True</code> state becomes
+  unrepresentable rather than rejected.</li>
+<li><strong><code>result.ok</code> = <code>status is COMPLETED and not failures</code>.</strong> The headline fix:
+  a truncated run can never report <code>ok</code>.</li>
+<li><code>COMPLETED</code> means the <em>source was exhausted and every admitted item
+  resolved</em> — items may still have failed; that is exactly the
+  <code>COMPLETED</code>-but-not-<code>ok</code> state, and it is meaningful.</li>
+<li><code>.timed_out</code> / <code>.aborted</code> stay as derived properties (back-compat reads
+  keep working); <code>.status</code> is the source of truth.</li>
+<li><code>.complete</code> property = <code>status is COMPLETED</code> (the reviewer's "source
+  exhausted" signal, independent of item failures).</li>
+<li><code>__repr__</code> shows status whenever not <code>COMPLETED</code>-and-<code>ok</code>.</li>
+</ul>
+<h3 id="3-result-invariant-hardening">3. Result invariant hardening<a class="headerlink" href="#3-result-invariant-hardening" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>ItemResult</code>: an explicitly-passed <code>error</code> must be an <code>Exception</code> instance,
+  an explicitly-passed <code>value</code> must not be passed alongside it — kills the
+  <code>error=None</code> "success" hole.</li>
+<li><code>raise_on_failure()</code>: attach provenance via <code>exc.add_note(f"item {idx}")</code>
+  (PEP 678). Notes don't change exception types, so
+  <code>except* ConnectionError:</code> matching is untouched. When a stable
+  <code>checkpoint_key</code> was used, note the key instead of the index (design
+  question — resolve in implementation; index is the floor).</li>
+<li><code>__getitem__</code> overloads: <code>int → R</code>, <code>slice → list[R]</code>.</li>
+</ul>
+<h3 id="4-decorator-typing-prototype-gate-first">4. Decorator typing — prototype gate first<a class="headerlink" href="#4-decorator-typing-prototype-gate-first" title="Permanent link">&para;</a></h3>
+<p>May be the hardest item; gated by a throwaway prototype <strong>before</strong> any
+implementation:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">()</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span> <span class="o">...</span>
+
+<span class="n">f</span><span class="o">.</span><span class="n">map</span><span class="p">([</span><span class="mi">1</span><span class="p">])</span>          <span class="c1"># must type-check</span>
+<span class="n">f</span><span class="o">.</span><span class="n">map</span><span class="p">([</span><span class="s2">&quot;wrong&quot;</span><span class="p">])</span>    <span class="c1"># must be rejected by mypy --strict AND pyright</span>
+<span class="n">f</span><span class="o">.</span><span class="n">starmap</span><span class="p">([(</span><span class="mi">1</span><span class="p">,)])</span>   <span class="c1"># must type-check</span>
+<span class="n">f</span><span class="o">.</span><span class="n">starmap</span><span class="p">([(</span><span class="s2">&quot;w&quot;</span><span class="p">,)])</span> <span class="c1"># ideally rejected (starmap may be unattainable)</span>
+</code></pre></div>
+<p>The wrapper must become generic over the function's (single) parameter type
+as well as <code>R</code> — likely a <code>_ParallelFunc[T, R]</code> specialization selected by
+overloads on the decorator. If the type system cannot express it cleanly in
+both checkers, <strong>narrow the README/docs claim</strong> ("typed results and options;
+input item types are not checked") instead of shipping a runtime contraption.
+Negative assertions land in <code>tests/typing_assertions.py</code> either way.</p>
+<h3 id="5-decorator-override-sentinel">5. Decorator override sentinel<a class="headerlink" href="#5-decorator-override-sentinel" title="Permanent link">&para;</a></h3>
+<p>Module-private <code>_UNSET</code> default for every decorator option; <code>_merge_opts</code>
+skips <code>_UNSET</code> instead of <code>None</code>. An explicit <code>None</code> then genuinely
+overrides a non-None decorator default (e.g. <code>fetch.map(urls, retry=None)</code>
+turns retry <em>off</em>). Removes the documented limitation in
+<code>decorators.py:13-15</code>.</p>
+<h3 id="6-policy-numeric-validation">6. Policy numeric validation<a class="headerlink" href="#6-policy-numeric-validation" title="Permanent link">&para;</a></h3>
+<p><code>RateLimit</code>: <code>count</code> finite and <code>&gt; 0</code>; <code>burst</code> an int <code>&gt;= 1</code>.
+<code>Retry</code>: <code>backoff</code> finite and <code>&gt;= 0</code>; <code>max_delay</code> finite and <code>&gt;= 0</code>;
+<code>max_server_wait</code> finite and <code>&gt;= 0</code> or <code>None</code>; <code>attempts</code> unchanged.
+<code>math.isfinite</code> throughout — NaN and <code>inf</code> both die in <code>__post_init__</code> with
+the same actionable messages the existing checks use. Same pass covers
+<code>timeout=</code>/<code>task_timeout=</code> engine parameters if they share the hole.</p>
+<h3 id="7-checkpoint-trust-permissions-corruption">7. Checkpoint trust, permissions, corruption<a class="headerlink" href="#7-checkpoint-trust-permissions-corruption" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Docs:</strong> explicit warning in advanced-features.md and the API reference —
+  a checkpoint file contains pickle; opening an untrusted one can execute
+  arbitrary code. Treat checkpoint files like code, not like data.</li>
+<li><strong>Corruption:</strong> wrap the <code>get()</code>-path <code>pickle.loads</code> so a corrupted row
+  raises <code>CheckpointError</code> with the delete-to-start-fresh instruction —
+  matching <code>put()</code> and the schema checks.</li>
+<li><strong>Permissions:</strong> create new checkpoint files <code>0o600</code> (pre-create with
+  <code>os.open(..., O_CREAT | O_EXCL, 0o600)</code> before SQLite touches the path;
+  never chmod an <em>existing</em> file — the user may have intentional perms).
+  Explicitly scoped small threat-model pass: symlink at the path, existing
+  file, Windows (where mode bits are advisory — document, don't fight).
+  This item is <em>worthwhile, not trivial</em>; timebox it and document what it
+  does and does not defend against.</li>
+</ul>
+<h3 id="8-ci-and-release-hardening">8. CI and release hardening<a class="headerlink" href="#8-ci-and-release-hardening" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Wheel/sdist gate:</strong> build both, clean-install the wheel into a bare venv,
+  <code>import pyarallel</code>, run a smoke test, and verify <code>py.typed</code> ships (mypy
+  against the <em>installed</em> package on a tiny probe file).</li>
+<li><strong>macOS + Windows smoke lanes:</strong> one Python version each, test subset
+  covering process executor (fork/spawn), checkpoint file handling, and the
+  core engine. Ubuntu keeps the full matrix.</li>
+<li><strong>Trusted publishing:</strong> replace <code>Makefile</code> twine upload with a GitHub
+  Actions release workflow using PyPI trusted publishing (OIDC) + artifact
+  provenance. Manual laptop uploads end at 0.8.0.</li>
+</ul>
+<h3 id="9-docs-and-metadata-honesty">9. Docs and metadata honesty<a class="headerlink" href="#9-docs-and-metadata-honesty" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Roadmap rewritten around current reality (0.7 shipped; v0.8/0.9/1.0 as
+  refined here).</li>
+<li>Version single-sourced: <code>[tool.hatch.version] path = "pyarallel/__init__.py"</code>,
+  <code>dynamic = ["version"]</code> in <code>[project]</code>.</li>
+<li>README claims re-audited after the typing gate resolves ("fully typed"
+  stays only if item 4 lands in full).</li>
+</ul>
+<h2 id="sequencing">Sequencing<a class="headerlink" href="#sequencing" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Regression tests first</strong> — pin today's footguns as <em>failing-is-correct</em>
+   tests before touching code: <code>.ok</code> on timeout, <code>ItemResult(error=None)</code>,
+   NaN rate, corrupted checkpoint row, decorator <code>None</code> override. Each test
+   names the production bug it prevents.</li>
+<li><code>RunStatus</code> / <code>.ok</code> redesign + result hardening (items 2, 3).</li>
+<li><code>window_size</code> rename (item 1) — mechanical, lands after the semantic work
+   so review diffs stay separable.</li>
+<li>Typing prototype gate → decorator typing + sentinel (items 4, 5).</li>
+<li>Policy validation + checkpoint hardening (items 6, 7).</li>
+<li>CI/release + docs/metadata (items 8, 9).</li>
+<li>Full four-review cadence (Codex review + adversarial, two independent
+   agents) before merge, as in v0.5–v0.7.</li>
+</ol>
+<h2 id="explicitly-deferred-to-v09-features-not-contract">Explicitly deferred to v0.9 (features, not contract)<a class="headerlink" href="#explicitly-deferred-to-v09-features-not-contract" title="Permanent link">&para;</a></h2>
+<p><code>Retry.for_http()</code> helper; <code>AsyncIterable</code> sources; <code>checkpoint_version=</code>
+semantic token; cooperative stop + <code>CANCELLED</code>; minimal collected-result
+metadata (<code>attempts</code>/<code>duration</code> exposure — the streaming/collected
+asymmetry); reusable-HTTP-client example fixes; the deterministic local
+429 → shared-pause → interrupt → resume demo.</p>
+<h2 id="deferred-to-design-spike-only-pre-freeze-check-no-shipping">Deferred to design-spike-only (pre-freeze check, no shipping)<a class="headerlink" href="#deferred-to-design-spike-only-pre-freeze-check-no-shipping" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Weighted/composite quotas</strong> — verify the <code>Limiter</code> surface doesn't
+  preclude weighted acquisition later; 1.1 headline at most.</li>
+<li><strong>Streaming checkpoint</strong> — "cached computation" ≠ "sink committed";
+  at-least-once replay semantics must be crisp before any implementation.</li>
+</ul>
+<h2 id="review-amendments">Review amendments<a class="headerlink" href="#review-amendments" title="Permanent link">&para;</a></h2>
+<h3 id="a1-typing-prototype-verdict-gate-resolved">A1 — Typing prototype verdict (gate resolved)<a class="headerlink" href="#a1-typing-prototype-verdict-gate-resolved" title="Permanent link">&para;</a></h3>
+<p>Two approaches prototyped against mypy <code>--strict</code> and pyright:</p>
+<ul>
+<li><strong>Approach A (self-type specialization)</strong> — <code>def map[T](self:
+  _ParallelFunc[[T], R], ...)</code>. Pyright solves it fully; <strong>mypy cannot</strong>
+  (infers <code>Iterable[Never]</code> on the positive case). Rejected.</li>
+<li><strong>Approach B (decorator overloads → unary subclass)</strong> — <code>@overload def
+  parallel[T, R](fn: Callable[[T], R]) -&gt; _UnaryParallelFunc[T, R]</code>, with
+  a <code>_ParallelDecorator</code> carrying an overloaded <code>__call__</code> so the factory
+  spelling (<code>@parallel(workers=4)</code>) specializes too. <strong>Works in both
+  checkers.</strong> Shipped.</li>
+</ul>
+<p>Honest narrowings, verified inexpressible or structural:</p>
+<ul>
+<li><strong>Multi-arg <code>.starmap()</code> stays <code>Iterable[tuple[Any, ...]]</code></strong> — binding
+  a ParamSpec to a tuple type (<code>*Ts</code> inside a ParamSpec list) is invalid
+  in both checkers.</li>
+<li><strong>Bound methods can never bind item types</strong> — <code>self</code> makes the
+  function non-unary before <code>__get__</code> splits it off; <code>_BoundParallel[R]</code>
+  keeps <code>R</code> typed with loose items.</li>
+<li><strong>Default-arg functions</strong> (<code>def f(x, y=2)</code>) match the unary overload
+  (<code>T</code> = first param) — <code>.map()</code> gains typing; <code>.starmap()</code> remains
+  loose, so <code>f.starmap([(1, 2)])</code> keeps working.</li>
+<li>Negative assertions are <em>enforced</em> in CI by mypy's
+  <code>warn_unused_ignores</code>; pyright honors ignore comments silently, so its
+  agreement is prototype-verified. Adding a pyright CI step is part of
+  work item 8.</li>
+</ul>
+<h3 id="a2-decorator-default-surface-scope-finding">A2 — Decorator default surface (scope finding)<a class="headerlink" href="#a2-decorator-default-surface-scope-finding" title="Permanent link">&para;</a></h3>
+<p>Decorator defaults cover only <code>workers</code>/<code>executor</code>/<code>rate_limit</code> (async:
+<code>concurrency</code>/<code>rate_limit</code>); <code>retry=</code> etc. are per-call-only. Widening
+the default surface is deliberately NOT part of v0.8 — it is new API,
+not contract repair. v0.9 question.</p>
+<h3 id="a3-status-redesign-regression-pins-reviewer-follow-up">A3 — Status-redesign regression pins (reviewer follow-up)<a class="headerlink" href="#a3-status-redesign-regression-pins-reviewer-follow-up" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Repeated <code>raise_on_failure()</code> must not append duplicate PEP 678 index
+  notes (mutating stored exceptions is observable) — pinned.</li>
+<li>A truncated all-success run must raise a clear run-incomplete error
+  from <code>values()</code>, iteration, AND indexing — never an empty/misleading
+  <code>ExceptionGroup</code> — pinned, including the <code>ok_values()</code> escape hatch.</li>
+</ul>
+<h3 id="a4-checkpoint-permissions-approach-reviewer-follow-up">A4 — Checkpoint permissions approach (reviewer follow-up)<a class="headerlink" href="#a4-checkpoint-permissions-approach-reviewer-follow-up" title="Permanent link">&para;</a></h3>
+<p>Create new checkpoint files securely at creation time
+(<code>os.open(..., O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)</code>), not
+chmod-after-SQLite-open — the latter leaves a creation-time exposure
+window and a symlink concern. Never touch permissions of an existing
+file.</p>
+<h3 id="a5-four-review-findings-codex-2-gpt-55-deep-code-review-adversarial-design-review">A5 — Four-review findings (Codex ×2 gpt-5.5, deep code review, adversarial design review)<a class="headerlink" href="#a5-four-review-findings-codex-2-gpt-55-deep-code-review-adversarial-design-review" title="Permanent link">&para;</a></h3>
+<p>All fixed on the branch unless noted:</p>
+<ul>
+<li><strong>P1 (code review + Codex adversarial): symlink defense was a no-op</strong>
+  for dangling symlinks — <code>O_EXCL</code> reports them as EEXIST, the suppress
+  treated that as "existing file", SQLite followed the link. Fixed:
+  <code>lstat</code> on <code>FileExistsError</code>, non-regular files fail closed with
+  <code>CheckpointError</code>; two symlink tests added.</li>
+<li><strong>P1 (code review): async <code>concurrency: int | None</code> became a typed
+  lie</strong> under presence-sentinel — explicit <code>None</code> crashed the engine.
+  Fixed: <code>int</code> in all three async TypedDicts, clear runtime
+  <code>ValueError</code>, typing + runtime tests.</li>
+<li><strong>P1 (code review): the plan's own <code>timeout</code>/<code>task_timeout</code> numeric
+  commitment was unmet</strong> — <code>timeout=float("nan")</code> silently disabled the
+  deadline while reporting COMPLETED. Fixed: <code>_validate_timeout</code>
+  (finite, <code>&gt;= 0</code>, or None) on both engines.</li>
+<li><strong>P2 (Codex + design review, converging): truncation now checked
+  before per-item failures</strong> in <code>values()</code>/iteration/indexing — sized
+  and unsized truncations previously raised different exception types
+  for the same event, and the <code>Aborted</code> branch was dead code (aborted
+  runs always carry failure markers). One ordering flip fixed both;
+  the branch is now live and tested.</li>
+<li><strong>P0-doc (design review): the <code>None</code>-override blast radius</strong> —
+  <code>rl = maybe or None; f.map(urls, rate_limit=rl)</code> silently disables
+  rate limiting after upgrade. Dedicated CHANGELOG migration callout
+  with the idiom spelled out. Runtime warnings considered and rejected
+  (warning on documented legitimate use is noise).</li>
+<li><strong>P1 (design review): unannotated lambdas via <code>parallel()(...)</code></strong>
+  false-positive in pyright and collapse to <code>Any</code> in mypy. Not fixable
+  at the type level (bidirectional inference vs. the overload set);
+  pinned as documented limitations in <code>typing_assertions.py</code> with a
+  pyright suppression, README claim narrowed to "named functions".
+  <code>functools.partial</code>: pyright binds correctly, mypy collapses to
+  <code>Any</code> — mypy-specific hole, documented same place.</li>
+<li><strong>P2 (code review): release workflow published without a test gate</strong>
+  — a tag on a red commit would ship. Fixed: pytest step before build.</li>
+<li><strong>P2 (code review): cross-run note contamination</strong> — the same
+  exception <em>instance</em> failing in two different runs accumulates an
+  index note per run. Inherent to mutating shared exceptions;
+  documented in the <code>raise_on_failure</code> docstring.</li>
+<li><strong>Release checklist (both Codex reviews): <code>__version__</code> is the single
+  version source now — bump to 0.8.0 immediately before tagging;</strong> the
+  tag-guard blocks a mismatched tag.</li>
+<li>Checked-and-clean (code review): RunStatus wiring at all construction
+  sites, <code>halt.stop</code> unreachable-assert, rename completeness, decorator
+  factory parity vs 0.7, docs examples under new <code>.ok</code> semantics,
+  checkpoint fresh-file detection with the pre-created empty file, CI
+  shell correctness. Design review: <code>.ok</code> redesign holds against the
+  common idiom; keyword-only/<code>*args</code>/callable-class typing all resolve
+  correctly.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

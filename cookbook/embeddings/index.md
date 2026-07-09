@@ -39,7 +39,7 @@ result = parallel_map(
         on=(openai.RateLimitError, openai.APIConnectionError),
         wait_from=retry_after,              # a 429 pauses the WHOLE pool
     ),
-    batch_size=100,                         # in-flight window (default 2 x workers)
+    window_size=100,                         # in-flight window (default 2 x workers)
     checkpoint="embeddings.ckpt",           # crash at item 40k? rerun resumes
 )
 

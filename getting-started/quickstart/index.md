@@ -128,11 +128,11 @@ See [Checkpoint / Resume](https://oneryalcin.github.io/pyarallel/user-guide/adva
 
 ## The Admission Window
 
-Memory is bounded by default: at most `2 × workers` items are submitted but unresolved at any moment, and input — generators included — is consumed lazily, one window ahead. `batch_size` overrides the window when you want more lookahead:
+Memory is bounded by default: at most `2 × workers` items are submitted but unresolved at any moment, and input — generators included — is consumed lazily, one window ahead. `window_size` overrides the window when you want more lookahead:
 
 ```
 # Up to 500 items in flight instead of the default 2 x workers
-results = parallel_map(process, huge_list, workers=8, batch_size=500)
+results = parallel_map(process, huge_list, workers=8, window_size=500)
 ```
 
 There are no chunks and no barriers — a slow item never stalls the items behind it.

@@ -1476,6 +1476,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1753,10 +1781,10 @@ subinterpreters yet); keep <code>executor="process"</code> for those. See
 <h2 id="the-admission-window">The Admission Window<a class="headerlink" href="#the-admission-window" title="Permanent link">&para;</a></h2>
 <p>Memory is bounded by default: at most <code>2 × workers</code> items are submitted
 but unresolved at any moment, and input — generators included — is
-consumed lazily, one window ahead. <code>batch_size</code> overrides the window
+consumed lazily, one window ahead. <code>window_size</code> overrides the window
 when you want more lookahead:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Up to 500 items in flight instead of the default 2 x workers</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">huge_list</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">huge_list</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
 </code></pre></div>
 <p>There are no chunks and no barriers — a slow item never stalls the
 items behind it.</p>

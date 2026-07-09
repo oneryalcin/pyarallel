@@ -16,7 +16,7 @@ results = parallel_map(
     rate_limit=None,                 # RateLimit spec, shared Limiter, or ops/second
     timeout=None,                    # Total timeout in seconds
     on_progress=None,                # callback(completed, total)
-    batch_size=None,                 # Lazy batch consumption for unsized iterables
+    window_size=None,                # Admission window: max unresolved items
     retry=None,                      # Retry(attempts=3, backoff=1.0)
     checkpoint=None,                 # Path to a resume file (SQLite)
     checkpoint_key=None,             # Stable per-item identity for resume
@@ -40,9 +40,9 @@ results = parallel_map(
 | `rate_limit`           | `Limiter \| RateLimit \| float \| None`      | `None`     | Rate limiting (float = ops/second). Pass a shared `Limiter` to draw from one budget across calls                                                                                                                                                                                            |
 | `timeout`              | `float \| None`                              | `None`     | Total wall-clock timeout in seconds. Sets `result.timed_out` on expiry; the source is never drained after a stop                                                                                                                                                                            |
 | `on_progress`          | `Callable[[int, int], None] \| None`         | `None`     | Progress callback `(completed, total)`. For unsized iterables, `total` is items seen so far                                                                                                                                                                                                 |
-| `batch_size`           | `int \| None`                                | `None`     | Admission window: max items submitted but unresolved (default `2 × workers`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily                                                                                                                               |
+| `window_size`          | `int \| None`                                | `None`     | Admission window: max items submitted but unresolved (default `2 × workers`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily                                                                                                                               |
 | `retry`                | `Retry \| None`                              | `None`     | Per-item retry with backoff                                                                                                                                                                                                                                                                 |
-| `checkpoint`           | `str \| Path \| None`                        | `None`     | Checkpoint file for resumable runs — completed items load from disk on rerun                                                                                                                                                                                                                |
+| `checkpoint`           | `str \| Path \| None`                        | `None`     | Checkpoint file for resumable runs — completed items load from disk on rerun. **Contains pickle: treat the file like code** — never resume from a file you didn't create ([details](https://oneryalcin.github.io/pyarallel/user-guide/advanced-features/#checkpoint-resume))                |
 | `checkpoint_key`       | `Callable[[T], str \| int \| bytes] \| None` | `None`     | Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires `checkpoint=`                                                                                                                                                 |
 | `max_errors`           | `int \| None`                                | `None`     | Abort after this many failures (counted after retries). Unrun items are marked `Aborted`                                                                                                                                                                                                    |
 | `sequential`           | `bool`                                       | `False`    | Run every item inline in the calling thread — no pool, real stack traces, working breakpoints. `workers` is ignored                                                                                                                                                                         |
@@ -66,7 +66,7 @@ results = parallel_map(fetch, urls, timeout=60.0,
                        on_progress=lambda d, t: print(f"{d}/{t}"))
 
 # Wider admission window — more lookahead for uneven task durations
-results = parallel_map(process, million_items, workers=8, batch_size=500)
+results = parallel_map(process, million_items, workers=8, window_size=500)
 
 # With retry — flaky network calls
 results = parallel_map(fetch, urls, workers=10, retry=Retry(attempts=3, backoff=1.0))
@@ -101,7 +101,7 @@ The async API doesn't need it — `concurrency=1` already serializes.
 
 ### Early Abort with `max_errors`
 
-With `max_errors=N`, the run stops once N items have failed (counted **after** retries are exhausted — an item that fails then succeeds on retry is a success), and `result.aborted` is set. Because all admission is windowed (`batch_size` if set, else `2 × workers`), the abort is cheap by construction: total submissions stay within the abort point plus one window.
+With `max_errors=N`, the run stops once N items have failed (counted **after** retries are exhausted — an item that fails then succeeds on retry is a success), and `result.aborted` is set. Because all admission is windowed (`window_size` if set, else `2 × workers`), the abort is cheap by construction: total submissions stay within the abort point plus one window.
 
 On abort you still get a complete `ParallelResult` — one entry per input item. Finished work keeps its real result; items that never ran are marked with an `Aborted` exception, distinguishable from real failures:
 
@@ -142,7 +142,7 @@ Available on `parallel_map`, `async_parallel_map`, and `.map()` — not on starm
 
 When `items` has a known length, `on_progress(done, total)` reports the final total.
 
-When `items` is unsized (for example a generator) and `batch_size` is set, Pyarallel keeps input consumption lazy instead of materializing the full input up front. In that mode, `total` is the number of items discovered so far, not a guaranteed final total.
+When `items` is unsized (for example a generator) and `window_size` is set, Pyarallel keeps input consumption lazy instead of materializing the full input up front. In that mode, `total` is the number of items discovered so far, not a guaranteed final total.
 
 ______________________________________________________________________
 
@@ -218,7 +218,7 @@ from pyarallel import parallel_starmap
 results = parallel_starmap(fn, [(arg1, arg2), (arg3, arg4), ...])
 ```
 
-Takes the same options as `parallel_map` (workers, executor, rate_limit, timeout, batch_size, retry).
+Takes the same options as `parallel_map` (workers, executor, rate_limit, timeout, window_size, retry).
 
 ### Examples
 
@@ -276,14 +276,14 @@ Same as `parallel_map` except no `timeout` or `on_progress` (results stream as t
 | `workers`     | `int \| None`                            | `None`     | Number of parallel workers (stdlib default when `None`)                                        |
 | `executor`    | `"thread" \| "process" \| "interpreter"` | `"thread"` | Thread pool, process pool, or (3.14+) sub-interpreter pool — see [parallel_map](#parallel_map) |
 | `rate_limit`  | `Limiter \| RateLimit \| float \| None`  | `None`     | Rate limiting                                                                                  |
-| `batch_size`  | `int \| None`                            | `None`     | Maximum items in flight (default `2 × workers`)                                                |
+| `window_size` | `int \| None`                            | `None`     | Maximum items in flight (default `2 × workers`)                                                |
 | `retry`       | `Retry \| None`                          | `None`     | Per-item retry                                                                                 |
 | `ordered`     | `bool`                                   | `False`    | Yield in input order instead of completion order                                               |
 | `on_progress` | `Callable[[int, int], None] \| None`     | `None`     | `callback(done, total)` per completed item                                                     |
 
 Changed in v0.5 (streaming) and v0.6 (everywhere)
 
-`batch_size` is an **in-flight bound**, not a chunk size — one meaning across every API since v0.6. Earlier versions processed chunks with a barrier between them (one slow item stalled the next chunk) and materialized the whole input when `batch_size` was unset. Neither is true anymore — the default window of `2 × workers` already gives constant memory; raise `batch_size` only to increase lookahead.
+`window_size` is an **in-flight bound**, not a chunk size — one meaning across every API since v0.6. Earlier versions processed chunks with a barrier between them (one slow item stalled the next chunk) and materialized the whole input when `window_size` was unset. Neither is true anymore — the default window of `2 × workers` already gives constant memory; raise `window_size` only to increase lookahead.
 
 ### Yields
 
@@ -361,26 +361,28 @@ ______________________________________________________________________
 
 ## `ParallelResult`
 
-Container for parallel execution results. Behaves like a `list` when all tasks succeed. Provides structured access when some fail.
+Container for parallel execution results. Behaves like a `list` when the run completed and all tasks succeeded. Provides structured access otherwise.
 
-`timed_out`/`aborted` report how the run *ended* — the reliable signal when per-item markers can't carry it: an unsized input that hits `timeout=` returns only the items actually pulled (possibly all successes), and the flag is what distinguishes that truncation from a completed run.
+`.status` (a `RunStatus`: `COMPLETED` / `TIMED_OUT` / `ABORTED`) reports how the run *ended* — the reliable signal when per-item markers can't carry it: an unsized input that hits `timeout=` returns only the items actually pulled (possibly all successes), and the status is what distinguishes that truncation from a completed run. Since v0.8, **a truncated run is never `ok`** and its "whole result" accessors — `.values()`, iteration, indexing — raise (`TimeoutError` / `Aborted`) instead of quietly returning a partial list. Use `.successes()` / `.ok_values()` to consume partial results deliberately.
 
 ### Properties and Methods
 
-| Member                | Returns                       | Description                                                   |
-| --------------------- | ----------------------------- | ------------------------------------------------------------- |
-| `.ok`                 | `bool`                        | `True` if every task succeeded                                |
-| `.timed_out`          | `bool`                        | `True` when the run stopped on the total `timeout=` deadline  |
-| `.aborted`            | `bool`                        | `True` when the run stopped early via `max_errors`            |
-| `.values()`           | `list[R]`                     | All results in order. Raises `ExceptionGroup` on failure      |
-| `.ok_values()`        | `list[R]`                     | Values of successful tasks only, in input order. Never raises |
-| `.successes()`        | `list[tuple[int, R]]`         | `(index, value)` for each success                             |
-| `.failures()`         | `list[tuple[int, Exception]]` | `(index, exception)` for each failure                         |
-| `.raise_on_failure()` | `None`                        | Raises `ExceptionGroup` if any task failed                    |
-| `len(result)`         | `int`                         | Total number of tasks                                         |
-| `result[i]`           | `R`                           | Index into values (raises on failure)                         |
-| `list(result)`        | `list[R]`                     | Iterate values (raises on failure)                            |
-| `bool(result)`        | `bool`                        | `True` if any tasks were submitted                            |
+| Member                | Returns                       | Description                                                                                                                            |
+| --------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `.ok`                 | `bool`                        | `True` when the run **completed** and every task succeeded                                                                             |
+| `.status`             | `RunStatus`                   | How the run ended: `COMPLETED`, `TIMED_OUT`, or `ABORTED`                                                                              |
+| `.complete`           | `bool`                        | Source exhausted, every item resolved — independent of failures: a run can be complete and not ok                                      |
+| `.timed_out`          | `bool`                        | Derived: `status is RunStatus.TIMED_OUT`                                                                                               |
+| `.aborted`            | `bool`                        | Derived: `status is RunStatus.ABORTED`                                                                                                 |
+| `.values()`           | `list[R]`                     | All results in order. Raises `TimeoutError`/`Aborted` on truncation (checked first), `ExceptionGroup` on failure                       |
+| `.ok_values()`        | `list[R]`                     | Values of successful tasks only, in input order. Never raises                                                                          |
+| `.successes()`        | `list[tuple[int, R]]`         | `(index, value)` for each success                                                                                                      |
+| `.failures()`         | `list[tuple[int, Exception]]` | `(index, exception)` for each failure                                                                                                  |
+| `.raise_on_failure()` | `None`                        | Raises `ExceptionGroup` if any task failed; each sub-exception carries its item index as a PEP 678 note (`except*` matching untouched) |
+| `len(result)`         | `int`                         | Number of tasks with a result entry                                                                                                    |
+| `result[i]`           | `R`                           | Index into values (raises on failure/truncation)                                                                                       |
+| `list(result)`        | `list[R]`                     | Iterate values (raises on failure/truncation)                                                                                          |
+| `bool(result)`        | `bool`                        | `True` if any tasks were submitted                                                                                                     |
 
 ### Example
 
@@ -493,7 +495,7 @@ results = parallel_map(
     workers=10,
     rate_limit=RateLimit(100, "minute"),
     retry=Retry(attempts=3, backoff=1.0),
-    batch_size=500,
+    window_size=500,
 )
 ```
 

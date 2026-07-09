@@ -66,13 +66,13 @@ For very large ID lists where the results shouldn't all sit in memory, stream in
 from pyarallel import parallel_iter
 
 for item in parallel_iter(fetch_genbank, gene_ids, rate_limit=ncbi,
-                          batch_size=100):
+                          window_size=100):
     if item.ok:
         write_fasta(item.value)
     else:
         log_failed(item.index, item.error)
 ```
 
-Note: `checkpoint=` is a `parallel_map` feature — the streaming engine doesn't take it (you're writing each record to disk as it arrives, so resume is your sink's job: skip IDs whose FASTA already exists). For a resumable *and* memory-bounded run, `parallel_map` with `checkpoint=` over a `batch_size` window is usually the better fit.
+Note: `checkpoint=` is a `parallel_map` feature — the streaming engine doesn't take it (you're writing each record to disk as it arrives, so resume is your sink's job: skip IDs whose FASTA already exists). For a resumable *and* memory-bounded run, `parallel_map` with `checkpoint=` over a `window_size` window is usually the better fit.
 
 The same shape works for any hard-rate-limited scientific API where the budget is per-key and jobs run long: UniProt, Ensembl, PubChem, Crossref, Semantic Scholar (1 req/s per key), the PDB.

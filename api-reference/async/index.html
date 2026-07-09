@@ -1499,6 +1499,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1711,7 +1739,7 @@
     <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                    <span class="c1"># Total wall-clock timeout (mirror of sync)</span>
     <span class="n">task_timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>               <span class="c1"># Per-task timeout in seconds</span>
     <span class="n">on_progress</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># callback(completed, total)</span>
-    <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Lazy batch consumption for unsized iterables</span>
+    <span class="n">window_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># Admission window: max unresolved items</span>
     <span class="n">retry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                      <span class="c1"># Retry(attempts=3, backoff=1.0)</span>
     <span class="n">checkpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Path to a resume file (SQLite)</span>
     <span class="n">checkpoint_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>             <span class="c1"># Stable per-item identity for resume</span>
@@ -1773,7 +1801,7 @@
 <td>Progress callback. For unsized iterables, <code>total</code> is items seen so far</td>
 </tr>
 <tr>
-<td><code>batch_size</code></td>
+<td><code>window_size</code></td>
 <td><code>int \| None</code></td>
 <td><code>None</code></td>
 <td>Admission window: max tasks created but unresolved (default <code>2 × concurrency</code>). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily</td>
@@ -1857,7 +1885,7 @@ over it is meaningless. Pass a sized input for a real total.</p>
 <h2 id="async_parallel_iter"><code>async_parallel_iter</code><a class="headerlink" href="#async_parallel_iter" title="Permanent link">&para;</a></h2>
 <p>Async streaming — yields <code>ItemResult</code> in completion order. A bounded
 window of tasks is in flight at any moment (default <code>2 × concurrency</code>,
-override with <code>batch_size</code>): memory stays constant, input is consumed
+override with <code>window_size</code>): memory stays constant, input is consumed
 lazily, and a slow item delays only itself.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel_iter</span>
 
@@ -1869,7 +1897,7 @@ lazily, and a slow item delays only itself.</p>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Changed in v0.5 (streaming) and v0.6 (everywhere)</p>
-<p><code>batch_size</code> is an <strong>in-flight bound</strong>, not a chunk size — one
+<p><code>window_size</code> is an <strong>in-flight bound</strong>, not a chunk size — one
 meaning across every API since v0.6: there are no barriers, and
 input is never materialized.</p>
 </div>

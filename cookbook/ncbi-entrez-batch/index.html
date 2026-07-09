@@ -1320,6 +1320,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1438,7 +1466,7 @@ flight and writes each record as it arrives:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_iter</span>
 
 <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">parallel_iter</span><span class="p">(</span><span class="n">fetch_genbank</span><span class="p">,</span> <span class="n">gene_ids</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="n">ncbi</span><span class="p">,</span>
-                          <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+                          <span class="n">window_size</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
     <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
         <span class="n">write_fasta</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
@@ -1448,7 +1476,7 @@ flight and writes each record as it arrives:</p>
 doesn't take it (you're writing each record to disk as it arrives, so
 resume is your sink's job: skip IDs whose FASTA already exists). For a
 resumable <em>and</em> memory-bounded run, <code>parallel_map</code> with <code>checkpoint=</code>
-over a <code>batch_size</code> window is usually the better fit.</p>
+over a <code>window_size</code> window is usually the better fit.</p>
 <p>The same shape works for any hard-rate-limited scientific API where the
 budget is per-key and jobs run long: UniProt, Ensembl, PubChem,
 Crossref, Semantic Scholar (1 req/s per key), the PDB.</p>

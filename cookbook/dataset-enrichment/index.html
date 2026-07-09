@@ -1368,6 +1368,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1478,7 +1506,7 @@ pandas DataFrames, HuggingFace datasets, or any iterable of records.</p>
     <span class="n">dataset</span><span class="p">[</span><span class="s2">&quot;text&quot;</span><span class="p">],</span>
     <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span>
     <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;second&quot;</span><span class="p">),</span>
-    <span class="n">batch_size</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
+    <span class="n">window_size</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span><span class="s2">&quot;predicted_sentiment&quot;</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>

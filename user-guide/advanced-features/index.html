@@ -1527,6 +1527,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1804,11 +1832,17 @@ jump — use a plain <code>on_progress</code> callback instead.</p>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="ne">TimeoutError</span><span class="p">):</span>
             <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Item </span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2"> timed out&quot;</span><span class="p">)</span>
 </code></pre></div>
-<p><code>results.timed_out</code> is the reliable expiry signal. For sized inputs
-every unfinished slot is also marked with a <code>TimeoutError</code> failure; an
-unsized input (a generator) instead returns a <strong>shorter</strong> result
-covering only the items actually pulled — the source is never drained
-after a stop, so a blocking or infinite generator stays untouched.</p>
+<p><code>results.timed_out</code> (i.e. <code>results.status is RunStatus.TIMED_OUT</code>) is
+the reliable expiry signal. For sized inputs every unfinished slot is
+also marked with a <code>TimeoutError</code> failure; an unsized input (a
+generator) instead returns a <strong>shorter</strong> result covering only the items
+actually pulled — the source is never drained after a stop, so a
+blocking or infinite generator stays untouched.</p>
+<p>A timed-out run is never <code>ok</code> (v0.8) — even when every <em>returned</em> item
+succeeded, the run is a truncation, and <code>.values()</code>/iteration/indexing
+raise <code>TimeoutError</code> rather than passing a partial list off as the
+whole. Consume partial results deliberately with <code>.successes()</code> or
+<code>.ok_values()</code>.</p>
 <h3 id="per-task-timeout-async">Per-Task Timeout (async)<a class="headerlink" href="#per-task-timeout-async" title="Permanent link">&para;</a></h3>
 <p>The async API supports per-task timeouts via <code>asyncio.wait_for</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel_map</span>
@@ -1905,7 +1939,20 @@ load from disk, failed and unseen items execute:</p>
   still recomputes.
 - Checkpoint files from pyarallel &lt; 0.5 fail closed — delete and rerun.
 - Items and results must be picklable; a result that cannot be
-  checkpointed aborts the run with <code>CheckpointError</code>.</p>
+  checkpointed aborts the run with <code>CheckpointError</code>.
+- A corrupted row raises <code>CheckpointError</code> with delete-to-start-fresh
+  instructions, never a raw unpickling error.</p>
+<div class="admonition danger">
+<p class="admonition-title">Checkpoint files are code, not data</p>
+<p>Rows are stored as <strong>pickle</strong> — resuming from a checkpoint executes
+whatever its pickle streams contain. Anyone who can <em>write</em> the file
+can run code in your process on the next resume. Never resume from a
+file you didn't create; never accept one from an untrusted source
+(a bug report, a shared bucket). Pyarallel creates new checkpoint
+files owner-only (<code>0o600</code>, POSIX) and leaves existing files'
+permissions alone — but a directory writable by others (<code>/tmp</code>-like
+locations) is not a safe home for one regardless.</p>
+</div>
 <p>Available on <code>parallel_map</code>, <code>async_parallel_map</code>, and <code>.map()</code>.</p>
 <h2 id="early-abort-max_errors">Early Abort — <code>max_errors</code><a class="headerlink" href="#early-abort-max_errors" title="Permanent link">&para;</a></h2>
 <p>Stop paying for a dead API. With <code>max_errors=N</code> the run aborts once N
@@ -1933,11 +1980,11 @@ morning rerun resumes exactly where it stopped:</p>
 failure is yielded, with no placeholder items for unseen input.</p>
 <h2 id="the-admission-window">The Admission Window<a class="headerlink" href="#the-admission-window" title="Permanent link">&para;</a></h2>
 <p>Every API — collected and streaming — admits work through a bounded
-window: at most <code>batch_size</code> items (default <code>2 × workers</code>) are
+window: at most <code>window_size</code> items (default <code>2 × workers</code>) are
 submitted but unresolved at any moment. Input is consumed lazily, one
 window ahead, so generators are never materialized:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># At most 500 items in flight instead of the default 2 x workers</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">huge_list</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">huge_list</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
 </code></pre></div>
 <p>There are no chunks and no barriers — a slow item never stalls the
 items behind it, and an error anywhere never prevents the rest from
@@ -1981,7 +2028,7 @@ running.</p>
         <span class="n">log_error</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">item</span><span class="o">.</span><span class="n">error</span><span class="p">)</span>
 </code></pre></div>
 <p>The engine keeps a bounded window of items in flight (default
-<code>2 × workers</code>; set <code>batch_size</code> to change it). Input is consumed lazily —
+<code>2 × workers</code>; set <code>window_size</code> to change it). Input is consumed lazily —
 generators are never materialized — and a slow item delays only itself:
 there are no batch barriers. Breaking out of the loop stops submission
 and cancels not-yet-started tasks; tasks already running in a worker
@@ -2032,14 +2079,22 @@ as <code>parallel_map</code>.</p>
 <span class="n">failed_items</span> <span class="o">=</span> <span class="p">[</span><span class="n">items</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">failures</span><span class="p">()]</span>
 <span class="n">retry_result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">failed_items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 </code></pre></div>
-<p>When you iterate or call <code>.values()</code>, failures raise an <code>ExceptionGroup</code>:</p>
+<p>When you iterate or call <code>.values()</code>, failures raise an <code>ExceptionGroup</code>
+— and each sub-exception carries its item index as a PEP 678 note, so
+provenance survives without changing exception types (<code>except*
+ConnectionError</code> still matches):</p>
 <div class="highlight"><pre><span></span><code><span class="k">try</span><span class="p">:</span>
     <span class="n">values</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
 <span class="k">except</span> <span class="n">ExceptionGroup</span> <span class="k">as</span> <span class="n">eg</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">eg</span><span class="o">.</span><span class="n">exceptions</span><span class="p">)</span><span class="si">}</span><span class="s2"> tasks failed&quot;</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">exc</span> <span class="ow">in</span> <span class="n">eg</span><span class="o">.</span><span class="n">exceptions</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>   <span class="c1"># notes show &quot;item index N&quot;</span>
 </code></pre></div>
+<p>A <em>truncated</em> run (<code>timeout=</code> hit, or <code>max_errors</code> abort) raises from
+those same accessors even when every returned item succeeded — a
+partial list must never read as the whole. <code>result.status</code> says how the
+run ended; <code>.successes()</code> / <code>.ok_values()</code> are the deliberate
+partial-result paths.</p>
 
 
 

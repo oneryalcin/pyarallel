@@ -1320,6 +1320,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1404,7 +1432,7 @@ Works with OpenAI, Cohere, HuggingFace Inference API, or any HTTP endpoint.</p>
         <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">openai</span><span class="o">.</span><span class="n">RateLimitError</span><span class="p">,</span> <span class="n">openai</span><span class="o">.</span><span class="n">APIConnectionError</span><span class="p">),</span>
         <span class="n">wait_from</span><span class="o">=</span><span class="n">retry_after</span><span class="p">,</span>              <span class="c1"># a 429 pauses the WHOLE pool</span>
     <span class="p">),</span>
-    <span class="n">batch_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>                         <span class="c1"># in-flight window (default 2 x workers)</span>
+    <span class="n">window_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>                         <span class="c1"># in-flight window (default 2 x workers)</span>
     <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;embeddings.ckpt&quot;</span><span class="p">,</span>           <span class="c1"># crash at item 40k? rerun resumes</span>
 <span class="p">)</span>
 

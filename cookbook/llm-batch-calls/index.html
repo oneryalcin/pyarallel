@@ -1320,6 +1320,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1428,7 +1456,7 @@ twice, and a dead API at 2 a.m. must not burn the quota retrying forever.</p>
   run stops admitting work once the 20th post-retry failure lands — at
   most one admission window (default <code>2 × workers</code>) is still in flight —
   and returns partial results; the morning rerun resumes from the
-  checkpoint. Shrink <code>batch_size</code> to tighten that bound on expensive
+  checkpoint. Shrink <code>window_size</code> to tighten that bound on expensive
   calls, at some throughput cost.</li>
 </ul>
 <p>The recipe is client-agnostic: swap the <code>openai</code> call for

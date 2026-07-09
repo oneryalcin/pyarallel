@@ -1320,6 +1320,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1384,7 +1412,7 @@
     <span class="p">}</span>
 
 <span class="n">output_buffer</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">parallel_iter</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">fetch_rows</span><span class="p">(),</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">500</span><span class="p">):</span>
+<span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">parallel_iter</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">fetch_rows</span><span class="p">(),</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">500</span><span class="p">):</span>
     <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
         <span class="n">output_buffer</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_buffer</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">1000</span><span class="p">:</span>

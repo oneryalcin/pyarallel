@@ -1810,6 +1810,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2332,7 +2360,7 @@
     <span class="n">rate_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># RateLimit spec, shared Limiter, or ops/second</span>
     <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                    <span class="c1"># Total timeout in seconds</span>
     <span class="n">on_progress</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># callback(completed, total)</span>
-    <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Lazy batch consumption for unsized iterables</span>
+    <span class="n">window_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># Admission window: max unresolved items</span>
     <span class="n">retry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                      <span class="c1"># Retry(attempts=3, backoff=1.0)</span>
     <span class="n">checkpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Path to a resume file (SQLite)</span>
     <span class="n">checkpoint_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>             <span class="c1"># Stable per-item identity for resume</span>
@@ -2397,7 +2425,7 @@
 <td>Progress callback <code>(completed, total)</code>. For unsized iterables, <code>total</code> is items seen so far</td>
 </tr>
 <tr>
-<td><code>batch_size</code></td>
+<td><code>window_size</code></td>
 <td><code>int \| None</code></td>
 <td><code>None</code></td>
 <td>Admission window: max items submitted but unresolved (default <code>2 × workers</code>). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily</td>
@@ -2412,7 +2440,7 @@
 <td><code>checkpoint</code></td>
 <td><code>str \| Path \| None</code></td>
 <td><code>None</code></td>
-<td>Checkpoint file for resumable runs — completed items load from disk on rerun</td>
+<td>Checkpoint file for resumable runs — completed items load from disk on rerun. <strong>Contains pickle: treat the file like code</strong> — never resume from a file you didn't create (<a href="../../user-guide/advanced-features/#checkpoint-resume">details</a>)</td>
 </tr>
 <tr>
 <td><code>checkpoint_key</code></td>
@@ -2461,7 +2489,7 @@
                        <span class="n">on_progress</span><span class="o">=</span><span class="k">lambda</span> <span class="n">d</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">))</span>
 
 <span class="c1"># Wider admission window — more lookahead for uneven task durations</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">million_items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">million_items</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="mi">500</span><span class="p">)</span>
 
 <span class="c1"># With retry — flaky network calls</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">backoff</span><span class="o">=</span><span class="mf">1.0</span><span class="p">))</span>
@@ -2504,7 +2532,7 @@ the standard guard against native-library memory leaks. With
 <p>With <code>max_errors=N</code>, the run stops once N items have failed (counted
 <strong>after</strong> retries are exhausted — an item that fails then succeeds on
 retry is a success), and <code>result.aborted</code> is set. Because all admission
-is windowed (<code>batch_size</code> if set, else <code>2 × workers</code>), the abort is
+is windowed (<code>window_size</code> if set, else <code>2 × workers</code>), the abort is
 cheap by construction: total submissions stay within the abort point
 plus one window.</p>
 <p>On abort you still get a complete <code>ParallelResult</code> — one entry per input
@@ -2576,7 +2604,7 @@ starmap or the streaming APIs.</p>
 <h3 id="notes-on-progress-and-unsized-iterables">Notes on Progress and Unsized Iterables<a class="headerlink" href="#notes-on-progress-and-unsized-iterables" title="Permanent link">&para;</a></h3>
 <p>When <code>items</code> has a known length, <code>on_progress(done, total)</code> reports the final
 total.</p>
-<p>When <code>items</code> is unsized (for example a generator) and <code>batch_size</code> is set,
+<p>When <code>items</code> is unsized (for example a generator) and <code>window_size</code> is set,
 Pyarallel keeps input consumption lazy instead of materializing the full input
 up front. In that mode, <code>total</code> is the number of items discovered so far, not a
 guaranteed final total.</p>
@@ -2660,7 +2688,7 @@ guaranteed final total.</p>
 
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_starmap</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="p">[(</span><span class="n">arg1</span><span class="p">,</span> <span class="n">arg2</span><span class="p">),</span> <span class="p">(</span><span class="n">arg3</span><span class="p">,</span> <span class="n">arg4</span><span class="p">),</span> <span class="o">...</span><span class="p">])</span>
 </code></pre></div>
-<p>Takes the same options as <code>parallel_map</code> (workers, executor, rate_limit, timeout, batch_size, retry).</p>
+<p>Takes the same options as <code>parallel_map</code> (workers, executor, rate_limit, timeout, window_size, retry).</p>
 <h3 id="examples_1">Examples<a class="headerlink" href="#examples_1" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
@@ -2739,7 +2767,7 @@ and a slow item delays only itself — items behind it keep streaming.</p>
 <td>Rate limiting</td>
 </tr>
 <tr>
-<td><code>batch_size</code></td>
+<td><code>window_size</code></td>
 <td><code>int \| None</code></td>
 <td><code>None</code></td>
 <td>Maximum items in flight (default <code>2 × workers</code>)</td>
@@ -2766,12 +2794,12 @@ and a slow item delays only itself — items behind it keep streaming.</p>
 </table>
 <div class="admonition note">
 <p class="admonition-title">Changed in v0.5 (streaming) and v0.6 (everywhere)</p>
-<p><code>batch_size</code> is an <strong>in-flight bound</strong>, not a chunk size — one
+<p><code>window_size</code> is an <strong>in-flight bound</strong>, not a chunk size — one
 meaning across every API since v0.6. Earlier versions processed
 chunks with a barrier between them (one slow item stalled the next
-chunk) and materialized the whole input when <code>batch_size</code> was
+chunk) and materialized the whole input when <code>window_size</code> was
 unset. Neither is true anymore — the default window of <code>2 × workers</code>
-already gives constant memory; raise <code>batch_size</code> only to increase
+already gives constant memory; raise <code>window_size</code> only to increase
 lookahead.</p>
 </div>
 <h3 id="yields">Yields<a class="headerlink" href="#yields" title="Permanent link">&para;</a></h3>
@@ -2866,12 +2894,18 @@ and <code>.stream()</code>.</p>
 </code></pre></div>
 <hr />
 <h2 id="parallelresult"><code>ParallelResult</code><a class="headerlink" href="#parallelresult" title="Permanent link">&para;</a></h2>
-<p>Container for parallel execution results. Behaves like a <code>list</code> when all tasks succeed. Provides structured access when some fail.</p>
-<p><code>timed_out</code>/<code>aborted</code> report how the run <em>ended</em> — the reliable signal
-when per-item markers can't carry it: an unsized input that hits
-<code>timeout=</code> returns only the items actually pulled (possibly all
-successes), and the flag is what distinguishes that truncation from a
-completed run.</p>
+<p>Container for parallel execution results. Behaves like a <code>list</code> when the
+run completed and all tasks succeeded. Provides structured access
+otherwise.</p>
+<p><code>.status</code> (a <code>RunStatus</code>: <code>COMPLETED</code> / <code>TIMED_OUT</code> / <code>ABORTED</code>) reports
+how the run <em>ended</em> — the reliable signal when per-item markers can't
+carry it: an unsized input that hits <code>timeout=</code> returns only the items
+actually pulled (possibly all successes), and the status is what
+distinguishes that truncation from a completed run. Since v0.8, <strong>a
+truncated run is never <code>ok</code></strong> and its "whole result" accessors —
+<code>.values()</code>, iteration, indexing — raise (<code>TimeoutError</code> / <code>Aborted</code>)
+instead of quietly returning a partial list. Use <code>.successes()</code> /
+<code>.ok_values()</code> to consume partial results deliberately.</p>
 <h3 id="properties-and-methods">Properties and Methods<a class="headerlink" href="#properties-and-methods" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
@@ -2885,22 +2919,32 @@ completed run.</p>
 <tr>
 <td><code>.ok</code></td>
 <td><code>bool</code></td>
-<td><code>True</code> if every task succeeded</td>
+<td><code>True</code> when the run <strong>completed</strong> and every task succeeded</td>
+</tr>
+<tr>
+<td><code>.status</code></td>
+<td><code>RunStatus</code></td>
+<td>How the run ended: <code>COMPLETED</code>, <code>TIMED_OUT</code>, or <code>ABORTED</code></td>
+</tr>
+<tr>
+<td><code>.complete</code></td>
+<td><code>bool</code></td>
+<td>Source exhausted, every item resolved — independent of failures: a run can be complete and not ok</td>
 </tr>
 <tr>
 <td><code>.timed_out</code></td>
 <td><code>bool</code></td>
-<td><code>True</code> when the run stopped on the total <code>timeout=</code> deadline</td>
+<td>Derived: <code>status is RunStatus.TIMED_OUT</code></td>
 </tr>
 <tr>
 <td><code>.aborted</code></td>
 <td><code>bool</code></td>
-<td><code>True</code> when the run stopped early via <code>max_errors</code></td>
+<td>Derived: <code>status is RunStatus.ABORTED</code></td>
 </tr>
 <tr>
 <td><code>.values()</code></td>
 <td><code>list[R]</code></td>
-<td>All results in order. Raises <code>ExceptionGroup</code> on failure</td>
+<td>All results in order. Raises <code>TimeoutError</code>/<code>Aborted</code> on truncation (checked first), <code>ExceptionGroup</code> on failure</td>
 </tr>
 <tr>
 <td><code>.ok_values()</code></td>
@@ -2920,22 +2964,22 @@ completed run.</p>
 <tr>
 <td><code>.raise_on_failure()</code></td>
 <td><code>None</code></td>
-<td>Raises <code>ExceptionGroup</code> if any task failed</td>
+<td>Raises <code>ExceptionGroup</code> if any task failed; each sub-exception carries its item index as a PEP 678 note (<code>except*</code> matching untouched)</td>
 </tr>
 <tr>
 <td><code>len(result)</code></td>
 <td><code>int</code></td>
-<td>Total number of tasks</td>
+<td>Number of tasks with a result entry</td>
 </tr>
 <tr>
 <td><code>result[i]</code></td>
 <td><code>R</code></td>
-<td>Index into values (raises on failure)</td>
+<td>Index into values (raises on failure/truncation)</td>
 </tr>
 <tr>
 <td><code>list(result)</code></td>
 <td><code>list[R]</code></td>
-<td>Iterate values (raises on failure)</td>
+<td>Iterate values (raises on failure/truncation)</td>
 </tr>
 <tr>
 <td><code>bool(result)</code></td>
@@ -3106,7 +3150,7 @@ multiplied by jitter.</p>
     <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
     <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">),</span>
     <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">backoff</span><span class="o">=</span><span class="mf">1.0</span><span class="p">),</span>
-    <span class="n">batch_size</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
+    <span class="n">window_size</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
 <h3 id="server-driven-backoff">Server-Driven Backoff<a class="headerlink" href="#server-driven-backoff" title="Permanent link">&para;</a></h3>

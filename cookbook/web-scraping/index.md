@@ -56,7 +56,7 @@ For large crawls (10K+ URLs), use streaming so results don't accumulate in memor
 from pyarallel import parallel_iter
 
 for item in parallel_iter(scrape_page, url_generator(), workers=10,
-                          rate_limit=RateLimit(5, "second"), batch_size=500):
+                          rate_limit=RateLimit(5, "second"), window_size=500):
     if item.ok:
         save_to_db(item.value)
     else:

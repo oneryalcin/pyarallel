@@ -18,7 +18,7 @@ results = await async_parallel_map(
     timeout=None,                    # Total wall-clock timeout (mirror of sync)
     task_timeout=None,               # Per-task timeout in seconds
     on_progress=None,                # callback(completed, total)
-    batch_size=None,                 # Lazy batch consumption for unsized iterables
+    window_size=None,                # Admission window: max unresolved items
     retry=None,                      # Retry(attempts=3, backoff=1.0)
     checkpoint=None,                 # Path to a resume file (SQLite)
     checkpoint_key=None,             # Stable per-item identity for resume
@@ -39,7 +39,7 @@ results = await async_parallel_map(
 | `timeout`        | `float \| None`                              | `None`   | **Total** wall-clock timeout — mirror of the sync `timeout`. Unfinished tasks are cancelled, `result.timed_out` is set; sized slots are marked `TimeoutError`, unsized inputs return a shorter result (the source is never drained)                                       |
 | `task_timeout`   | `float \| None`                              | `None`   | **Per-task** timeout in seconds                                                                                                                                                                                                                                           |
 | `on_progress`    | `Callable[[int, int], None] \| None`         | `None`   | Progress callback. For unsized iterables, `total` is items seen so far                                                                                                                                                                                                    |
-| `batch_size`     | `int \| None`                                | `None`   | Admission window: max tasks created but unresolved (default `2 × concurrency`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily                                                                                                           |
+| `window_size`    | `int \| None`                                | `None`   | Admission window: max tasks created but unresolved (default `2 × concurrency`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily                                                                                                           |
 | `retry`          | `Retry \| None`                              | `None`   | Per-item retry with backoff                                                                                                                                                                                                                                               |
 | `checkpoint`     | `str \| Path \| None`                        | `None`   | Checkpoint file for resumable runs — completed items load from disk on rerun                                                                                                                                                                                              |
 | `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None`   | Stable per-item identity — see the [sync docs](https://oneryalcin.github.io/pyarallel/api-reference/core/#checkpoint-resume)                                                                                                                                              |
@@ -107,7 +107,7 @@ ______________________________________________________________________
 
 ## `async_parallel_iter`
 
-Async streaming — yields `ItemResult` in completion order. A bounded window of tasks is in flight at any moment (default `2 × concurrency`, override with `batch_size`): memory stays constant, input is consumed lazily, and a slow item delays only itself.
+Async streaming — yields `ItemResult` in completion order. A bounded window of tasks is in flight at any moment (default `2 × concurrency`, override with `window_size`): memory stays constant, input is consumed lazily, and a slow item delays only itself.
 
 ```
 from pyarallel import async_parallel_iter
@@ -121,7 +121,7 @@ async for item in async_parallel_iter(fetch, urls, concurrency=10):
 
 Changed in v0.5 (streaming) and v0.6 (everywhere)
 
-`batch_size` is an **in-flight bound**, not a chunk size — one meaning across every API since v0.6: there are no barriers, and input is never materialized.
+`window_size` is an **in-flight bound**, not a chunk size — one meaning across every API since v0.6: there are no barriers, and input is never materialized.
 
 Takes the same `ordered=` and `on_progress=` options as `parallel_iter`: `ordered=True` yields in input order with a reorder buffer counted inside the window; `on_progress(done, total)` fires per completed item.
 
