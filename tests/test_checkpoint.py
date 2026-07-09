@@ -66,11 +66,13 @@ class TestResume:
                 raise ValueError("crash mid-stream")
             return x * 2
 
-        first = parallel_map(work, (i for i in range(8)), batch_size=3, checkpoint=ckpt)
+        first = parallel_map(
+            work, (i for i in range(8)), window_size=3, checkpoint=ckpt
+        )
         assert not first.ok
 
         second = parallel_map(
-            work, (i for i in range(8)), batch_size=3, checkpoint=ckpt
+            work, (i for i in range(8)), window_size=3, checkpoint=ckpt
         )
         assert second.ok
         assert list(second) == [i * 2 for i in range(8)]
@@ -616,3 +618,28 @@ class TestCheckpointTimeoutInterplay:
 
 def _ckpt_double(x):
     return x * 2
+
+
+class TestCorruptedRow:
+    """v0.8 review: put() wraps failures in CheckpointError but the get()
+    path called pickle.loads bare — a corrupted value blob leaked a raw
+    unpickling exception instead of the actionable delete-to-start-fresh
+    error every other unusable-checkpoint case raises."""
+
+    def test_corrupted_value_blob_raises_checkpoint_error(self, tmp_path):
+        import sqlite3
+
+        ckpt = tmp_path / "run.ckpt"
+        first = parallel_map(_ckpt_double, [1, 2, 3], checkpoint=str(ckpt))
+        assert first.ok
+
+        conn = sqlite3.connect(ckpt)
+        conn.execute(
+            "UPDATE results SET value = ? WHERE key = 'i:1'",
+            (b"\x80\x99 not a pickle",),
+        )
+        conn.commit()
+        conn.close()
+
+        with pytest.raises(CheckpointError):
+            parallel_map(_ckpt_double, [1, 2, 3], checkpoint=str(ckpt))

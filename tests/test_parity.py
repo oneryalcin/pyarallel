@@ -194,7 +194,7 @@ class TestAsyncTotalTimeout:
             hang,
             items(),
             concurrency=2,
-            batch_size=2,
+            window_size=2,
             timeout=0.3,
         )
         assert result.timed_out

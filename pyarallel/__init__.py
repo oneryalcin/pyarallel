@@ -14,7 +14,7 @@ from .core import (
 from .decorators import async_parallel, parallel
 from .limiter import Limiter
 from .policies import RateLimit, Retry
-from .result import Aborted, ItemResult, ParallelResult
+from .result import Aborted, ItemResult, ParallelResult, RunStatus
 
 __version__ = "0.7.0"
 __all__ = [
@@ -24,6 +24,7 @@ __all__ = [
     "Retry",
     "Limiter",
     "Aborted",
+    "RunStatus",
     "CheckpointError",
     "parallel",
     "parallel_iter",

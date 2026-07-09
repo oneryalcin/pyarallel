@@ -106,7 +106,7 @@ def check_decorator_option_keys() -> None:
             rate_limit=limiter,
             timeout=30.0,
             on_progress=lambda done, total: None,
-            batch_size=100,
+            window_size=100,
             retry=Retry(attempts=2),
             checkpoint="run.ckpt",
             checkpoint_key=lambda item: str(item),
@@ -117,8 +117,11 @@ def check_decorator_option_keys() -> None:
         ),
         ParallelResult[str],
     )
-    # Explicit None means "inherit the decorator default" — must type-check.
-    assert_type(triple.map([1], workers=None, executor=None), ParallelResult[str])
+    # v0.8: an explicitly passed option overrides the decorator default —
+    # workers=None is a valid override (engine auto-sizing); executor has
+    # no None value, so passing None must be a type error.
+    assert_type(triple.map([1], workers=None), ParallelResult[str])
+    triple.map([1], executor=None)  # type: ignore[arg-type]  # None not a value
 
     assert_type(
         triple.stream([1], ordered=True, max_errors=3, sequential=None),

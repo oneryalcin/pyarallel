@@ -2,6 +2,8 @@
 
 import time
 
+import pytest
+
 from pyarallel import Retry, parallel_map
 
 
@@ -655,3 +657,37 @@ class TestProcessExecutorRetryPickling:
 
 def _module_level_square(x):
     return x * x
+
+
+class TestRetryNumericValidation:
+    """v0.8 review: Retry(backoff=-5) and Retry(max_delay=nan) were
+    accepted — a negative backoff makes _delay() negative and nan
+    poisons every min()/comparison downstream."""
+
+    def test_negative_backoff_rejected(self):
+        with pytest.raises(ValueError):
+            Retry(backoff=-1.0)
+
+    def test_nan_backoff_rejected(self):
+        with pytest.raises(ValueError):
+            Retry(backoff=float("nan"))
+
+    def test_inf_backoff_rejected(self):
+        with pytest.raises(ValueError):
+            Retry(backoff=float("inf"))
+
+    def test_negative_max_delay_rejected(self):
+        with pytest.raises(ValueError):
+            Retry(max_delay=-1.0)
+
+    def test_nan_max_delay_rejected(self):
+        with pytest.raises(ValueError):
+            Retry(max_delay=float("nan"))
+
+    def test_nan_max_server_wait_rejected(self):
+        with pytest.raises(ValueError):
+            Retry(max_server_wait=float("nan"))
+
+    def test_zero_backoff_allowed(self):
+        """Immediate retry is a legitimate strategy (tests, local calls)."""
+        assert Retry(backoff=0.0).backoff == 0.0

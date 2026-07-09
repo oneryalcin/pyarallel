@@ -271,7 +271,15 @@ class _CheckpointStore:
         ).fetchone()
         if row is None or row[0] != fingerprint:
             return None
-        return (pickle.loads(row[1]),)
+        try:
+            return (pickle.loads(row[1]),)
+        except Exception as exc:
+            # A corrupted value blob must fail like every other unusable
+            # checkpoint — actionably — not leak a raw unpickling error.
+            raise CheckpointError(
+                f"Checkpoint row {key!r} is corrupted and cannot be read "
+                f"({exc}). Delete the file to start fresh."
+            ) from exc
 
     def put(self, key: str, fingerprint: bytes, value: Any) -> None:
         """Record a completed item.

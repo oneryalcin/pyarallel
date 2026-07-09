@@ -10,9 +10,10 @@ Per-call options are typed once per engine (``SyncMapOptions`` etc.,
 declared next to the engine functions) and threaded through with
 ``Unpack`` — the engine's explicit signature stays the source of truth,
 and a signature change no longer touches five hand-copied keyword lists.
-An explicit ``None`` for any option means "inherit the decorator
-default" (``_merge_opts`` skips ``None``); an explicit ``None`` cannot
-*override* a non-None decorator default — known, documented limitation.
+Keyword *presence* is the inherit/override sentinel (v0.8): an unpassed
+option inherits the decorator default; an explicitly passed option —
+even ``None`` — overrides it, so ``fetch.map(urls, rate_limit=None)``
+genuinely turns the decorator's rate limit off.
 """
 
 from __future__ import annotations
@@ -44,9 +45,14 @@ from .result import ItemResult, ParallelResult
 
 
 def _merge_opts(defaults: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
-    """Merge decorator defaults with per-call overrides (skip None values)."""
+    """Merge decorator defaults with per-call overrides.
+
+    Presence is the sentinel: *overrides* holds only the keywords the
+    caller actually passed (``**opts``), so an unpassed option inherits
+    and an explicit ``None`` overrides — no None-skipping.
+    """
     opts = dict(defaults)
-    opts.update({k: v for k, v in overrides.items() if v is not None})
+    opts.update(overrides)
     return opts
 
 

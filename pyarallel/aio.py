@@ -23,7 +23,6 @@ from ._run import (
     _mark_timeout_indices,
     _progress_total,
     _RunStop,
-    _StopReason,
     _timeout_failure,
     _total_if_known,
     _validate_max_errors,
@@ -36,6 +35,7 @@ from .result import (
     Aborted,
     ItemResult,
     ParallelResult,
+    RunStatus,
     _Failure,
     _item_result,
     _Outcome,
@@ -44,14 +44,15 @@ from .result import (
 
 class AsyncMapOptions(TypedDict, total=False):
     """Per-call options of ``async_parallel_map`` — the async decorator
-    ``.map()`` surface. Every key allows ``None`` = "inherit"."""
+    ``.map()`` surface. An unpassed key inherits the decorator
+    default; an explicitly passed key — even ``None`` — overrides."""
 
     concurrency: int | None
     rate_limit: Limiter | RateLimit | float | None
     timeout: float | None
     task_timeout: float | None
     on_progress: Callable[[int, int], None] | None
-    batch_size: int | None
+    window_size: int | None
     retry: Retry | None
     checkpoint: str | Path | None
     checkpoint_key: Callable[[Any], str | int | bytes] | None
@@ -66,7 +67,7 @@ class AsyncStarmapOptions(TypedDict, total=False):
     timeout: float | None
     task_timeout: float | None
     on_progress: Callable[[int, int], None] | None
-    batch_size: int | None
+    window_size: int | None
     retry: Retry | None
 
 
@@ -76,7 +77,7 @@ class AsyncStreamOptions(TypedDict, total=False):
     concurrency: int | None
     rate_limit: Limiter | RateLimit | float | None
     task_timeout: float | None
-    batch_size: int | None
+    window_size: int | None
     retry: Retry | None
     ordered: bool | None
     on_progress: Callable[[int, int], None] | None
@@ -143,7 +144,7 @@ async def async_parallel_map[T, R](
     timeout: float | None = None,
     task_timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
-    batch_size: int | None = None,
+    window_size: int | None = None,
     retry: Retry | None = None,
     checkpoint: str | Path | None = None,
     checkpoint_key: Callable[[T], str | int | bytes] | None = None,
@@ -172,7 +173,7 @@ async def async_parallel_map[T, R](
             completions) — it grows as the run progresses, so a
             percentage over it is meaningless; pass a sized input for a
             real total.
-        batch_size: The admission window — the maximum number of tasks
+        window_size: The admission window — the maximum number of tasks
             created but not yet resolved (default ``2 × concurrency``).
             It is a memory/lookahead bound, not a chunk size: there are
             no barriers, and input is consumed lazily, one window ahead,
@@ -205,8 +206,8 @@ async def async_parallel_map[T, R](
     Returns:
         ``ParallelResult`` — same container as the sync API.
     """
-    if batch_size is not None and batch_size < 1:
-        raise ValueError(f"batch_size must be >= 1, got {batch_size}")
+    if window_size is not None and window_size < 1:
+        raise ValueError(f"window_size must be >= 1, got {window_size}")
     if concurrency < 1:
         raise ValueError(f"concurrency must be >= 1, got {concurrency}")
     _validate_max_errors(max_errors)
@@ -221,7 +222,7 @@ async def async_parallel_map[T, R](
         timeout=timeout,
         task_timeout=task_timeout,
         on_progress=on_progress,
-        batch_size=batch_size,
+        window_size=window_size,
         retry=retry,
         checkpoint=checkpoint,
         checkpoint_key=checkpoint_key,
@@ -238,7 +239,7 @@ async def _async_collected_map(
     timeout: float | None,
     task_timeout: float | None,
     on_progress: Callable[[int, int], None] | None,
-    batch_size: int | None,
+    window_size: int | None,
     retry: Retry | None,
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
@@ -252,7 +253,7 @@ async def _async_collected_map(
     ``max_errors`` cheap (abort-trigger plus one window, not thousands
     of upfront task creations).
     """
-    window = batch_size if batch_size is not None else 2 * concurrency
+    window = window_size if window_size is not None else 2 * concurrency
     semaphore = asyncio.Semaphore(concurrency)
     limiter = _as_limiter(rate_limit)
     total = _total_if_known(items)
@@ -291,7 +292,7 @@ async def _async_collected_map(
             # without ever reaching an await, so asyncio.timeout() cannot
             # preempt them — the deadline must bind here too.
             if deadline is not None and time.monotonic() >= deadline:
-                halt.stop(_StopReason.TIMED_OUT)
+                halt.stop(RunStatus.TIMED_OUT)
                 return False
             try:
                 item = next(source)
@@ -322,7 +323,7 @@ async def _async_collected_map(
             results[idx] = _Failure(error)
             failures += 1
             if max_errors is not None and failures >= max_errors:
-                halt.stop(_StopReason.ABORTED)
+                halt.stop(RunStatus.ABORTED)
         else:
             results[idx] = outcome.value
             # Outside the except: a checkpoint write failure raises
@@ -357,7 +358,7 @@ async def _async_collected_map(
         if timeout is not None and timeout <= 0:
             # Already expired: admit no work (asyncio.timeout alone
             # cancels only at the first suspension point).
-            halt.stop(_StopReason.TIMED_OUT)
+            halt.stop(RunStatus.TIMED_OUT)
         elif timeout is not None:
             scope = asyncio.timeout(timeout)
             try:
@@ -369,7 +370,7 @@ async def _async_collected_map(
                 # and must propagate, not be repackaged as expiry.
                 if not scope.expired():
                     raise
-                halt.stop(_StopReason.TIMED_OUT)
+                halt.stop(RunStatus.TIMED_OUT)
         else:
             await _drive()
 
@@ -408,7 +409,7 @@ async def _async_collected_map(
         if store is not None:
             store.close()
 
-    return ParallelResult(results, timed_out=halt.timed_out, aborted=halt.aborted)
+    return ParallelResult(results, status=halt.status)
 
 
 async def async_parallel_starmap[R](
@@ -420,7 +421,7 @@ async def async_parallel_starmap[R](
     timeout: float | None = None,
     task_timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
-    batch_size: int | None = None,
+    window_size: int | None = None,
     retry: Retry | None = None,
 ) -> ParallelResult[R]:
     """Like ``async_parallel_map`` but unpacks each item as ``fn(*args)``."""
@@ -436,7 +437,7 @@ async def async_parallel_starmap[R](
         timeout=timeout,
         task_timeout=task_timeout,
         on_progress=on_progress,
-        batch_size=batch_size,
+        window_size=window_size,
         retry=retry,
     )
 
@@ -448,7 +449,7 @@ async def async_parallel_iter[T, R](
     concurrency: int = 4,
     rate_limit: Limiter | RateLimit | float | None = None,
     task_timeout: float | None = None,
-    batch_size: int | None = None,
+    window_size: int | None = None,
     retry: Retry | None = None,
     ordered: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
@@ -463,7 +464,7 @@ async def async_parallel_iter[T, R](
     exactly one window ahead of the yields; generators are never
     materialized.
 
-    ``batch_size`` sets the window: the maximum number of
+    ``window_size`` sets the window: the maximum number of
     started-but-unyielded tasks (default ``2 × concurrency``). It is a
     memory/lookahead bound, not a chunk size — there are no barriers.
 
@@ -506,13 +507,13 @@ async def async_parallel_iter[T, R](
                 if found(item):
                     break  # aclosing cancels in-flight tasks here
     """
-    if batch_size is not None and batch_size < 1:
-        raise ValueError(f"batch_size must be >= 1, got {batch_size}")
+    if window_size is not None and window_size < 1:
+        raise ValueError(f"window_size must be >= 1, got {window_size}")
     if concurrency < 1:
         raise ValueError(f"concurrency must be >= 1, got {concurrency}")
     _validate_max_errors(max_errors)
 
-    window = batch_size if batch_size is not None else 2 * concurrency
+    window = window_size if window_size is not None else 2 * concurrency
     semaphore = asyncio.Semaphore(concurrency)
     limiter = _as_limiter(rate_limit)
 

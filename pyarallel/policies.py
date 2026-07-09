@@ -8,6 +8,7 @@ elsewhere — a ``RateLimit`` is a spec; the runtime state that enforces it is
 
 from __future__ import annotations
 
+import math
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -37,8 +38,12 @@ class RateLimit:
     _VALID_INTERVALS = {"second": 1, "minute": 60, "hour": 3600}
 
     def __post_init__(self) -> None:
-        if self.count <= 0:
-            raise ValueError(f"RateLimit count must be positive, got {self.count}")
+        # isfinite first: NaN compares False to everything, so `<= 0`
+        # alone waves it through and it poisons the bucket math silently.
+        if not math.isfinite(self.count) or self.count <= 0:
+            raise ValueError(
+                f"RateLimit count must be positive and finite, got {self.count}"
+            )
         if self.per not in self._VALID_INTERVALS:
             raise ValueError(
                 f'RateLimit per must be "second", "minute", or "hour", got {self.per!r}'
@@ -96,9 +101,22 @@ class Retry:
     def __post_init__(self) -> None:
         if self.attempts < 1:
             raise ValueError(f"Retry attempts must be >= 1, got {self.attempts}")
-        if self.max_server_wait is not None and self.max_server_wait < 0:
+        # NaN/inf/negative all poison the delay math downstream (NaN wins
+        # every min(), a negative backoff yields negative sleeps) — reject
+        # at construction, where the mistake is visible.
+        if not math.isfinite(self.backoff) or self.backoff < 0:
             raise ValueError(
-                f"Retry max_server_wait must be >= 0 or None, got "
+                f"Retry backoff must be >= 0 and finite, got {self.backoff}"
+            )
+        if not math.isfinite(self.max_delay) or self.max_delay < 0:
+            raise ValueError(
+                f"Retry max_delay must be >= 0 and finite, got {self.max_delay}"
+            )
+        if self.max_server_wait is not None and (
+            not math.isfinite(self.max_server_wait) or self.max_server_wait < 0
+        ):
+            raise ValueError(
+                f"Retry max_server_wait must be >= 0 and finite (or None), got "
                 f"{self.max_server_wait}"
             )
 

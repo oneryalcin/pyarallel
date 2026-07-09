@@ -42,7 +42,6 @@ from ._run import (
     _mark_timeout_indices,
     _progress_total,
     _RunStop,
-    _StopReason,
     _timeout_failure,
     _total_if_known,
     _validate_max_errors,
@@ -55,6 +54,7 @@ from .result import (
     Aborted,
     ItemResult,
     ParallelResult,
+    RunStatus,
     _Failure,
     _item_result,
     _Outcome,
@@ -66,15 +66,16 @@ ExecutorType = Literal["thread", "process", "interpreter"]
 class SyncMapOptions(TypedDict, total=False):
     """Per-call options of ``parallel_map`` — the decorator ``.map()``
     surface. Declared to match the engine signature (the source of
-    truth); ``typing_assertions.py`` keeps them honest. Every key allows
-    ``None`` = "inherit the decorator default"."""
+    truth); ``typing_assertions.py`` keeps them honest. An *unpassed*
+    key inherits the decorator default; a key passed explicitly — even
+    as ``None`` — overrides it (v0.8)."""
 
     workers: int | None
-    executor: ExecutorType | None
+    executor: ExecutorType
     rate_limit: Limiter | RateLimit | float | None
     timeout: float | None
     on_progress: Callable[[int, int], None] | None
-    batch_size: int | None
+    window_size: int | None
     retry: Retry | None
     checkpoint: str | Path | None
     checkpoint_key: Callable[[Any], str | int | bytes] | None
@@ -88,11 +89,11 @@ class SyncStarmapOptions(TypedDict, total=False):
     """Per-call options of ``parallel_starmap`` (no checkpoint)."""
 
     workers: int | None
-    executor: ExecutorType | None
+    executor: ExecutorType
     rate_limit: Limiter | RateLimit | float | None
     timeout: float | None
     on_progress: Callable[[int, int], None] | None
-    batch_size: int | None
+    window_size: int | None
     retry: Retry | None
     sequential: bool | None
     worker_init: Callable[[], None] | None
@@ -103,9 +104,9 @@ class SyncStreamOptions(TypedDict, total=False):
     """Per-call options of ``parallel_iter`` — the ``.stream()`` surface."""
 
     workers: int | None
-    executor: ExecutorType | None
+    executor: ExecutorType
     rate_limit: Limiter | RateLimit | float | None
-    batch_size: int | None
+    window_size: int | None
     retry: Retry | None
     ordered: bool | None
     on_progress: Callable[[int, int], None] | None
@@ -162,11 +163,11 @@ def _execute_outcome(
 
 
 def _validate_common(
-    workers: int | None, executor: str, batch_size: int | None
+    workers: int | None, executor: str, window_size: int | None
 ) -> None:
     """Shared argument validation for the sync entry points."""
-    if batch_size is not None and batch_size < 1:
-        raise ValueError(f"batch_size must be >= 1, got {batch_size}")
+    if window_size is not None and window_size < 1:
+        raise ValueError(f"window_size must be >= 1, got {window_size}")
     if workers is not None and workers < 1:
         raise ValueError(f"workers must be >= 1, got {workers}")
     if executor not in ("thread", "process", "interpreter"):
@@ -393,7 +394,7 @@ def parallel_map[T, R](
     rate_limit: Limiter | RateLimit | float | None = None,
     timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
-    batch_size: int | None = None,
+    window_size: int | None = None,
     retry: Retry | None = None,
     checkpoint: str | Path | None = None,
     checkpoint_key: Callable[[T], str | int | bytes] | None = None,
@@ -435,7 +436,7 @@ def parallel_map[T, R](
             completions) — it grows as the run progresses, so a
             percentage over it is meaningless; pass a sized input for a
             real total.
-        batch_size: The admission window — the maximum number of items
+        window_size: The admission window — the maximum number of items
             submitted but not yet resolved (default ``2 × workers``).
             It is a memory/lookahead bound, not a chunk size: there are
             no barriers, and input is consumed lazily, one window ahead,
@@ -500,7 +501,7 @@ def parallel_map[T, R](
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
     """
-    _validate_common(workers, executor, batch_size)
+    _validate_common(workers, executor, window_size)
     _validate_max_errors(max_errors)
     if not sequential:
         # Debug mode ignores the pool entirely — a process-configured call
@@ -531,7 +532,7 @@ def parallel_map[T, R](
         rate_limit=rate_limit,
         timeout=timeout,
         on_progress=on_progress,
-        batch_size=batch_size,
+        window_size=window_size,
         retry=retry,
         checkpoint=checkpoint,
         checkpoint_key=checkpoint_key,
@@ -550,7 +551,7 @@ def _collected_map(
     rate_limit: Limiter | RateLimit | float | None,
     timeout: float | None,
     on_progress: Callable[[int, int], None] | None,
-    batch_size: int | None,
+    window_size: int | None,
     retry: Retry | None,
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
@@ -573,8 +574,8 @@ def _collected_map(
     bucket = _as_limiter(rate_limit)
     task_fn = _build_task_fn(fn, executor, retry, bucket)
     window = (
-        batch_size
-        if batch_size is not None
+        window_size
+        if window_size is not None
         else 2 * _effective_workers(workers, executor)
     )
     total = _total_if_known(items)
@@ -604,7 +605,7 @@ def _collected_map(
             # without ever reaching a wait — the deadline must bind here
             # too, or a checkpoint-heavy run ignores timeout= entirely.
             if deadline is not None and time.monotonic() >= deadline:
-                halt.stop(_StopReason.TIMED_OUT)
+                halt.stop(RunStatus.TIMED_OUT)
                 return False
             try:
                 item = next(source)
@@ -628,7 +629,7 @@ def _collected_map(
                     # never submitted — mark its slot, stop admitting.
                     assert timeout is not None
                     results[idx] = _timeout_failure(timeout, idx)
-                    halt.stop(_StopReason.TIMED_OUT)
+                    halt.stop(RunStatus.TIMED_OUT)
                     return False
             in_flight[_submit_task(pool, executor, task_fn, item)] = idx
             return True
@@ -646,7 +647,7 @@ def _collected_map(
             results[idx] = _Failure(error)
             failures += 1
             if max_errors is not None and failures >= max_errors:
-                halt.stop(_StopReason.ABORTED)
+                halt.stop(RunStatus.ABORTED)
         else:
             results[idx] = outcome.value
             # Outside the except: a checkpoint write failure raises
@@ -686,7 +687,7 @@ def _collected_map(
             # Deadline first — an already-expired timeout must not admit
             # any work at all (timeout=0 means zero tasks run).
             if deadline is not None and time.monotonic() >= deadline:
-                halt.stop(_StopReason.TIMED_OUT)
+                halt.stop(RunStatus.TIMED_OUT)
                 break
             while not halt.stopped and len(in_flight) < window:
                 if not _submit_next():
@@ -709,7 +710,7 @@ def _collected_map(
                 in_flight, timeout=wait_timeout, return_when=FIRST_COMPLETED
             )
             if not done:
-                halt.stop(_StopReason.TIMED_OUT)
+                halt.stop(RunStatus.TIMED_OUT)
                 break
             for future in done:
                 _absorb(future, in_flight.pop(future))
@@ -755,7 +756,7 @@ def _collected_map(
         if store is not None:
             store.close()
 
-    return ParallelResult(results, timed_out=halt.timed_out, aborted=halt.aborted)
+    return ParallelResult(results, status=halt.status)
 
 
 def _sequential_collected_map(
@@ -799,7 +800,7 @@ def _sequential_collected_map(
     try:
         for idx, item in enumerate(items):
             if deadline is not None and time.monotonic() >= deadline:
-                halt.stop(_StopReason.TIMED_OUT)
+                halt.stop(RunStatus.TIMED_OUT)
                 break
             results.append(_PENDING)
             if store is not None:
@@ -817,7 +818,7 @@ def _sequential_collected_map(
                 if not bucket.wait(timeout=budget):
                     assert timeout is not None
                     results[idx] = _timeout_failure(timeout, idx)
-                    halt.stop(_StopReason.TIMED_OUT)
+                    halt.stop(RunStatus.TIMED_OUT)
                     break
             outcome = task_fn(item)
             if outcome.error is not None:
@@ -831,7 +832,7 @@ def _sequential_collected_map(
             if on_progress:
                 on_progress(completed, _progress_total(total, results))
             if max_errors is not None and failures >= max_errors:
-                halt.stop(_StopReason.ABORTED)
+                halt.stop(RunStatus.ABORTED)
                 break
 
         # Same no-drain policy as the windowed engine: never touch the
@@ -849,7 +850,7 @@ def _sequential_collected_map(
         if store is not None:
             store.close()
 
-    return ParallelResult(results, timed_out=halt.timed_out, aborted=halt.aborted)
+    return ParallelResult(results, status=halt.status)
 
 
 def _sequential_iter(
@@ -898,7 +899,7 @@ def parallel_starmap[R](
     rate_limit: Limiter | RateLimit | float | None = None,
     timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
-    batch_size: int | None = None,
+    window_size: int | None = None,
     retry: Retry | None = None,
     sequential: bool = False,
     worker_init: Callable[[], None] | None = None,
@@ -932,7 +933,7 @@ def parallel_starmap[R](
                 rate_limit=rate_limit,
                 timeout=timeout,
                 on_progress=on_progress,
-                batch_size=batch_size,
+                window_size=window_size,
                 retry=retry,
                 sequential=sequential,
                 worker_init=worker_init,
@@ -951,7 +952,7 @@ def parallel_starmap[R](
         rate_limit=rate_limit,
         timeout=timeout,
         on_progress=on_progress,
-        batch_size=batch_size,
+        window_size=window_size,
         retry=retry,
         sequential=sequential,
         worker_init=worker_init,
@@ -966,7 +967,7 @@ def parallel_iter[T, R](
     workers: int | None = None,
     executor: ExecutorType = "thread",
     rate_limit: Limiter | RateLimit | float | None = None,
-    batch_size: int | None = None,
+    window_size: int | None = None,
     retry: Retry | None = None,
     ordered: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
@@ -984,7 +985,7 @@ def parallel_iter[T, R](
     exactly one window ahead of the yields; generators are never
     materialized.
 
-    ``batch_size`` sets the window: the maximum number of
+    ``window_size`` sets the window: the maximum number of
     submitted-but-unyielded items (default ``2 × workers``). It is a
     memory/lookahead bound, not a chunk size — there are no barriers.
 
@@ -1035,7 +1036,7 @@ def parallel_iter[T, R](
             else:
                 log_error(item.index, item.error)
     """
-    _validate_common(workers, executor, batch_size)
+    _validate_common(workers, executor, window_size)
     _validate_max_errors(max_errors)
     if not sequential:
         _validate_worker_options(executor, worker_init, max_tasks_per_worker)
@@ -1055,8 +1056,8 @@ def parallel_iter[T, R](
     bucket = _as_limiter(rate_limit)
     task_fn = _build_task_fn(fn, executor, retry, bucket)
     window = (
-        batch_size
-        if batch_size is not None
+        window_size
+        if window_size is not None
         else 2 * _effective_workers(workers, executor)
     )
     total = _total_if_known(items)

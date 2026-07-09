@@ -2,7 +2,7 @@
 
 import pytest
 
-from pyarallel import ItemResult, ParallelResult
+from pyarallel import ItemResult, ParallelResult, RunStatus
 from pyarallel.result import _Failure
 
 
@@ -134,17 +134,17 @@ class TestValidation:
         with pytest.raises(ValueError, match=">= 1"):
             Retry(attempts=-1)
 
-    def test_batch_size_zero_raises(self):
+    def test_window_size_zero_raises(self):
         from pyarallel import parallel_map
 
         with pytest.raises(ValueError, match=">= 1"):
-            parallel_map(lambda x: x, [1], batch_size=0)
+            parallel_map(lambda x: x, [1], window_size=0)
 
-    def test_batch_size_negative_raises(self):
+    def test_window_size_negative_raises(self):
         from pyarallel import parallel_map
 
         with pytest.raises(ValueError, match=">= 1"):
-            parallel_map(lambda x: x, [1], batch_size=-1)
+            parallel_map(lambda x: x, [1], window_size=-1)
 
     def test_workers_zero_raises(self):
         from pyarallel import parallel_map
@@ -209,10 +209,10 @@ class TestRunStatus:
         assert r.timed_out is False
         assert r.aborted is False
 
-    def test_flags_are_read_only_and_settable_at_construction(self):
-        r = ParallelResult([], timed_out=True, aborted=True)
+    def test_status_settable_at_construction(self):
+        r = ParallelResult([], status=RunStatus.TIMED_OUT)
         assert r.timed_out is True
-        assert r.aborted is True
+        assert r.aborted is False  # one status — contradiction unrepresentable
 
     def test_clean_run_reports_neither(self):
         from pyarallel import parallel_map
@@ -274,11 +274,11 @@ class TestRunStatusExclusivityAndRepr:
     complete one."""
 
     def test_repr_shows_timed_out_on_all_success_truncation(self):
-        r = ParallelResult([1, 2, 3], timed_out=True)
+        r = ParallelResult([1, 2, 3], status=RunStatus.TIMED_OUT)
         assert "timed_out" in repr(r)
 
     def test_repr_shows_aborted(self):
-        r = ParallelResult([1, _Failure(ValueError("x"))], aborted=True)
+        r = ParallelResult([1, _Failure(ValueError("x"))], status=RunStatus.ABORTED)
         assert "aborted" in repr(r)
 
     def test_repr_unchanged_for_clean_runs(self):
@@ -298,3 +298,46 @@ class TestRunStatusExclusivityAndRepr:
         r = parallel_map(slow, range(20), workers=2, max_errors=5, timeout=0.2)
         assert r.timed_out is True
         assert r.aborted is False
+
+
+class TestItemResultInvariants:
+    """v0.8 review: ItemResult(0, error=None) passed the exactly-one check
+    (the parameter *was* supplied) and built a fake success — .ok True,
+    .value None. Invalid states must be unconstructable."""
+
+    def test_explicit_none_error_rejected(self):
+        with pytest.raises(ValueError):
+            ItemResult(0, error=None)
+
+    def test_error_must_be_exception(self):
+        with pytest.raises(ValueError):
+            ItemResult(0, error="not an exception")  # type: ignore[arg-type]
+
+    def test_explicit_none_value_is_a_real_success(self):
+        """fn returning None is legitimate — must stay constructable."""
+        it = ItemResult(0, value=None)
+        assert it.ok is True
+        assert it.value is None
+
+
+class TestFailureProvenance:
+    """v0.8 review: raise_on_failure() flattened failures into an
+    ExceptionGroup with no way back to *which item* failed. PEP 678 notes
+    carry the index without changing exception types, so
+    `except* ConnectionError` matching is untouched."""
+
+    def test_notes_carry_item_index(self):
+        r = ParallelResult([10, _Failure(ValueError("bad")), 30])
+        with pytest.raises(ExceptionGroup) as excinfo:
+            r.raise_on_failure()
+        (sub,) = excinfo.value.exceptions
+        assert any("1" in note for note in sub.__notes__)
+
+    def test_except_star_matching_survives_notes(self):
+        r = ParallelResult([_Failure(ConnectionError("down"))])
+        matched = False
+        try:
+            r.raise_on_failure()
+        except* ConnectionError:
+            matched = True
+        assert matched

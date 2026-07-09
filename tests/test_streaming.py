@@ -57,7 +57,7 @@ class TestParallelIterBasic:
 
 class TestParallelIterStreaming:
     def test_constant_memory_with_batching(self):
-        """With batch_size, only one batch of results exists at a time."""
+        """With window_size, only one batch of results exists at a time."""
         from pyarallel import parallel_iter
 
         yielded_count = 0
@@ -65,7 +65,7 @@ class TestParallelIterStreaming:
             lambda x: x * 2,
             range(20),
             workers=2,
-            batch_size=5,
+            window_size=5,
         ):
             yielded_count += 1
 
@@ -141,7 +141,7 @@ class TestParallelIterWithOptions:
         )
         assert time.monotonic() - start >= 0.3
 
-    def test_with_batch_size(self):
+    def test_with_window_size(self):
         from pyarallel import parallel_iter
 
         results = list(
@@ -149,7 +149,7 @@ class TestParallelIterWithOptions:
                 lambda x: x * 2,
                 range(15),
                 workers=3,
-                batch_size=5,
+                window_size=5,
             )
         )
         results.sort(key=lambda item: item.index)
@@ -213,8 +213,8 @@ class TestSlidingWindow:
         assert set(order[:9]) == set(range(1, 10))
         assert elapsed < 1.5
 
-    def test_batch_size_is_an_in_flight_bound_not_a_barrier(self):
-        """v0.4: batch_size chunked with a barrier — items 2..5 could not
+    def test_window_size_is_an_in_flight_bound_not_a_barrier(self):
+        """v0.4: window_size chunked with a barrier — items 2..5 could not
         start until the whole first chunk (including the straggler) drained."""
         from pyarallel import parallel_iter
 
@@ -224,12 +224,12 @@ class TestSlidingWindow:
 
         order = [
             item.index
-            for item in parallel_iter(task, range(6), workers=2, batch_size=2)
+            for item in parallel_iter(task, range(6), workers=2, window_size=2)
         ]
         assert order[-1] == 0  # the old barrier forced 0 before 2..5
 
     def test_unbatched_input_is_not_materialized(self):
-        """v0.4 without batch_size pulled the whole iterator into memory.
+        """v0.4 without window_size pulled the whole iterator into memory.
         The <= 8 bound also pins the review amendment: with workers=2 the
         window is 4, not the thread pool's default of up to 64."""
         from pyarallel import parallel_iter
@@ -262,7 +262,7 @@ class TestSlidingWindow:
             time.sleep(0.05)
             return x
 
-        stream = parallel_iter(slow, range(100), workers=2, batch_size=4)
+        stream = parallel_iter(slow, range(100), workers=2, window_size=4)
         next(stream)
         next(stream)
         stream.close()
@@ -306,7 +306,7 @@ class TestAsyncSlidingWindow:
         assert elapsed < 1.5
 
     async def test_unbatched_input_is_not_materialized(self):
-        """v0.4 built list(items) whenever batch_size was None."""
+        """v0.4 built list(items) whenever window_size was None."""
         from pyarallel import async_parallel_iter
 
         advanced = 0
@@ -406,7 +406,7 @@ class TestOrderedStreaming:
             return x
 
         for item in parallel_iter(
-            slow_first, source(), workers=4, batch_size=window, ordered=True
+            slow_first, source(), workers=4, window_size=window, ordered=True
         ):
             assert item.ok
             yielded += 1
@@ -462,7 +462,7 @@ class TestOrderedStreaming:
             return x
 
         async for item in async_parallel_iter(
-            slow_first, source(), concurrency=4, batch_size=window, ordered=True
+            slow_first, source(), concurrency=4, window_size=window, ordered=True
         ):
             assert item.ok
             yielded += 1
@@ -570,7 +570,7 @@ class TestAsyncParallelIter:
         assert all(item.ok for item in results)
         assert [item.value for item in results] == [None, None, None]
 
-    async def test_batch_size_consumes_generator_lazily(self):
+    async def test_window_size_consumes_generator_lazily(self):
         import asyncio
         import threading
 
@@ -603,7 +603,7 @@ class TestAsyncParallelIter:
             async def collect():
                 collected = []
                 async for item in async_parallel_iter(
-                    track, items(), concurrency=2, batch_size=2
+                    track, items(), concurrency=2, window_size=2
                 ):
                     collected.append(item)
                 holder["result"] = collected

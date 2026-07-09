@@ -12,38 +12,36 @@ v0.6 engine unification deleted.)
 
 from __future__ import annotations
 
-import enum
 from collections.abc import Iterable
 from typing import Any
 
-from .result import _PENDING, _Failure
-
-
-class _StopReason(enum.Enum):
-    """Why a run stopped early. A run stops for exactly one reason."""
-
-    TIMED_OUT = "timed_out"
-    ABORTED = "aborted"
+from .result import _PENDING, RunStatus, _Failure
 
 
 class _RunStop:
     """The stop state of one run — first writer wins.
 
-    ``timed_out``/``aborted`` exclusivity used to be a read-time formula
-    (``aborted and not timed_out``) applied at each ``ParallelResult``
-    construction; this makes it structural. A failure salvaged after the
-    deadline may still call ``stop(ABORTED)`` — it no-ops, exactly the
-    masking the formula encoded.
+    Stop reasons speak the public ``RunStatus`` vocabulary directly
+    (v0.8 — the internal ``_StopReason`` duplicate is gone).
+    ``timed_out``/``aborted`` exclusivity is structural: a failure
+    salvaged after the deadline may still call ``stop(ABORTED)`` — it
+    no-ops, first writer wins.
     """
 
     __slots__ = ("reason",)
 
     def __init__(self) -> None:
-        self.reason: _StopReason | None = None
+        self.reason: RunStatus | None = None
 
-    def stop(self, reason: _StopReason) -> None:
+    def stop(self, reason: RunStatus) -> None:
+        assert reason is not RunStatus.COMPLETED  # completion isn't a *stop*
         if self.reason is None:
             self.reason = reason
+
+    @property
+    def status(self) -> RunStatus:
+        """How the run ended — COMPLETED unless a stop was recorded."""
+        return self.reason if self.reason is not None else RunStatus.COMPLETED
 
     @property
     def stopped(self) -> bool:
@@ -51,11 +49,11 @@ class _RunStop:
 
     @property
     def timed_out(self) -> bool:
-        return self.reason is _StopReason.TIMED_OUT
+        return self.reason is RunStatus.TIMED_OUT
 
     @property
     def aborted(self) -> bool:
-        return self.reason is _StopReason.ABORTED
+        return self.reason is RunStatus.ABORTED
 
 
 def _validate_max_errors(max_errors: int | None) -> None:

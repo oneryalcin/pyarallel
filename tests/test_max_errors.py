@@ -463,7 +463,7 @@ class TestMidPlanReviewFindings:
                 slow_head_then_dead,
                 range(1000),
                 workers=4,
-                batch_size=8,
+                window_size=8,
                 ordered=True,
                 max_errors=3,
             )
