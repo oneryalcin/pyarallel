@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (0.8.0) — the honest-contract release
+## 0.8.0 — 2026-07-10 — the honest-contract release
 
 One deliberate contract-breaking release before 1.0: everywhere the
 public vocabulary lied, it now tells the truth. Full rationale and
