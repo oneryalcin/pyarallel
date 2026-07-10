@@ -89,10 +89,10 @@ honest:
   a user-supplied semantic token (model name, prompt SHA…) joining
   checkpoint identity, for the config automatic function inspection
   cannot see. Fails closed on change, both tokens in the error.
-- **Cooperative stop** — a stop token that ceases admission, cancels
-  queued work, preserves checkpoints, and reports
-  `RunStatus.CANCELLED`. Honest about running sync threads being
-  uninterruptible.
+- **Cooperative stop** *(done — on `v0.9-cooperative-stop`)* — a stop
+  token that ceases admission, cancels queued work, preserves
+  checkpoints, and reports `RunStatus.CANCELLED`. Honest about running
+  sync threads being uninterruptible.
 - **Collected-result metadata** *(done — on `v0.9-collected-metadata`)* —
   `ParallelResult.item_results()` exposes the `attempts`/`duration`
   already computed per item (previously discarded by collected maps),

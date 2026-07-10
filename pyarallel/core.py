@@ -53,6 +53,7 @@ from .policies import RateLimit, Retry
 from .result import (
     _PENDING,
     Aborted,
+    Cancelled,
     ItemResult,
     ParallelResult,
     RunStatus,
@@ -60,6 +61,7 @@ from .result import (
     _item_result,
     _Outcome,
 )
+from .stop import StopToken
 
 ExecutorType = Literal["thread", "process", "interpreter"]
 
@@ -82,6 +84,7 @@ class SyncMapOptions(TypedDict, total=False):
     checkpoint_key: Callable[[Any], str | int | bytes] | None
     checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None
     max_errors: int | None
+    stop: StopToken | None
     sequential: bool | None
     worker_init: Callable[[], None] | None
     max_tasks_per_worker: int | None
@@ -406,6 +409,7 @@ def parallel_map[T, R](
     checkpoint_key: Callable[[T], str | int | bytes] | None = None,
     checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None = None,
     max_errors: int | None = None,
+    stop: StopToken | None = None,
     sequential: bool = False,
     worker_init: Callable[[], None] | None = None,
     max_tasks_per_worker: int | None = None,
@@ -531,6 +535,7 @@ def parallel_map[T, R](
             checkpoint_key=checkpoint_key,
             checkpoint_version=checkpoint_version,
             max_errors=max_errors,
+            stop=stop,
             worker_init=worker_init,
         )
 
@@ -548,6 +553,7 @@ def parallel_map[T, R](
         checkpoint_key=checkpoint_key,
         checkpoint_version=checkpoint_version,
         max_errors=max_errors,
+        stop=stop,
         worker_init=worker_init,
         max_tasks_per_worker=max_tasks_per_worker,
     )
@@ -568,6 +574,7 @@ def _collected_map(
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
     checkpoint_version: Any = None,
     max_errors: int | None,
+    stop: StopToken | None = None,
     worker_init: Callable[[], None] | None = None,
     max_tasks_per_worker: int | None = None,
 ) -> ParallelResult[Any]:
@@ -621,6 +628,10 @@ def _collected_map(
             # Cached checkpoint hits consume real time (lookup + key_fn)
             # without ever reaching a wait — the deadline must bind here
             # too, or a checkpoint-heavy run ignores timeout= entirely.
+            # Stop first: a user's cancel beats the clock.
+            if stop is not None and stop.stopped:
+                halt.stop(RunStatus.CANCELLED)
+                return False
             if deadline is not None and time.monotonic() >= deadline:
                 halt.stop(RunStatus.TIMED_OUT)
                 return False
@@ -638,17 +649,46 @@ def _collected_map(
                     completed += 1
                     _report()
                     continue  # cached — keep looking for work to admit
-            if bucket is not None:
+            if bucket is not None and stop is None:
+                # No token: one bounded wait. The limiter predicts —
+                # a grant beyond the budget returns False immediately
+                # and times the run out now, not at the deadline.
                 budget: float | None = None
                 if deadline is not None:
                     budget = max(0.0, deadline - time.monotonic())
                 if not bucket.wait(timeout=budget):
-                    # timeout= wins over rate-limit pacing; this item was
-                    # never submitted — mark its slot, stop admitting.
+                    # timeout= wins over rate-limit pacing; this item
+                    # was never submitted — mark its slot, stop admitting.
                     assert timeout is not None
                     results[idx] = _timeout_failure(timeout, idx)
                     halt.stop(RunStatus.TIMED_OUT)
                     return False
+            elif bucket is not None:
+                assert stop is not None  # the fast path took stop is None
+                # Token present: ~100ms slices so a cancel lands
+                # promptly even while rate-limited. A failed slice means
+                # the limiter PREDICTED the grant exceeds the slice and
+                # returned immediately (deep review F1: looping without
+                # sleeping here was a busy-spin at 100% CPU) — sleep the
+                # slice, then re-check.
+                while True:
+                    slice_budget = 0.1
+                    if deadline is not None:
+                        slice_budget = min(max(0.0, deadline - time.monotonic()), 0.1)
+                    if bucket.wait(timeout=slice_budget):
+                        break
+                    if stop.stopped:
+                        results[idx] = _Failure(
+                            Cancelled("cancelled while waiting for a rate-limit slot")
+                        )
+                        halt.stop(RunStatus.CANCELLED)
+                        return False
+                    if deadline is not None and time.monotonic() >= deadline:
+                        assert timeout is not None
+                        results[idx] = _timeout_failure(timeout, idx)
+                        halt.stop(RunStatus.TIMED_OUT)
+                        return False
+                    time.sleep(slice_budget)  # > 0: deadline gate above
             in_flight[_submit_task(pool, executor, task_fn, item)] = idx
             return True
 
@@ -706,8 +746,11 @@ def _collected_map(
     # never touches the source again (no-drain).
     try:
         while True:
-            # Deadline first — an already-expired timeout must not admit
-            # any work at all (timeout=0 means zero tasks run).
+            # Stop first, then deadline — an already-stopped token or
+            # already-expired timeout must not admit any work at all.
+            if stop is not None and stop.stopped:
+                halt.stop(RunStatus.CANCELLED)
+                break
             if deadline is not None and time.monotonic() >= deadline:
                 halt.stop(RunStatus.TIMED_OUT)
                 break
@@ -725,14 +768,29 @@ def _collected_map(
                 break
             if not in_flight:
                 break
-            wait_timeout: float | None = None
-            if deadline is not None:
-                wait_timeout = max(0.0, deadline - time.monotonic())
-            done, _pending = wait(
-                in_flight, timeout=wait_timeout, return_when=FIRST_COMPLETED
-            )
-            if not done:
-                halt.stop(RunStatus.TIMED_OUT)
+            # The completion wait is sliced when a StopToken is present
+            # (~100ms cancel latency); without one it blocks exactly as
+            # before, bounded only by the deadline.
+            while True:
+                wait_timeout: float | None = None
+                if deadline is not None:
+                    wait_timeout = max(0.0, deadline - time.monotonic())
+                if stop is not None:
+                    wait_timeout = (
+                        0.1 if wait_timeout is None else min(wait_timeout, 0.1)
+                    )
+                done, _pending = wait(
+                    in_flight, timeout=wait_timeout, return_when=FIRST_COMPLETED
+                )
+                if done:
+                    break
+                if stop is not None and stop.stopped:
+                    halt.stop(RunStatus.CANCELLED)
+                    break
+                if deadline is not None and time.monotonic() >= deadline:
+                    halt.stop(RunStatus.TIMED_OUT)
+                    break
+            if halt.stopped:
                 break
             for future in done:
                 _absorb(future, in_flight.pop(future))
@@ -767,6 +825,25 @@ def _collected_map(
                 pad = total - len(results)
                 results.extend(_Failure(Aborted(reason)) for _ in range(pad))
                 meta.extend((0, 0.0) for _ in range(pad))
+        elif halt.cancelled:
+            # Same salvage as abort: keep completions that raced the
+            # stop, mark everything unresolved Cancelled. Running
+            # threads cannot be killed — they finish in the background
+            # (their slots still read Cancelled: the RESULT was not
+            # delivered to this run).
+            done, pending = wait(in_flight, timeout=0)
+            for future in done:
+                _absorb(future, in_flight.pop(future))
+            for future in pending:
+                future.cancel()
+            reason = "cancelled by StopToken"
+            for idx in in_flight.values():
+                if results[idx] is _PENDING:
+                    results[idx] = _Failure(Cancelled(reason))
+            if total is not None:
+                pad = total - len(results)
+                results.extend(_Failure(Cancelled(reason)) for _ in range(pad))
+                meta.extend((0, 0.0) for _ in range(pad))
     finally:
         # Every stop — timeout, abort, or an escaping driver error
         # (source iterator, checkpoint write, progress callback) —
@@ -794,6 +871,7 @@ def _sequential_collected_map(
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
     checkpoint_version: Any = None,
     max_errors: int | None,
+    stop: StopToken | None = None,
     worker_init: Callable[[], None] | None,
 ) -> ParallelResult[Any]:
     """The debug engine: every item runs inline in the calling thread.
@@ -827,6 +905,9 @@ def _sequential_collected_map(
 
     try:
         for idx, item in enumerate(items):
+            if stop is not None and stop.stopped:
+                halt.stop(RunStatus.CANCELLED)
+                break
             if deadline is not None and time.monotonic() >= deadline:
                 halt.stop(RunStatus.TIMED_OUT)
                 break
@@ -840,7 +921,9 @@ def _sequential_collected_map(
                     if on_progress:
                         on_progress(completed, _progress_total(total, results))
                     continue
-            if bucket is not None:
+            if bucket is not None and stop is None:
+                # No token: one bounded, predicting wait (see the
+                # windowed engine — grant beyond budget times out now).
                 budget: float | None = None
                 if deadline is not None:
                     budget = max(0.0, deadline - time.monotonic())
@@ -849,6 +932,41 @@ def _sequential_collected_map(
                     results[idx] = _timeout_failure(timeout, idx)
                     halt.stop(RunStatus.TIMED_OUT)
                     break
+            elif bucket is not None:
+                assert stop is not None  # the fast path took stop is None
+                # Token present: sliced, and a failed slice SLEEPS
+                # (deep review F1 — the limiter's early return made a
+                # sleepless loop a busy-spin). The item must NOT run
+                # once the token has stopped.
+                paced_out = False
+                while True:
+                    slice_budget = 0.1
+                    if deadline is not None:
+                        slice_budget = min(max(0.0, deadline - time.monotonic()), 0.1)
+                    if bucket.wait(timeout=slice_budget):
+                        break
+                    if stop.stopped:
+                        results[idx] = _Failure(
+                            Cancelled("cancelled while waiting for a rate-limit slot")
+                        )
+                        halt.stop(RunStatus.CANCELLED)
+                        paced_out = True
+                        break
+                    if deadline is not None and time.monotonic() >= deadline:
+                        assert timeout is not None
+                        results[idx] = _timeout_failure(timeout, idx)
+                        halt.stop(RunStatus.TIMED_OUT)
+                        paced_out = True
+                        break
+                    time.sleep(slice_budget)  # > 0: deadline gate above
+                if paced_out:
+                    break
+            if stop is not None and stop.stopped:
+                # The token flipped while this item paced or queued —
+                # running it now would be post-cancel work.
+                results[idx] = _Failure(Cancelled("cancelled by StopToken"))
+                halt.stop(RunStatus.CANCELLED)
+                break
             outcome = task_fn(item)
             meta[idx] = (outcome.attempts, outcome.duration)
             if outcome.error is not None:
@@ -872,6 +990,12 @@ def _sequential_collected_map(
             for idx in range(len(results), total):
                 results.append(_timeout_failure(timeout, idx))
                 meta.append((0, 0.0))
+        elif halt.cancelled and total is not None:
+            pad = total - len(results)
+            results.extend(
+                _Failure(Cancelled("cancelled by StopToken")) for _ in range(pad)
+            )
+            meta.extend((0, 0.0) for _ in range(pad))
         elif halt.aborted and total is not None:
             reason = f"aborted after {failures} failures (max_errors={max_errors})"
             pad = total - len(results)
