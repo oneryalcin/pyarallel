@@ -12,12 +12,16 @@ import httpx
 from pathlib import Path
 from pyarallel import async_parallel_map, RateLimit, Retry
 
+# ONE client for the whole run: connection pooling + TLS session reuse.
+# A client-per-download renegotiates TLS on every file — the #1 async
+# HTTP anti-pattern.
+client = httpx.AsyncClient()
+
 async def download(url):
-    async with httpx.AsyncClient() as client:
-        r = await client.get(url, timeout=30, follow_redirects=True)
-        r.raise_for_status()
-        filename = Path("downloads") / url.split("/")[-1]
-        filename.write_bytes(r.content)
+    r = await client.get(url, timeout=30, follow_redirects=True)
+    r.raise_for_status()
+    filename = Path("downloads") / url.split("/")[-1]
+    filename.write_bytes(r.content)
         return {"url": url, "size": len(r.content)}
 
 urls = [...]  # hundreds of file URLs

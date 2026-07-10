@@ -63,9 +63,10 @@ Same thing, async:
 import httpx
 from pyarallel import async_parallel_map, RateLimit, Retry
 
+client = httpx.AsyncClient()  # ONE client: pooled connections across all calls
+
 async def fetch_async(url):
-    async with httpx.AsyncClient() as client:
-        return (await client.get(url, timeout=10)).json()
+    return (await client.get(url, timeout=10)).json()
 
 result = await async_parallel_map(
     fetch_async, urls,
@@ -73,6 +74,7 @@ result = await async_parallel_map(
     rate_limit=RateLimit(100, "minute"),
     retry=Retry(attempts=3, on=(ConnectionError, TimeoutError)),
 )
+await client.aclose()
 # Same result model — result.ok, result.successes(), result.failures()
 ```
 
@@ -145,13 +147,15 @@ result = parallel_map(resize_image, paths, executor="process")
 import httpx
 from pyarallel import async_parallel_map
 
+client = httpx.AsyncClient()  # ONE client: pooled connections across all calls
+
 async def fetch_async(url):
-    async with httpx.AsyncClient() as client:
-        return (await client.get(url, timeout=10)).json()
+    return (await client.get(url, timeout=10)).json()
 
 result = await async_parallel_map(
     fetch_async, urls, concurrency=20, task_timeout=5.0,
 )
+await client.aclose()
 ```
 
 ### Decorator
@@ -169,10 +173,11 @@ fetch("http://example.com")          # normal call — returns dict
 fetch.map(urls)                      # parallel — returns ParallelResult
 fetch.stream(urls, window_size=500)   # streaming — yields ItemResult
 
+client = httpx.AsyncClient()  # ONE client, reused by every call
+
 @async_parallel(concurrency=10)
 async def fetch_async(url):
-    async with httpx.AsyncClient() as c:
-        return (await c.get(url)).json()
+    return (await client.get(url)).json()
 
 await fetch_async.map(urls)          # async parallel
 ```

@@ -67,9 +67,10 @@ Pre-v1, Pyarallel keeps these names intentionally different. If you're moving fr
 ```python
 import httpx
 
+client = httpx.AsyncClient()  # ONE client — connections pooled across calls
+
 async def fetch(url):
-    async with httpx.AsyncClient() as client:
-        return (await client.get(url)).json()
+    return (await client.get(url)).json()
 
 # Basic
 results = await async_parallel_map(fetch, urls, concurrency=20)
@@ -191,10 +192,11 @@ async def fn(item): ...
 ```python
 from pyarallel import async_parallel
 
+client = httpx.AsyncClient()  # ONE client, reused by every call
+
 @async_parallel(concurrency=10)
 async def fetch(url):
-    async with httpx.AsyncClient() as c:
-        return (await c.get(url)).json()
+    return (await client.get(url)).json()
 
 # Normal call
 data = await fetch("http://example.com")
@@ -212,11 +214,11 @@ Works with async instance methods:
 class AsyncScraper:
     def __init__(self, base_url):
         self.base_url = base_url
+        self.client = httpx.AsyncClient()  # one client per scraper
 
     @async_parallel(concurrency=5)
     async def fetch(self, path):
-        async with httpx.AsyncClient() as c:
-            return (await c.get(f"{self.base_url}{path}")).json()
+        return (await self.client.get(f"{self.base_url}{path}")).json()
 
 scraper = AsyncScraper("https://api.example.com")
 data = await scraper.fetch("/users/1")

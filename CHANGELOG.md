@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+- New: **decorator defaults widened** — `@parallel` / `@async_parallel`
+  accept `retry`, `timeout` (+ `task_timeout` async), `window_size`,
+  `max_errors`, and `on_progress` as defaults: they are properties of
+  the *function's behavior* ("this fetcher retries 429s") and the
+  natural spelling `@parallel(retry=...)` previously raised TypeError.
+  Per-call presence-sentinel semantics unchanged (unpassed inherits,
+  explicit — even `None` — overrides). Deliberately excluded, loudly:
+  `checkpoint`/`checkpoint_key`/`checkpoint_version` (a checkpoint file
+  names a *run* — a shared default file means duplicate keys and wrong
+  resumes) and `stop` (a token is a campaign latch). A collected-only
+  `timeout` default is ignored by `.stream()` (streaming has no total
+  deadline).
+- Docs: the `AsyncClient`-per-item anti-pattern purged from README,
+  quickstart, API reference, and cookbook — one client around the
+  fan-out (connection pooling, TLS reuse), flagged since the first
+  external review.
+- Roadmap: v0.10 "Prove and package" section restored (benchmark lab,
+  executable cookbook examples, compat/deprecation policy, API
+  snapshot) — two of the original review's v0.10 items had been left
+  under a "shipped" header.
+
 ## 0.9.0 — 2026-07-10 — the real-job release
 
 - New: **the resilience demo** (`examples/resilience_demo.py`) — every

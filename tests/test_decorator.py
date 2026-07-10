@@ -209,3 +209,180 @@ class TestExplicitNoneOverride:
         elapsed = time.monotonic() - start
         assert r.ok
         assert elapsed > 1.0
+
+
+class TestWidenedDecoratorDefaults:
+    """v0.10: decorator defaults widen beyond workers/executor/rate_limit.
+    Production evidence for the decision: the v0.8 red tests instinctively
+    wrote @parallel(retry=...) and got TypeError — the natural spelling
+    didn't exist. Retry/timeout/window/max_errors/on_progress are
+    properties of the function's behavior and belong at the decorator;
+    checkpoint*/stop stay per-call-only (a checkpoint file names a RUN —
+    a shared default file means duplicate keys and wrong resumes; a stop
+    token is a campaign latch)."""
+
+    def test_retry_as_decorator_default(self):
+        from pyarallel import Retry, parallel
+
+        calls = {"n": 0}
+
+        @parallel(workers=1, retry=Retry(attempts=3, backoff=0.0, jitter=False))
+        def flaky(x):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise ValueError("first call fails")
+            return x
+
+        r = flaky.map([1])
+        assert r.ok
+        assert calls["n"] == 2  # the decorator's retry policy applied
+
+    def test_percall_still_overrides_decorator_retry(self):
+        from pyarallel import Retry, parallel
+
+        calls = {"n": 0}
+
+        @parallel(workers=1, retry=Retry(attempts=5, backoff=0.0, jitter=False))
+        def flaky(x):
+            calls["n"] += 1
+            raise ValueError("always fails")
+
+        r = flaky.map([1], retry=None)  # explicit None: retry OFF (v0.8 rule)
+        assert not r.ok
+        assert calls["n"] == 1
+
+    def test_max_errors_and_window_as_defaults(self):
+        from pyarallel import parallel
+
+        @parallel(workers=1, max_errors=2, window_size=2)
+        def boom(x):
+            raise ValueError(f"item {x}")
+
+        r = boom.map(list(range(50)))
+        assert r.aborted
+
+    def test_timeout_as_default(self):
+        import time as _time
+
+        from pyarallel import parallel
+
+        @parallel(workers=2, timeout=0.2)
+        def slow(x):
+            _time.sleep(5)
+            return x
+
+        r = slow.map([1, 2])
+        assert r.timed_out
+
+    def test_on_progress_as_default(self):
+        from pyarallel import parallel
+
+        seen = []
+
+        @parallel(workers=1, on_progress=lambda d, t: seen.append(d))
+        def work(x):
+            return x
+
+        work.map([1, 2, 3])
+        assert seen == [1, 2, 3]
+
+    def test_checkpoint_rejected_as_decorator_default(self):
+        """A checkpoint file names a run, not a function — two .map()
+        calls sharing one default file would collide keys and serve
+        wrong resumes. Rejected loudly at decoration time."""
+        import pytest
+
+        from pyarallel import parallel
+
+        with pytest.raises(TypeError):
+
+            @parallel(workers=1, checkpoint="run.ckpt")  # type: ignore[call-arg]
+            def fn(x):
+                return x
+
+    def test_stop_rejected_as_decorator_default(self):
+        import pytest
+
+        from pyarallel import StopToken, parallel
+
+        with pytest.raises(TypeError):
+
+            @parallel(workers=1, stop=StopToken())  # type: ignore[call-arg]
+            def fn(x):
+                return x
+
+    async def test_async_decorator_widened(self):
+        from pyarallel import Retry, async_parallel
+
+        calls = {"n": 0}
+
+        @async_parallel(
+            concurrency=1, retry=Retry(attempts=3, backoff=0.0, jitter=False)
+        )
+        async def flaky(x):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise ValueError("first fails")
+            return x
+
+        r = await flaky.map([1])
+        assert r.ok
+        assert calls["n"] == 2
+
+    async def test_async_task_timeout_as_default(self):
+        import asyncio
+
+        from pyarallel import async_parallel
+
+        @async_parallel(concurrency=2, task_timeout=0.1)
+        async def slow(x):
+            await asyncio.sleep(5)
+            return x
+
+        r = await slow.map([1])
+        assert not r.ok  # per-task timeout from the decorator applied
+
+    def test_timeout_default_does_not_break_stream(self):
+        """timeout= is a collected-API option; the streaming engines have
+        no total deadline. A decorator default must not crash .stream()."""
+        from pyarallel import parallel
+
+        @parallel(workers=1, timeout=30.0)
+        def work(x):
+            return x
+
+        got = sorted(item.value for item in work.stream([1, 2, 3]))
+        assert got == [1, 2, 3]  # sorted: .stream() yields in completion order
+
+    async def test_async_timeout_default_does_not_break_stream(self):
+        from pyarallel import async_parallel
+
+        @async_parallel(concurrency=1, timeout=30.0)
+        async def work(x):
+            return x
+
+        got = sorted([item.value async for item in work.stream([1, 2])])
+        assert got == [1, 2]  # sorted: completion order
+
+    def test_max_errors_default_does_not_break_starmap(self):
+        """Codex review: parallel_starmap doesn't take max_errors — a
+        decorator default must not crash .starmap() (same bug class as
+        timeout vs .stream())."""
+        from pyarallel import parallel
+
+        @parallel(workers=1, max_errors=5)
+        def add(a, b):
+            return a + b
+
+        r = add.starmap([(1, 2), (3, 4)])
+        assert r.values() == [3, 7]
+
+    async def test_async_max_errors_default_does_not_break_starmap(self):
+        from pyarallel import async_parallel
+
+        @async_parallel(concurrency=1, max_errors=5)
+        async def add(a, b):
+            return a + b
+
+        r = await add.starmap([(1, 2)])
+        assert r.values() == [3]
