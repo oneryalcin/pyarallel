@@ -649,32 +649,46 @@ def _collected_map(
                     completed += 1
                     _report()
                     continue  # cached — keep looking for work to admit
-            if bucket is not None:
-                # Pacing waits are sliced when a StopToken is present so
-                # a cancel lands within ~100ms even while rate-limited
-                # (a failed slice leaks nothing — limiter contract).
+            if bucket is not None and stop is None:
+                # No token: one bounded wait. The limiter predicts —
+                # a grant beyond the budget returns False immediately
+                # and times the run out now, not at the deadline.
+                budget: float | None = None
+                if deadline is not None:
+                    budget = max(0.0, deadline - time.monotonic())
+                if not bucket.wait(timeout=budget):
+                    # timeout= wins over rate-limit pacing; this item
+                    # was never submitted — mark its slot, stop admitting.
+                    assert timeout is not None
+                    results[idx] = _timeout_failure(timeout, idx)
+                    halt.stop(RunStatus.TIMED_OUT)
+                    return False
+            elif bucket is not None:
+                assert stop is not None  # the fast path took stop is None
+                # Token present: ~100ms slices so a cancel lands
+                # promptly even while rate-limited. A failed slice means
+                # the limiter PREDICTED the grant exceeds the slice and
+                # returned immediately (deep review F1: looping without
+                # sleeping here was a busy-spin at 100% CPU) — sleep the
+                # slice, then re-check.
                 while True:
-                    budget: float | None = None
+                    slice_budget = 0.1
                     if deadline is not None:
-                        budget = max(0.0, deadline - time.monotonic())
-                    slice_budget = budget
-                    if stop is not None:
-                        slice_budget = 0.1 if budget is None else min(budget, 0.1)
+                        slice_budget = min(max(0.0, deadline - time.monotonic()), 0.1)
                     if bucket.wait(timeout=slice_budget):
                         break
-                    if stop is not None and stop.stopped:
+                    if stop.stopped:
                         results[idx] = _Failure(
                             Cancelled("cancelled while waiting for a rate-limit slot")
                         )
                         halt.stop(RunStatus.CANCELLED)
                         return False
                     if deadline is not None and time.monotonic() >= deadline:
-                        # timeout= wins over rate-limit pacing; this item
-                        # was never submitted — mark its slot, stop admitting.
                         assert timeout is not None
                         results[idx] = _timeout_failure(timeout, idx)
                         halt.stop(RunStatus.TIMED_OUT)
                         return False
+                    time.sleep(slice_budget)  # > 0: deadline gate above
             in_flight[_submit_task(pool, executor, task_fn, item)] = idx
             return True
 
@@ -907,21 +921,31 @@ def _sequential_collected_map(
                     if on_progress:
                         on_progress(completed, _progress_total(total, results))
                     continue
-            if bucket is not None:
-                # Same sliced pacing as the windowed engine: a cancel
-                # lands within ~100ms even while rate-limited, and the
-                # item must NOT run once the token has stopped.
+            if bucket is not None and stop is None:
+                # No token: one bounded, predicting wait (see the
+                # windowed engine — grant beyond budget times out now).
+                budget: float | None = None
+                if deadline is not None:
+                    budget = max(0.0, deadline - time.monotonic())
+                if not bucket.wait(timeout=budget):
+                    assert timeout is not None
+                    results[idx] = _timeout_failure(timeout, idx)
+                    halt.stop(RunStatus.TIMED_OUT)
+                    break
+            elif bucket is not None:
+                assert stop is not None  # the fast path took stop is None
+                # Token present: sliced, and a failed slice SLEEPS
+                # (deep review F1 — the limiter's early return made a
+                # sleepless loop a busy-spin). The item must NOT run
+                # once the token has stopped.
                 paced_out = False
                 while True:
-                    budget: float | None = None
+                    slice_budget = 0.1
                     if deadline is not None:
-                        budget = max(0.0, deadline - time.monotonic())
-                    slice_budget = budget
-                    if stop is not None:
-                        slice_budget = 0.1 if budget is None else min(budget, 0.1)
+                        slice_budget = min(max(0.0, deadline - time.monotonic()), 0.1)
                     if bucket.wait(timeout=slice_budget):
                         break
-                    if stop is not None and stop.stopped:
+                    if stop.stopped:
                         results[idx] = _Failure(
                             Cancelled("cancelled while waiting for a rate-limit slot")
                         )
@@ -934,6 +958,7 @@ def _sequential_collected_map(
                         halt.stop(RunStatus.TIMED_OUT)
                         paced_out = True
                         break
+                    time.sleep(slice_budget)  # > 0: deadline gate above
                 if paced_out:
                     break
             if stop is not None and stop.stopped:

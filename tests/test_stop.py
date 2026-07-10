@@ -168,10 +168,6 @@ class TestAsyncCancel:
             await asyncio.sleep(30)
             return x
 
-        async def stopper():
-            await asyncio.sleep(0.2)
-            t.stop()
-
         asyncio.get_event_loop().call_later(0.2, t.stop)
         start = time.monotonic()
         r = await async_parallel_map(slow, list(range(10)), concurrency=4, stop=t)
@@ -299,3 +295,57 @@ class TestAdversarialReviewFindings:
 
         r = await async_parallel_map(afn, [1, 2], stop=t, timeout=0)
         assert r.status is RunStatus.CANCELLED
+
+
+class TestPacingSpinRegression:
+    """Deep review F1: Limiter.wait(timeout=slice) returns False
+    IMMEDIATELY when the predicted grant exceeds the slice — the slicing
+    loop degenerated to a busy-spin (measured: 1.9M wait calls and a
+    pegged core per pacing second), triggered by the token's mere
+    presence. Failed slices must sleep."""
+
+    def test_stop_pacing_does_not_burn_cpu(self):
+        from pyarallel import RateLimit
+
+        t = StopToken()
+
+        def work(x):
+            return x
+
+        threading.Timer(0.5, t.stop).start()
+        cpu_before = time.process_time()
+        r = parallel_map(work, [1, 2], rate_limit=RateLimit(1, "minute"), stop=t)
+        cpu_used = time.process_time() - cpu_before
+        assert r.status is RunStatus.CANCELLED
+        assert cpu_used < 0.2  # polling, not spinning (was ~0.5s = 100%)
+
+    def test_timeout_without_stop_keeps_early_exit(self):
+        """The fix must not lose the old no-token semantic: a bounded
+        pacing wait whose predicted grant exceeds the remaining budget
+        times out IMMEDIATELY (prediction), not at the deadline."""
+        from pyarallel import RateLimit
+
+        def work(x):
+            return x
+
+        start = time.monotonic()
+        r = parallel_map(work, [1, 2], rate_limit=RateLimit(1, "minute"), timeout=2.0)
+        assert r.status is RunStatus.TIMED_OUT
+        assert time.monotonic() - start < 1.5  # early exit, not 2s
+
+    def test_sequential_stop_pacing_does_not_burn_cpu(self):
+        from pyarallel import RateLimit
+
+        t = StopToken()
+        threading.Timer(0.5, t.stop).start()
+        cpu_before = time.process_time()
+        r = parallel_map(
+            lambda x: x,
+            [1, 2],
+            sequential=True,
+            rate_limit=RateLimit(1, "minute"),
+            stop=t,
+        )
+        cpu_used = time.process_time() - cpu_before
+        assert r.status is RunStatus.CANCELLED
+        assert cpu_used < 0.2

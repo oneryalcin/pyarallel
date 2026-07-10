@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- New: **cooperative stop** — `stop=StopToken()` on the collected APIs.
+- New: **cooperative stop** — `stop=StopToken()` on the collected map
+  APIs (`parallel_map` / `async_parallel_map` / decorator `.map()`;
+  starmap keeps its smaller surface, streaming needs no token).
   `token.stop()` (thread-safe, idempotent, signal-handler-safe) ceases
   admission, cancels what can be cancelled, keeps completed checkpoint
   rows, and reports `RunStatus.CANCELLED`; unresolved items are marked

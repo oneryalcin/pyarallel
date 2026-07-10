@@ -476,6 +476,11 @@ async def _async_collected_map(
             done, _pending = await asyncio.wait(
                 waiting, return_when=asyncio.FIRST_COMPLETED
             )
+            # Absorb real completions before honoring the stop — so a
+            # salvaged Nth failure CAN name the status ABORTED when it
+            # arrives in the same wake as the stop (deep review F4:
+            # accepted nondeterminism, first classification wins; sync
+            # has the same first-writer rule with deterministic order).
             stopped_now = stop_task is not None and stop_task in done
             if stop_task is not None:
                 done.discard(stop_task)
