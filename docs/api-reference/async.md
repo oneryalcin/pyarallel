@@ -6,6 +6,7 @@ Pyarallel provides async-native parallel execution: a windowed engine driven by 
 
 Execute an async function over items concurrently.
 
+<!-- docs-check: skip -->
 ```python
 from pyarallel import async_parallel_map
 

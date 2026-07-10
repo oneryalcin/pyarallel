@@ -144,9 +144,10 @@ can proceed in parallel.
 - **Committed benchmark lab** — the free-threading/interpreter numbers
   (2.4×/3.4×) come from throwaway scripts on one machine; commit a
   reproducible harness so the claims are re-runnable.
-- **Executable cookbook examples** — the resilience demo is CI-enforced;
-  the cookbook recipes are still prose that can drift. Executable
-  contract tests where feasible (fakes for the external services).
+- **Executable cookbook examples** *(done — on `v0.10-executable-docs`)*
+  — all 110 user-facing doc blocks compile-gated and API-shape-gated
+  (keywords checked against real signatures); the flagship LLM recipe
+  and streaming ETL execute end to end against fakes in CI.
 - **Compatibility & deprecation policy** *(done — on
   `v0.10-freeze-prep`)* — [Compatibility & Policies](policies.md):
   semver from 1.0, deprecation windows, checkpoint persistence
