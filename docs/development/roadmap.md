@@ -147,10 +147,13 @@ can proceed in parallel.
 - **Executable cookbook examples** — the resilience demo is CI-enforced;
   the cookbook recipes are still prose that can drift. Executable
   contract tests where feasible (fakes for the external services).
-- **Compatibility & deprecation policy** — documented, plus checkpoint
-  persistence guarantees across versions.
-- **Public API snapshot in CI** — the exported-surface diff gate that
-  makes an accidental break a red build.
+- **Compatibility & deprecation policy** *(done — on
+  `v0.10-freeze-prep`)* — [Compatibility & Policies](policies.md):
+  semver from 1.0, deprecation windows, checkpoint persistence
+  guarantees, Python-floor policy, and what "public" means.
+- **Public API snapshot in CI** *(done — on `v0.10-freeze-prep`)* —
+  `tests/api_snapshot.txt` renders the whole exported surface;
+  accidental changes are a red build, deliberate ones a reviewed diff.
 
 ## v1.0 — Freeze
 

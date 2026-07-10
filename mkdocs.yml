@@ -46,6 +46,7 @@ nav:
     - Rate Limiting: api-reference/rate-limiting.md
   - Development:
     - Contributing: development/CONTRIBUTING.md
+    - Compatibility & Policies: development/policies.md
     - DevX Principles: development/devx-principles.md
     - Roadmap: development/roadmap.md
     - v0.5.0 Plan: development/plans/v0.5.0.md
