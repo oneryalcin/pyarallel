@@ -2,7 +2,7 @@
 
 The performance sentences in the docs — "1.0× under the GIL, 2.4× on
 free-threaded builds", "3.4× over threads for interpreters on a standard
-build", "~30 ms interpreter workers instead of fork/spawn", "one windowed
+build", "interpreter workers start faster than process fork/spawn", "one windowed
 engine, O(n) driver" — used to rest on throwaway scripts that ran once on
 one machine. This directory replaces them with **one runnable harness** so
 the claims are falsifiable on *your* machine.
@@ -53,8 +53,8 @@ churn it).
 | Benchmark | Measures | Documented claim it backs |
 |---|---|---|
 | **cpu-scaling** | `parallel_map` of a pure-Python CPU spin: `thread` workers=1 vs 4, plus `process`/`interpreter` at 4. | `thread_scaling` → "1.0× under the GIL, **2.4×** on free-threaded"; `thread/interpreter` on a GIL build → "**3.4×**, interpreters get true CPU parallelism on standard builds". |
-| **engine-overhead** | Per-item wall time of `parallel_map` and `parallel_iter` over a no-op vs a plain loop. | "one windowed engine, **O(n)** driver" — the engine adds a small, flat per-item cost. |
-| **worker-startup** | Time to first result on a *cold* pool (workers=1) per executor. | "~**30 ms** interpreter workers instead of process fork/spawn". |
+| **engine-overhead** | Per-item wall time of `parallel_map` and `parallel_iter` over a no-op vs a plain loop, at two sizes a decade apart. | "one windowed engine, **O(n)** driver" — flat per-item cost across a 10× size range is the linearity evidence. |
+| **worker-startup** | Time to first result on a *cold* pool (workers=1) per executor. | Interpreter cold-start beats process fork/spawn on GIL builds (~50 ms vs ~72 ms recorded; machine-dependent). |
 
 ### Why the item count matters (and why `--quick` under-reports)
 
