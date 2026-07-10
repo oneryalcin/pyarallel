@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 — 2026-07-11 — prove and package
 
 - New: **committed benchmark lab** (`benchmarks/bench.py`) — the
   free-threading/interpreter performance numbers (1.0×/2.4× thread

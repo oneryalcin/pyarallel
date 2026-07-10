@@ -17,7 +17,7 @@ from .policies import RateLimit, Retry
 from .result import Aborted, Cancelled, ItemResult, ParallelResult, RunStatus
 from .stop import StopToken
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 __all__ = [
     "ParallelResult",
     "ItemResult",

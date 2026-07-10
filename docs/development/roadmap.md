@@ -24,7 +24,7 @@ The best direction toward 1.0 is not more kinds of parallelism — it is being
 **the most trustworthy single-machine runtime for expensive, rate-limited
 fan-out jobs**.
 
-## Current (0.9.0 on PyPI)
+## Current (0.10.0 on PyPI)
 
 - `parallel_map()` / `parallel_starmap()` / `parallel_iter()` and async
   mirrors; `@parallel` / `@async_parallel` decorators with `.map()` /
@@ -123,7 +123,7 @@ Design spikes (pre-freeze checks, no shipping):
 - **Streaming checkpoint** — "cached computation" ≠ "sink committed";
   needs crisp at-least-once replay semantics before any implementation.
 
-## v0.10 — Prove and package
+## v0.10 — Prove and package *(shipped in 0.10.0)*
 
 The last stop before freeze — the items the external review's original
 v0.10 proposed that weren't absorbed into v0.8/v0.9, plus two v0.9
