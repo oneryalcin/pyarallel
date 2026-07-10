@@ -81,8 +81,10 @@ honest:
   hand-rolled: numeric *and* date-form `Retry-After`, clean fallback on
   malformed values, duck-typed response extraction, no HTTP client
   import.
-- **`AsyncIterable` sources** — async cursors and paginated generators
-  with end-to-end backpressure (no-drain, closure, cancellation tests).
+- **`AsyncIterable` sources** *(done — on `v0.9-async-sources`)* —
+  async cursors and paginated generators with end-to-end backpressure
+  (no-drain, closure, cancellation tests); `timeout=` binds during a
+  stuck source await.
 - **`checkpoint_version=`** — a user-supplied semantic token
   (model name, prompt SHA…) joining checkpoint identity, for the config
   automatic function inspection cannot see.

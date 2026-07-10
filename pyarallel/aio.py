@@ -15,7 +15,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
+from collections.abc import (
+    AsyncIterable,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Iterable,
+)
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -41,6 +47,37 @@ from .result import (
     _item_result,
     _Outcome,
 )
+
+
+def _aiter_source(items: Iterable[Any] | AsyncIterable[Any]) -> AsyncIterator[Any]:
+    """Normalize any source to an async iterator (v0.9).
+
+    Async sources — cursors, paginated API generators — are consumed
+    directly, so backpressure reaches all the way to the producer: the
+    engine pulls one item as one window slot frees, and a million-row
+    cursor never materializes. An object that is both ``Iterable`` and
+    ``AsyncIterable`` is consumed async — the async protocol is why
+    you'd build such a thing.
+
+    Sync iterables are wrapped; the wrapper's ``anext`` runs the pull
+    synchronously (no suspension point added), so admission behavior
+    and event-loop blocking are exactly as before.
+
+    Closure contract: an *idle* source is never touched or drained —
+    but a pull in progress at a stop/close is cancelled, and that
+    cancellation runs the source's ``finally`` (standard asyncio
+    pipeline semantics). Final closing is the caller's job
+    (``aclosing()``).
+    """
+    if isinstance(items, AsyncIterable):
+        return aiter(items)
+    iterator = iter(items)
+
+    async def _wrap() -> AsyncIterator[Any]:
+        for item in iterator:
+            yield item
+
+    return _wrap()
 
 
 class AsyncMapOptions(TypedDict, total=False):
@@ -138,7 +175,7 @@ async def _async_execute_outcome(
 
 async def async_parallel_map[T, R](
     fn: Callable[[T], Awaitable[R]],
-    items: Iterable[T],
+    items: Iterable[T] | AsyncIterable[T],
     *,
     concurrency: int = 4,
     rate_limit: Limiter | RateLimit | float | None = None,
@@ -155,7 +192,12 @@ async def async_parallel_map[T, R](
 
     Args:
         fn: Async function applied to each item.
-        items: Any iterable.
+        items: Any iterable — sync or async (v0.9). An async source
+            (DB cursor, paginated API generator) is consumed directly
+            with end-to-end backpressure: one item pulled as one window
+            slot frees, nothing materialized. An idle source is never
+            touched and a truncated run leaves it un-drained; a pull in
+            progress at a stop is cancelled (its ``finally`` runs).
         concurrency: Maximum number of tasks running at once.
         rate_limit: ``RateLimit`` spec, ops-per-second as a number, or a
             shared ``Limiter`` instance to draw from one budget across
@@ -235,7 +277,7 @@ async def async_parallel_map[T, R](
 
 async def _async_collected_map(
     fn: Callable[..., Awaitable[Any]],
-    items: Iterable[Any],
+    items: Iterable[Any] | AsyncIterable[Any],
     *,
     concurrency: int,
     rate_limit: Limiter | RateLimit | float | None,
@@ -260,7 +302,7 @@ async def _async_collected_map(
     semaphore = asyncio.Semaphore(concurrency)
     limiter = _as_limiter(rate_limit)
     total = _total_if_known(items)
-    source = iter(items)
+    source = _aiter_source(items)
     results: list[Any] = []
     in_flight: dict[asyncio.Task[_Outcome], int] = {}
     completed = 0
@@ -288,18 +330,24 @@ async def _async_collected_map(
         if on_progress:
             on_progress(completed, _progress_total(total, results))
 
-    def _submit_next() -> bool:
+    async def _submit_next() -> bool:
         nonlocal completed
         while True:
             # Cached checkpoint hits consume real time (lookup + key_fn)
             # without ever reaching an await, so asyncio.timeout() cannot
-            # preempt them — the deadline must bind here too.
+            # preempt them — the deadline must bind here too. (A genuinely
+            # async source pull IS preemptible: asyncio.timeout cancels
+            # it, so a stuck cursor cannot outlive the deadline — for
+            # cancellation-respecting sources; one that swallows the
+            # CancelledError and blocks is a hang, as everywhere in
+            # asyncio. The cancellation lands in the source and runs its
+            # finally — the documented exception to never-touching it.)
             if deadline is not None and time.monotonic() >= deadline:
                 halt.stop(RunStatus.TIMED_OUT)
                 return False
             try:
-                item = next(source)
-            except StopIteration:
+                item = await anext(source)
+            except StopAsyncIteration:
                 return False
             idx = len(results)
             results.append(_PENDING)
@@ -345,7 +393,7 @@ async def _async_collected_map(
         # limiter waits happen inside tasks, which are cancelled on
         # abort before they can call the API.
         while True:
-            while not halt.stopped and len(in_flight) < window and _submit_next():
+            while not halt.stopped and len(in_flight) < window and await _submit_next():
                 pass
             if halt.stopped or not in_flight:
                 break
@@ -417,7 +465,7 @@ async def _async_collected_map(
 
 async def async_parallel_starmap[R](
     fn: Callable[..., Awaitable[R]],
-    items: Iterable[tuple[Any, ...]],
+    items: Iterable[tuple[Any, ...]] | AsyncIterable[tuple[Any, ...]],
     *,
     concurrency: int = 4,
     rate_limit: Limiter | RateLimit | float | None = None,
@@ -447,7 +495,7 @@ async def async_parallel_starmap[R](
 
 async def async_parallel_iter[T, R](
     fn: Callable[[T], Awaitable[R]],
-    items: Iterable[T],
+    items: Iterable[T] | AsyncIterable[T],
     *,
     concurrency: int = 4,
     rate_limit: Limiter | RateLimit | float | None = None,
@@ -530,37 +578,60 @@ async def async_parallel_iter[T, R](
             )
 
     total = _total_if_known(items)
-    source = enumerate(items)
+    source = _aiter_source(items)
     seen = 0
     completed = 0
     failures = 0
     yielded_failures = 0
+    exhausted = False
     in_flight: dict[asyncio.Task[_Outcome], int] = {}
     buffered: dict[int, ItemResult[R]] = {}
     next_yield = 0
 
-    def _submit_next() -> bool:
-        nonlocal seen
+    # THE PULL RACES AS A TASK (v0.9 review): parking the driver in
+    # `await anext(source)` hid already-completed results from the
+    # consumer — a paginated source stalling on a page fetch stalled the
+    # yields of everything that had finished. At most one pull is
+    # outstanding; it sits in the same asyncio.wait as the worker tasks,
+    # so a slow producer delays only admission, never delivery.
+    _EXHAUSTED: Any = object()
+    pull: asyncio.Task[Any] | None = None
+
+    async def _pull_once() -> Any:
+        # StopAsyncIteration must not cross a Task boundary — sentinel it.
         try:
-            idx, item = next(source)
-        except StopIteration:
-            return False
+            return await anext(source)
+        except StopAsyncIteration:
+            return _EXHAUSTED
+
+    def _maybe_start_pull() -> None:
+        # The engine invariant: in_flight + buffered never exceeds the
+        # window. Gating admission on the sum (not on completions) is
+        # what keeps ordered mode bounded when a straggler blocks the
+        # buffer. The single outstanding pull starts only when a slot is
+        # free, so admitting its item cannot overshoot.
+        nonlocal pull
+        if (
+            pull is None
+            and not exhausted
+            and (max_errors is None or failures < max_errors)
+            and len(in_flight) + len(buffered) < window
+        ):
+            pull = asyncio.create_task(_pull_once())
+
+    def _absorb_pull(task: asyncio.Task[Any]) -> None:
+        # A raising source is an input error and must propagate —
+        # task.result() re-raises it here, in the driver.
+        nonlocal pull, seen, exhausted
+        pull = None
+        item = task.result()
+        if item is _EXHAUSTED:
+            exhausted = True
+            return
+        idx = seen  # admission order is the item's index
         seen += 1
         in_flight[asyncio.create_task(_run(item))] = idx
-        return True
-
-    def _admit() -> None:
-        # The engine invariant: in_flight + buffered never exceeds the
-        # window. Gating admission on the sum (not on completions) is what
-        # keeps ordered mode bounded when a straggler blocks the buffer.
-        #
-        # No mid-fill failure peek here (unlike the sync driver): filling
-        # never blocks — limiter waits happen inside tasks, which are
-        # cancelled on abort before they can call the API.
-        if max_errors is not None and failures >= max_errors:
-            return  # aborting — no new work
-        while len(in_flight) + len(buffered) < window and _submit_next():
-            pass
+        _maybe_start_pull()
 
     def _yield_ends_stream(item_result: ItemResult[R]) -> bool:
         nonlocal yielded_failures
@@ -570,11 +641,17 @@ async def async_parallel_iter[T, R](
         return yielded_failures >= max_errors
 
     try:
-        _admit()
-        while in_flight:
+        _maybe_start_pull()
+        while in_flight or pull is not None:
+            waiting: set[asyncio.Task[Any]] = set(in_flight)
+            if pull is not None:
+                waiting.add(pull)
             done, _pending = await asyncio.wait(
-                in_flight, return_when=asyncio.FIRST_COMPLETED
+                waiting, return_when=asyncio.FIRST_COMPLETED
             )
+            if pull is not None and pull in done:
+                done.discard(pull)
+                _absorb_pull(pull)
             for task in done:
                 idx = in_flight.pop(task)
                 result: ItemResult[R]
@@ -593,7 +670,6 @@ async def async_parallel_iter[T, R](
                     yield result
                     if _yield_ends_stream(result):
                         return
-                    _admit()
             if ordered:
                 while next_yield in buffered:
                     ordered_result = buffered.pop(next_yield)
@@ -601,10 +677,17 @@ async def async_parallel_iter[T, R](
                     yield ordered_result
                     if _yield_ends_stream(ordered_result):
                         return
-                _admit()
+            _maybe_start_pull()
     finally:
         # Runs on exhaustion, on caller break (generator close), and when
-        # the items iterator itself raises: cancel everything in flight.
+        # the items iterator itself raises: cancel everything in flight,
+        # including an in-progress pull — the cancellation lands in the
+        # source and runs its finally (standard asyncio pipeline
+        # semantics; an *idle* source is never touched).
+        if pull is not None:
+            pull.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await pull
         for task in in_flight:
             task.cancel()
         for task in in_flight:

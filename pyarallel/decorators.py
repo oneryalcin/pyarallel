@@ -29,7 +29,14 @@ genuinely turns the decorator's rate limit off.
 from __future__ import annotations
 
 import functools
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Iterator
+from collections.abc import (
+    AsyncIterable,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Iterable,
+    Iterator,
+)
 from typing import Any, Unpack, cast, overload
 
 from .aio import (
@@ -285,21 +292,25 @@ class _BoundAsyncParallel[R]:
         return await self._fn(*args, **kwargs)
 
     async def map(
-        self, items: Iterable[Any], **opts: Unpack[AsyncMapOptions]
+        self, items: Iterable[Any] | AsyncIterable[Any], **opts: Unpack[AsyncMapOptions]
     ) -> ParallelResult[R]:
         return await async_parallel_map(
             self._fn, items, **_merge_opts(self._defaults, dict(opts))
         )
 
     async def starmap(
-        self, items: Iterable[tuple[Any, ...]], **opts: Unpack[AsyncStarmapOptions]
+        self,
+        items: Iterable[tuple[Any, ...]] | AsyncIterable[tuple[Any, ...]],
+        **opts: Unpack[AsyncStarmapOptions],
     ) -> ParallelResult[R]:
         return await async_parallel_starmap(
             self._fn, items, **_merge_opts(self._defaults, dict(opts))
         )
 
     async def stream(
-        self, items: Iterable[Any], **opts: Unpack[AsyncStreamOptions]
+        self,
+        items: Iterable[Any] | AsyncIterable[Any],
+        **opts: Unpack[AsyncStreamOptions],
     ) -> AsyncIterator[ItemResult[R]]:
         async for item in async_parallel_iter(
             self._fn, items, **_merge_opts(self._defaults, dict(opts))
@@ -343,7 +354,7 @@ class _AsyncParallelFunc[**P, R]:
         return _BoundAsyncParallel(bound, self._defaults)
 
     async def map(
-        self, items: Iterable[Any], **opts: Unpack[AsyncMapOptions]
+        self, items: Iterable[Any] | AsyncIterable[Any], **opts: Unpack[AsyncMapOptions]
     ) -> ParallelResult[R]:
         return await async_parallel_map(
             cast("Callable[[Any], Awaitable[R]]", self.__wrapped__),
@@ -352,14 +363,18 @@ class _AsyncParallelFunc[**P, R]:
         )
 
     async def starmap(
-        self, items: Iterable[tuple[Any, ...]], **opts: Unpack[AsyncStarmapOptions]
+        self,
+        items: Iterable[tuple[Any, ...]] | AsyncIterable[tuple[Any, ...]],
+        **opts: Unpack[AsyncStarmapOptions],
     ) -> ParallelResult[R]:
         return await async_parallel_starmap(
             self.__wrapped__, items, **_merge_opts(self._defaults, dict(opts))
         )
 
     async def stream(
-        self, items: Iterable[Any], **opts: Unpack[AsyncStreamOptions]
+        self,
+        items: Iterable[Any] | AsyncIterable[Any],
+        **opts: Unpack[AsyncStreamOptions],
     ) -> AsyncIterator[ItemResult[R]]:
         async for item in async_parallel_iter(
             cast("Callable[[Any], Awaitable[R]]", self.__wrapped__),
@@ -374,12 +389,14 @@ class _UnaryAsyncParallelFunc[T, R](_AsyncParallelFunc[[T], R]):
     ``_UnaryParallelFunc``."""
 
     async def map(
-        self, items: Iterable[T], **opts: Unpack[AsyncMapOptions]
+        self, items: Iterable[T] | AsyncIterable[T], **opts: Unpack[AsyncMapOptions]
     ) -> ParallelResult[R]:
         return await _AsyncParallelFunc.map(self, items, **opts)
 
     async def stream(
-        self, items: Iterable[T], **opts: Unpack[AsyncStreamOptions]
+        self,
+        items: Iterable[T] | AsyncIterable[T],
+        **opts: Unpack[AsyncStreamOptions],
     ) -> AsyncIterator[ItemResult[R]]:
         async for item in _AsyncParallelFunc.stream(self, items, **opts):
             yield item

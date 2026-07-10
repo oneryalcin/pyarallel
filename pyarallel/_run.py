@@ -76,8 +76,12 @@ def _validate_timeout(value: float | None, name: str) -> None:
         raise ValueError(f"{name} must be >= 0 and finite (or None), got {value}")
 
 
-def _total_if_known(items: Iterable[Any]) -> int | None:
-    """Return len(items) when available without forcing materialization."""
+def _total_if_known(items: object) -> int | None:
+    """Return len(items) when available without forcing materialization.
+
+    Accepts any source shape (sync or async iterable) — async sources
+    simply have no ``len`` and report None, like generators.
+    """
     try:
         return len(items)  # type: ignore[arg-type]
     except TypeError:
