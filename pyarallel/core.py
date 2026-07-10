@@ -80,6 +80,7 @@ class SyncMapOptions(TypedDict, total=False):
     retry: Retry | None
     checkpoint: str | Path | None
     checkpoint_key: Callable[[Any], str | int | bytes] | None
+    checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None
     max_errors: int | None
     sequential: bool | None
     worker_init: Callable[[], None] | None
@@ -403,6 +404,7 @@ def parallel_map[T, R](
     retry: Retry | None = None,
     checkpoint: str | Path | None = None,
     checkpoint_key: Callable[[T], str | int | bytes] | None = None,
+    checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None = None,
     max_errors: int | None = None,
     sequential: bool = False,
     worker_init: Callable[[], None] | None = None,
@@ -512,6 +514,8 @@ def parallel_map[T, R](
         # Debug mode ignores the pool entirely — a process-configured call
         # with a local worker_init must still be one flag away from inline.
         _validate_worker_options(executor, worker_init, max_tasks_per_worker)
+    if checkpoint_version is not None and checkpoint is None:
+        raise ValueError("checkpoint_version requires checkpoint=")
     if checkpoint_key is not None and checkpoint is None:
         raise ValueError("checkpoint_key requires checkpoint= to be set")
 
@@ -525,6 +529,7 @@ def parallel_map[T, R](
             retry=retry,
             checkpoint=checkpoint,
             checkpoint_key=checkpoint_key,
+            checkpoint_version=checkpoint_version,
             max_errors=max_errors,
             worker_init=worker_init,
         )
@@ -541,6 +546,7 @@ def parallel_map[T, R](
         retry=retry,
         checkpoint=checkpoint,
         checkpoint_key=checkpoint_key,
+        checkpoint_version=checkpoint_version,
         max_errors=max_errors,
         worker_init=worker_init,
         max_tasks_per_worker=max_tasks_per_worker,
@@ -560,6 +566,7 @@ def _collected_map(
     retry: Retry | None,
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
+    checkpoint_version: Any = None,
     max_errors: int | None,
     worker_init: Callable[[], None] | None = None,
     max_tasks_per_worker: int | None = None,
@@ -593,7 +600,7 @@ def _collected_map(
     deadline = (time.monotonic() + timeout) if timeout is not None else None
 
     store = (
-        _open_checkpoint(checkpoint, fn, checkpoint_key)
+        _open_checkpoint(checkpoint, fn, checkpoint_key, checkpoint_version)
         if checkpoint is not None
         else None
     )
@@ -774,6 +781,7 @@ def _sequential_collected_map(
     retry: Retry | None,
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
+    checkpoint_version: Any = None,
     max_errors: int | None,
     worker_init: Callable[[], None] | None,
 ) -> ParallelResult[Any]:
@@ -795,7 +803,7 @@ def _sequential_collected_map(
     halt = _RunStop()
 
     store = (
-        _open_checkpoint(checkpoint, fn, checkpoint_key)
+        _open_checkpoint(checkpoint, fn, checkpoint_key, checkpoint_version)
         if checkpoint is not None
         else None
     )

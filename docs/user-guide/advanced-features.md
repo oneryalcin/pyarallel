@@ -195,8 +195,19 @@ Safety guards, stated honestly:
   `factor=3` raises `CheckpointError` — stale reuse fails closed, never
   silently.
 - Live objects in captured state (clients, sessions) count by *type* only —
-  config hidden inside them is invisible. Delete the checkpoint when it
-  changes. Bound methods and callable objects are rejected outright: their
+  config hidden inside them is invisible to inspection. For exactly that
+  config — a prompt, a model name, an environment — declare it (v0.9):
+
+  ```python
+  result = parallel_map(classify, tickets, checkpoint="classify.ckpt",
+                        checkpoint_version=("classify-v3", MODEL, PROMPT_SHA))
+  ```
+
+  Change the prompt → the token changes → the rerun fails closed with
+  both tokens in the error, instead of silently stitching 40k old-prompt
+  answers to 10k new-prompt ones. Tokens are `str`/`int`/`bytes` or
+  tuples of those (stable reprs only — a dict would invalidate on every
+  run). Bound methods and callable objects are rejected outright: their
   entire state is opaque.
 - A changed input at the same position is recomputed, never served stale.
 - Rows are positional by default: reordering or inserting inputs forces

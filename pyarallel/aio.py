@@ -94,6 +94,7 @@ class AsyncMapOptions(TypedDict, total=False):
     retry: Retry | None
     checkpoint: str | Path | None
     checkpoint_key: Callable[[Any], str | int | bytes] | None
+    checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None
     max_errors: int | None
 
 
@@ -186,6 +187,7 @@ async def async_parallel_map[T, R](
     retry: Retry | None = None,
     checkpoint: str | Path | None = None,
     checkpoint_key: Callable[[T], str | int | bytes] | None = None,
+    checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None = None,
     max_errors: int | None = None,
 ) -> ParallelResult[R]:
     """Execute an async *fn* over *items* concurrently.
@@ -256,6 +258,8 @@ async def async_parallel_map[T, R](
     _validate_timeout(timeout, "timeout")
     _validate_timeout(task_timeout, "task_timeout")
     _validate_max_errors(max_errors)
+    if checkpoint_version is not None and checkpoint is None:
+        raise ValueError("checkpoint_version requires checkpoint=")
     if checkpoint_key is not None and checkpoint is None:
         raise ValueError("checkpoint_key requires checkpoint= to be set")
 
@@ -271,6 +275,7 @@ async def async_parallel_map[T, R](
         retry=retry,
         checkpoint=checkpoint,
         checkpoint_key=checkpoint_key,
+        checkpoint_version=checkpoint_version,
         max_errors=max_errors,
     )
 
@@ -288,6 +293,7 @@ async def _async_collected_map(
     retry: Retry | None,
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
+    checkpoint_version: Any = None,
     max_errors: int | None,
 ) -> ParallelResult[Any]:
     """The async collected-map engine: bounded admission through a window.
@@ -313,7 +319,7 @@ async def _async_collected_map(
     deadline = (time.monotonic() + timeout) if timeout is not None else None
 
     store = (
-        _open_checkpoint(checkpoint, fn, checkpoint_key)
+        _open_checkpoint(checkpoint, fn, checkpoint_key, checkpoint_version)
         if checkpoint is not None
         else None
     )

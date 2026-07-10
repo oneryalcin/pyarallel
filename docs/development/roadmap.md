@@ -85,9 +85,10 @@ honest:
   async cursors and paginated generators with end-to-end backpressure
   (no-drain, closure, cancellation tests); `timeout=` binds during a
   stuck source await.
-- **`checkpoint_version=`** — a user-supplied semantic token
-  (model name, prompt SHA…) joining checkpoint identity, for the config
-  automatic function inspection cannot see.
+- **`checkpoint_version=`** *(done — on `v0.9-checkpoint-version`)* —
+  a user-supplied semantic token (model name, prompt SHA…) joining
+  checkpoint identity, for the config automatic function inspection
+  cannot see. Fails closed on change, both tokens in the error.
 - **Cooperative stop** — a stop token that ceases admission, cancels
   queued work, preserves checkpoints, and reports
   `RunStatus.CANCELLED`. Honest about running sync threads being
