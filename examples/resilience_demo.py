@@ -21,6 +21,7 @@ What you'll watch happen, in order:
           receipt — paid-for calls were not repeated.
 
 The demo asserts its own claims and exits non-zero if any fail.
+Port 8973 in use? Set ``DEMO_PORT`` to any free port.
 """
 
 from __future__ import annotations
@@ -56,26 +57,28 @@ class _QuotaState:
         self.in_window = 0
         self.total_ok = 0
         self.total_429 = 0
-        self.last_429_at = 0.0
-        self.first_ok_after_429 = 0.0
+        self.last_request_at = 0.0
+        self.max_gap = 0.0
 
     def admit(self) -> bool:
         with self.lock:
             now = time.monotonic()
+            # Measure the pool-pause as the LONGEST silence between any
+            # two consecutive requests (OK or 429): a granted-just-before
+            # -the-pause straggler can't fake it, and a real pool-wide
+            # Retry-After pause shows up as ~1s of total silence.
+            if self.last_request_at:
+                self.max_gap = max(self.max_gap, now - self.last_request_at)
+            self.last_request_at = now
             window = int(now)
             if window != self.window:
                 self.window = window
                 self.in_window = 0
             if self.in_window >= self.per_second:
                 self.total_429 += 1
-                self.last_429_at = now
                 return False
             self.in_window += 1
             self.total_ok += 1
-            # Measure the pool-pause: the first success after a 429 tells
-            # us how long the WHOLE pool actually backed off.
-            if self.last_429_at and not self.first_ok_after_429:
-                self.first_ok_after_429 = now - self.last_429_at
             return True
 
     def snapshot(self) -> dict[str, float]:
@@ -83,15 +86,15 @@ class _QuotaState:
             return {
                 "ok": self.total_ok,
                 "throttled": self.total_429,
-                "pause_after_429": round(self.first_ok_after_429, 2),
+                "pool_silence": round(self.max_gap, 2),
             }
 
     def reset(self) -> None:
         with self.lock:
             self.total_ok = 0
             self.total_429 = 0
-            self.last_429_at = 0.0
-            self.first_ok_after_429 = 0.0
+            self.last_request_at = 0.0
+            self.max_gap = 0.0
             # Fresh quota window too — without this, the previous act's
             # tail requests share a window with the next act's burst and
             # bleed a spurious 429 across the boundary.
@@ -182,8 +185,12 @@ def act1_429s_pause_the_pool() -> None:
     result = parallel_map(
         fetch,
         range(80),
-        workers=8,  # full speed, no client-side limit: we WILL get 429s
-        rate_limit=Limiter(RateLimit(200, "second")),  # shared, effectively open
+        workers=8,
+        # The shared Limiter IS the pause channel: 200/s is effectively
+        # unthrottled, but Retry-After can only slow a pool that shares
+        # a limiter — delete this and every worker rediscovers the 429
+        # on its own.
+        rate_limit=Limiter(RateLimit(200, "second")),
         retry=HTTP_RETRY,
     )
     stats = _get("/stats")
@@ -192,13 +199,13 @@ def act1_429s_pause_the_pool() -> None:
     print(f"  429s drawn      : {throttled} — and THAT is the point:")
     print("                    8 uncoordinated workers rediscover a quota")
     print("                    once per worker per window (dozens of wasted")
-    print("                    calls). Here the FIRST 429 paused the whole")
-    print(f"                    pool ({stats['pause_after_429']}s measured by the")
-    print("                    server), so almost no second one ever happened.")
+    print("                    calls). Here a single 429 paused the whole")
+    print(f"                    pool — the server measured {stats['pool_silence']}s of")
+    print("                    total silence — so almost no second one happened.")
     assert result.ok, "Act 1: all items must complete despite throttling"
     assert throttled >= 1, "Act 1: the demo needs at least one real 429"
     assert throttled <= 16, "Act 1: pool pause should prevent a 429 storm"
-    assert stats["pause_after_429"] >= 0.9, "Act 1: pool did not honor Retry-After"
+    assert stats["pool_silence"] >= 0.8, "Act 1: pool did not honor Retry-After"
 
 
 def act2_stay_under_the_limit() -> None:
@@ -259,6 +266,8 @@ def act3_kill_and_resume(checkpoint: str) -> None:
     print(f"  run 2: same command, {elapsed:.1f}s — resumed from SQLite")
     print(f"         server served only {calls_second} calls for {n_items} items")
     print(f"         {saved} paid-for calls NOT repeated (loaded from checkpoint)")
+    print("         (only calls in flight AT the kill instant can repeat —")
+    print("          at most one per worker; completed rows never do)")
     assert "child done ok=True" in rerun.stdout, "Act 3: rerun must complete"
     assert calls_second < n_items, "Act 3: rerun must not repeat completed work"
     assert saved >= done_before_kill - 8, "Act 3: checkpoint must cover completed work"
@@ -275,7 +284,13 @@ def main() -> None:
     print(f"fake API: {BASE}  (quota: 30 req/s, over-quota → 429 Retry-After: 1)")
 
     quota = _QuotaState(per_second=30)
-    server = _make_server(quota)
+    try:
+        server = _make_server(quota)
+    except OSError as exc:
+        sys.exit(
+            f"cannot bind 127.0.0.1:{PORT} ({exc}) — something is already "
+            f"using it. Set DEMO_PORT to any free port and rerun."
+        )
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     t0 = time.monotonic()

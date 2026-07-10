@@ -234,8 +234,9 @@ Works with instance methods and static methods via `@parallel` decorator — see
 
 ## See It Prove Itself
 
-Every claim above, verified locally in ~10 seconds — no credentials, no
-dependencies, one file:
+Every *resilience* claim — 429 handling, the pool-wide pause, rate-limit
+pacing, kill-and-resume — verified locally in ~10 seconds, no
+credentials, no dependencies, one file:
 
 ```bash
 python examples/resilience_demo.py
