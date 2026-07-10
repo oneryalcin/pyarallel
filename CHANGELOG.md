@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 — 2026-07-10 — the real-job release
 
 - New: **the resilience demo** (`examples/resilience_demo.py`) — every
   headline claim proven locally in ~10s with zero credentials and zero

@@ -24,7 +24,7 @@ The best direction toward 1.0 is not more kinds of parallelism — it is being
 **the most trustworthy single-machine runtime for expensive, rate-limited
 fan-out jobs**.
 
-## Current (0.7.0 on PyPI, 0.8 on main)
+## Current (0.9.0 on PyPI)
 
 - `parallel_map()` / `parallel_starmap()` / `parallel_iter()` and async
   mirrors; `@parallel` / `@async_parallel` decorators with `.map()` /
@@ -35,11 +35,21 @@ fan-out jobs**.
 - `RateLimit` (token bucket with `burst`) + shareable `Limiter` (one
   budget across calls, functions, sync and async)
 - `Retry` with backoff, jitter, `on`/`retry_if` filtering, and
-  `wait_from` server-driven waits that pause the shared limiter
-- `checkpoint=` / `checkpoint_key=` — SQLite resume, fail-closed
-  function identity, `0o600` creation, corruption → `CheckpointError`
+  `wait_from` server-driven waits that pause the shared limiter;
+  `Retry.for_http()` prewires the 429/`Retry-After` dance (both header
+  dialects, no HTTP client import)
+- `checkpoint=` / `checkpoint_key=` / `checkpoint_version=` — SQLite
+  resume, fail-closed function identity + semantic version token,
+  `0o600` creation, corruption → `CheckpointError`
 - `max_errors=` early abort; `timeout=` total (sync + async),
-  `task_timeout=` (async)
+  `task_timeout=` (async); `stop=StopToken()` cooperative cancel
+  (`RunStatus.CANCELLED`, checkpoint rows kept)
+- `AsyncIterable` sources with end-to-end backpressure; the streaming
+  pull races beside the workers
+- `ParallelResult.item_results()` — per-item `attempts`/`duration` on
+  collected maps
+- The resilience demo (`examples/resilience_demo.py`) — headline claims
+  self-asserted in CI against the installed wheel
 - `ParallelResult` with `RunStatus` (`.ok` = completed AND all
   succeeded; truncated runs never read as clean), PEP 678 failure
   provenance; `ItemResult` with `attempts`/`duration`
@@ -60,7 +70,7 @@ documents: [v0.5](plans/v0.5.0.md),
 
 ---
 
-## v0.8 — Honest contract *(in progress on `v0.8-honest-contract`)*
+## v0.8 — Honest contract *(shipped in 0.8.0)*
 
 One deliberate contract-breaking release; everything conceptually wrong
 with the public API fixed together, before 1.0 freezes it. Scope,
@@ -71,7 +81,7 @@ override sentinel, policy numeric validation, checkpoint
 security/corruption handling, CI/release trust (wheel gate, OS lanes,
 trusted publishing), this roadmap rewrite.
 
-## v0.9 — Real-job UX
+## v0.9 — Real-job UX *(shipped in 0.9.0)*
 
 Features earned by real workloads, sequenced after the contract is
 honest:
