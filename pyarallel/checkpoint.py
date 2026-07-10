@@ -439,8 +439,10 @@ def _encode_version(token: Any) -> str | None:
     ):
         raise CheckpointError(
             "checkpoint_version must be str, int, or bytes — or a tuple "
-            f"of those — got {token!r}. Unstable reprs (dicts, objects) "
-            "would invalidate the checkpoint on every rerun."
+            f"of those — got {token!r}. Other types are rejected because "
+            "their reprs are unreliable identity: sets hash-randomize "
+            "across runs, objects embed memory addresses, and mutable "
+            "containers can change between runs."
         )
     return repr(token)
 

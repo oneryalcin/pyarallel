@@ -795,3 +795,26 @@ class TestCheckpointVersion:
             await async_parallel_map(
                 afn, [1, 2], checkpoint=ckpt, checkpoint_version="v2"
             )
+
+    def test_sequential_path_enforces_version(self, tmp_path):
+        """The sequential debug engine opens checkpoints through its own
+        path — the version fence must bind there too (review F4)."""
+        ckpt = str(tmp_path / "run.ckpt")
+        parallel_map(
+            _ckpt_double,
+            [1],
+            checkpoint=ckpt,
+            checkpoint_version="v1",
+            sequential=True,
+        )
+        with pytest.raises(CheckpointError):
+            parallel_map(
+                _ckpt_double,
+                [1],
+                checkpoint=ckpt,
+                checkpoint_version="v2",
+                sequential=True,
+            )
+        # and cross-engine: created sequential, resumed parallel
+        with pytest.raises(CheckpointError):
+            parallel_map(_ckpt_double, [1], checkpoint=ckpt, checkpoint_version="v2")
