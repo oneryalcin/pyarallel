@@ -363,3 +363,26 @@ class TestWidenedDecoratorDefaults:
 
         got = sorted([item.value async for item in work.stream([1, 2])])
         assert got == [1, 2]  # sorted: completion order
+
+    def test_max_errors_default_does_not_break_starmap(self):
+        """Codex review: parallel_starmap doesn't take max_errors — a
+        decorator default must not crash .starmap() (same bug class as
+        timeout vs .stream())."""
+        from pyarallel import parallel
+
+        @parallel(workers=1, max_errors=5)
+        def add(a, b):
+            return a + b
+
+        r = add.starmap([(1, 2), (3, 4)])
+        assert r.values() == [3, 7]
+
+    async def test_async_max_errors_default_does_not_break_starmap(self):
+        from pyarallel import async_parallel
+
+        @async_parallel(concurrency=1, max_errors=5)
+        async def add(a, b):
+            return a + b
+
+        r = await add.starmap([(1, 2)])
+        assert r.values() == [3]

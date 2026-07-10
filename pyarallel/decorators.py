@@ -61,16 +61,34 @@ from .policies import RateLimit, Retry
 from .result import ItemResult, ParallelResult
 
 
-def _merge_opts(defaults: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+def _merge_opts(
+    defaults: dict[str, Any],
+    overrides: dict[str, Any],
+    *,
+    drop: tuple[str, ...] = (),
+) -> dict[str, Any]:
     """Merge decorator defaults with per-call overrides.
 
     Presence is the sentinel: *overrides* holds only the keywords the
     caller actually passed (``**opts``), so an unpassed option inherits
     and an explicit ``None`` overrides — no None-skipping.
+
+    *drop* names decorator defaults this surface's engine doesn't
+    accept — ``.stream()`` has no total ``timeout``, ``.starmap()`` no
+    ``max_errors`` — so a perfectly good default for ``.map()`` must
+    not crash the sibling surfaces. (Passing them per-call is already
+    a type error via the surface's TypedDict.)
     """
     opts = dict(defaults)
     opts.update(overrides)
+    for key in drop:
+        opts.pop(key, None)
     return opts
+
+
+# Decorator defaults an engine surface doesn't accept (see _merge_opts).
+_STREAM_DROP = ("timeout",)
+_STARMAP_DROP = ("max_errors",)
 
 
 # ---------------------------------------------------------------------------
@@ -101,15 +119,16 @@ class _BoundParallel[R]:
     ) -> ParallelResult[R]:
         """Like ``.map()`` but unpacks each item as ``fn(*args)``."""
         return parallel_starmap(
-            self._fn, items, **_merge_opts(self._defaults, dict(opts))
+            self._fn,
+            items,
+            **_merge_opts(self._defaults, dict(opts), drop=_STARMAP_DROP),
         )
 
     def stream(
         self, items: Iterable[Any], **opts: Unpack[SyncStreamOptions]
     ) -> Iterator[ItemResult[R]]:
         """Yield ``ItemResult`` as tasks finish — constant memory."""
-        merged = _merge_opts(self._defaults, dict(opts))
-        merged.pop("timeout", None)  # collected-only: streaming has no deadline
+        merged = _merge_opts(self._defaults, dict(opts), drop=_STREAM_DROP)
         return parallel_iter(self._fn, items, **merged)
 
 
@@ -182,15 +201,16 @@ class _ParallelFunc[**P, R]:
     ) -> ParallelResult[R]:
         """Like ``.map()`` but unpacks each item as ``fn(*args)``."""
         return parallel_starmap(
-            self.__wrapped__, items, **_merge_opts(self._defaults, dict(opts))
+            self.__wrapped__,
+            items,
+            **_merge_opts(self._defaults, dict(opts), drop=_STARMAP_DROP),
         )
 
     def stream(
         self, items: Iterable[Any], **opts: Unpack[SyncStreamOptions]
     ) -> Iterator[ItemResult[R]]:
         """Yield ``ItemResult`` as tasks finish — constant memory."""
-        merged = _merge_opts(self._defaults, dict(opts))
-        merged.pop("timeout", None)  # collected-only: streaming has no deadline
+        merged = _merge_opts(self._defaults, dict(opts), drop=_STREAM_DROP)
         return parallel_iter(
             cast("Callable[[Any], R]", self.__wrapped__),
             items,
@@ -337,7 +357,9 @@ class _BoundAsyncParallel[R]:
         **opts: Unpack[AsyncStarmapOptions],
     ) -> ParallelResult[R]:
         return await async_parallel_starmap(
-            self._fn, items, **_merge_opts(self._defaults, dict(opts))
+            self._fn,
+            items,
+            **_merge_opts(self._defaults, dict(opts), drop=_STARMAP_DROP),
         )
 
     async def stream(
@@ -345,8 +367,7 @@ class _BoundAsyncParallel[R]:
         items: Iterable[Any] | AsyncIterable[Any],
         **opts: Unpack[AsyncStreamOptions],
     ) -> AsyncIterator[ItemResult[R]]:
-        merged = _merge_opts(self._defaults, dict(opts))
-        merged.pop("timeout", None)  # collected-only: streaming has no deadline
+        merged = _merge_opts(self._defaults, dict(opts), drop=_STREAM_DROP)
         async for item in async_parallel_iter(self._fn, items, **merged):
             yield item
 
@@ -415,7 +436,9 @@ class _AsyncParallelFunc[**P, R]:
         **opts: Unpack[AsyncStarmapOptions],
     ) -> ParallelResult[R]:
         return await async_parallel_starmap(
-            self.__wrapped__, items, **_merge_opts(self._defaults, dict(opts))
+            self.__wrapped__,
+            items,
+            **_merge_opts(self._defaults, dict(opts), drop=_STARMAP_DROP),
         )
 
     async def stream(
@@ -423,8 +446,7 @@ class _AsyncParallelFunc[**P, R]:
         items: Iterable[Any] | AsyncIterable[Any],
         **opts: Unpack[AsyncStreamOptions],
     ) -> AsyncIterator[ItemResult[R]]:
-        merged = _merge_opts(self._defaults, dict(opts))
-        merged.pop("timeout", None)  # collected-only: streaming has no deadline
+        merged = _merge_opts(self._defaults, dict(opts), drop=_STREAM_DROP)
         async for item in async_parallel_iter(
             cast("Callable[[Any], Awaitable[R]]", self.__wrapped__),
             items,
