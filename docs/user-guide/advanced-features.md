@@ -117,25 +117,35 @@ Retries happen *inside the worker* — only the failing item is retried, never i
 
 ### Server-Driven Backoff (429 / Retry-After)
 
-Real APIs tell you how long to back off. `retry_if` decides retryability
-from the exception *instance*; `wait_from` extracts the server-mandated
-wait, which replaces the backoff delay (no jitter) and pauses the shared
-limiter so the whole pool slows down:
+Real APIs tell you how long to back off. For the standard HTTP dance,
+`Retry.for_http()` (v0.9) is prewired — both `Retry-After` dialects
+(numeric seconds *and* HTTP-date), malformed values falling back to
+exponential backoff, duck-typed against httpx/requests/aiohttp exception
+shapes with no client import:
 
 ```python
-def retry_after(exc):
-    response = getattr(exc, "response", None)
-    header = response.headers.get("retry-after") if response else None
-    return float(header) if header else None   # None → exponential backoff
-
 results = parallel_map(
     call_api, ids,
     rate_limit=limiter,   # a shared Limiter — see below
+    retry=Retry.for_http(on=(httpx.HTTPStatusError,)),   # 429/503 default
+)
+```
+
+Under the hood it fills two hooks you can also wire yourself when the
+policy isn't plain HTTP: `retry_if` decides retryability from the
+exception *instance*; `wait_from` extracts the server-mandated wait,
+which replaces the backoff delay (no jitter) and pauses the shared
+limiter so the whole pool slows down:
+
+```python
+results = parallel_map(
+    call_api, ids,
+    rate_limit=limiter,
     retry=Retry(
         attempts=5,
         on=(httpx.HTTPStatusError,),
         retry_if=lambda exc: exc.response.status_code in (429, 503),
-        wait_from=retry_after,
+        wait_from=lambda exc: parse_retry_after(exc.response),
     ),
 )
 ```

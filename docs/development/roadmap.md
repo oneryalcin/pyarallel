@@ -76,10 +76,11 @@ trusted publishing), this roadmap rewrite.
 Features earned by real workloads, sequenced after the contract is
 honest:
 
-- **`Retry.for_http()`** — dependency-free helper for the 429/`Retry-After`
-  dance every recipe currently hand-rolls: numeric *and* date-form
-  `Retry-After`, clean fallback on malformed values, explicit response
-  extraction, no HTTP client import.
+- **`Retry.for_http()`** *(done — on `v0.9-retry-for-http`)* —
+  dependency-free helper for the 429/`Retry-After` dance every recipe
+  hand-rolled: numeric *and* date-form `Retry-After`, clean fallback on
+  malformed values, duck-typed response extraction, no HTTP client
+  import.
 - **`AsyncIterable` sources** — async cursors and paginated generators
   with end-to-end backpressure (no-drain, closure, cancellation tests).
 - **`checkpoint_version=`** — a user-supplied semantic token

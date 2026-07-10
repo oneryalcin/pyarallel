@@ -21,14 +21,6 @@ def embed(text):
     )
     return response.data[0].embedding
 
-def retry_after(exc):
-    """Honor the server's Retry-After header when present."""
-    response = getattr(exc, "response", None)
-    if response is None:
-        return None
-    header = response.headers.get("retry-after")
-    return float(header) if header else None
-
 texts = ["document one", "document two", ...]  # thousands of texts
 
 # One Limiter = one budget. Reuse it across every call that spends
@@ -39,11 +31,10 @@ result = parallel_map(
     embed, texts,
     workers=10,
     rate_limit=limiter,
-    retry=Retry(
+    retry=Retry.for_http(               # 429 + Retry-After, prewired (v0.9)
         attempts=4,
         backoff=1.0,
         on=(openai.RateLimitError, openai.APIConnectionError),
-        wait_from=retry_after,              # a 429 pauses the WHOLE pool
     ),
     window_size=100,                         # in-flight window (default 2 x workers)
     checkpoint="embeddings.ckpt",           # crash at item 40k? rerun resumes
@@ -58,10 +49,11 @@ What each piece buys you:
   Pass the same instance to other jobs against the same key and they draw
   from one budget. Retries draw tokens too — a retry storm can't blow
   through the limit.
-- **`wait_from`** — when the API returns 429 with `Retry-After`, that wait
-  replaces the backoff *and* pauses the shared limiter, so one throttled
-  task slows the whole pool instead of every worker discovering the limit
-  separately.
+- **`Retry.for_http()`** — when the API returns 429 with `Retry-After`
+  (numeric or HTTP-date form), that wait replaces the backoff *and*
+  pauses the shared limiter, so one throttled task slows the whole pool
+  instead of every worker discovering the limit separately.
+  `APIConnectionError` carries no status; the type filter decides for it.
 - **`checkpoint=`** — every completed embedding is persisted (SQLite).
   If the run dies at item 40,000, rerunning the same line executes only
   the remainder. Delete the file when inputs or model change semantics

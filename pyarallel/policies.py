@@ -8,11 +8,103 @@ elsewhere — a ``RateLimit`` is a spec; the runtime state that enforces it is
 
 from __future__ import annotations
 
+import email.utils
 import math
 import random
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal
+from datetime import UTC, datetime
+from typing import Any, Literal
+
+
+def _default_response(exc: Exception) -> Any:
+    """Duck-typed response extraction covering the big three clients:
+    httpx and requests hang the response on ``exc.response``; aiohttp's
+    ``ClientResponseError`` carries ``status``/``headers`` on the
+    exception itself — so the exception *is* the response there."""
+    return getattr(exc, "response", exc)
+
+
+def _http_status(resp: Any) -> int | None:
+    """``status_code`` (httpx/requests) or ``status`` (aiohttp), else None."""
+    for attr in ("status_code", "status"):
+        value = getattr(resp, attr, None)
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+    return None
+
+
+def _retry_after_seconds(resp: Any) -> float | None:
+    """Parse ``Retry-After`` from *resp*'s headers — both dialects.
+
+    Numeric (``Retry-After: 30``) and HTTP-date (``Retry-After: Fri, 10
+    Jul 2026 08:00:00 GMT``) forms are handled; homemade parsers
+    routinely choke on the date form and either crash or retry
+    instantly — a stampede, the exact thing the server asked to avoid.
+    Malformed or missing values return None (= exponential backoff),
+    never an exception. Plain-dict headers (aiohttp) are
+    case-sensitive, so both spellings are tried.
+    """
+    headers = getattr(resp, "headers", None)
+    if headers is None:
+        return None
+    value = headers.get("Retry-After")
+    if value is None:
+        value = headers.get("retry-after")
+    if value is None:
+        return None
+    text = str(value).strip()
+    try:
+        seconds = float(text)
+    except ValueError:
+        seconds = None
+    if seconds is not None:
+        # RFC 9110 delay-seconds is digits only: nan/inf/negative are
+        # malformed → backoff, not instant retry (nan) or a sleep(inf)
+        # OverflowError when max_server_wait=None trusts the server.
+        if math.isfinite(seconds) and seconds >= 0:
+            return seconds
+        return None
+    try:
+        dt = email.utils.parsedate_to_datetime(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)  # RFC 9110: dates are GMT
+    return max(0.0, (dt - datetime.now(UTC)).total_seconds())
+
+
+class _HttpRetryIf:
+    """``retry_if`` for ``Retry.for_http`` — a module-level callable
+    class (not a closure) so the policy pickles into process workers."""
+
+    __slots__ = ("statuses", "extract")
+
+    def __init__(
+        self, statuses: frozenset[int], extract: Callable[[Exception], Any]
+    ) -> None:
+        self.statuses = statuses
+        self.extract = extract
+
+    def __call__(self, exc: Exception) -> bool:
+        status = _http_status(self.extract(exc))
+        if status is None:
+            # No status to judge (e.g. ConnectionError included in on=):
+            # the type filter already admitted it — retry.
+            return True
+        return status in self.statuses
+
+
+class _HttpWaitFrom:
+    """``wait_from`` for ``Retry.for_http`` — picklable, see above."""
+
+    __slots__ = ("extract",)
+
+    def __init__(self, extract: Callable[[Exception], Any]) -> None:
+        self.extract = extract
+
+    def __call__(self, exc: Exception) -> float | None:
+        return _retry_after_seconds(self.extract(exc))
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,6 +211,61 @@ class Retry:
                 f"Retry max_server_wait must be >= 0 and finite (or None), got "
                 f"{self.max_server_wait}"
             )
+
+    @classmethod
+    def for_http(
+        cls,
+        *,
+        on: tuple[type[Exception], ...],
+        statuses: set[int] | frozenset[int] = frozenset({429, 503}),
+        response: Callable[[Exception], Any] | None = None,
+        attempts: int = 3,
+        backoff: float = 1.0,
+        max_delay: float = 60.0,
+        jitter: bool = True,
+        max_server_wait: float | None = 600.0,
+    ) -> Retry:
+        """A ``Retry`` prewired for the HTTP throttling dance.
+
+        Retries the exception types in *on* when their response status
+        is in *statuses* (default 429/503), honoring ``Retry-After`` in
+        both its dialects — numeric seconds and HTTP-date — with
+        malformed values falling back to exponential backoff. When a
+        shared ``Limiter`` is in play, the server-mandated wait pauses
+        the whole pool, as with any ``wait_from``.
+
+        No HTTP client is imported. The response is found by duck
+        typing: ``exc.response`` when present (httpx, requests),
+        otherwise the exception itself (aiohttp puts ``status`` and
+        ``headers`` right on it). Pass ``response=`` to override — but a
+        custom extractor must tolerate *every* type in *on*: one that
+        raises (e.g. ``lambda e: e.response`` meeting a
+        ``ConnectionError``) replaces the real exception in the failure
+        report and skips the retry. The default is getattr-based and
+        safe for any exception.
+        Exceptions in *on* that carry no status at all (connection
+        errors) are retried — the type filter is the whole decision
+        for them.
+
+        Examples::
+
+            Retry.for_http(on=(httpx.HTTPStatusError,))
+            Retry.for_http(on=(requests.HTTPError,), statuses={429})
+            Retry.for_http(on=(aiohttp.ClientResponseError, ConnectionError))
+
+        Returns a plain frozen ``Retry`` — everything composes.
+        """
+        extract = response if response is not None else _default_response
+        return cls(
+            attempts=attempts,
+            backoff=backoff,
+            max_delay=max_delay,
+            jitter=jitter,
+            max_server_wait=max_server_wait,
+            on=on,
+            retry_if=_HttpRetryIf(frozenset(statuses), extract),
+            wait_from=_HttpWaitFrom(extract),
+        )
 
     def _delay(self, attempt: int) -> float:
         """Compute backoff delay before retry *attempt* (0-indexed)."""

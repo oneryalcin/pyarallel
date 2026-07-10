@@ -67,6 +67,11 @@ result = parallel_map(
         retry_if=is_rate_limit,
         wait_from=github_wait,          # one worker's throttle wait pauses the whole pool
     ),
+    # Why not Retry.for_http()? GitHub signals rate limits as 403 WITH
+    # rate-limit headers — but plain 403 is also "no permission", which
+    # must NOT be retried. Status alone can't tell them apart, so this
+    # recipe keeps its header-aware predicate. for_http covers APIs
+    # where status is the whole signal.
     checkpoint="codeowners.ckpt",
     checkpoint_key=lambda name: name,   # resume by repo — never re-mutate a done one
     max_errors=25,                      # the kill-switch: abort the migration if it goes wrong

@@ -27,12 +27,6 @@ def classify(ticket):
     )
     return response.choices[0].message.content
 
-def retry_after(exc):
-    """Honor the server's Retry-After header when present."""
-    response = getattr(exc, "response", None)
-    header = response.headers.get("retry-after") if response else None
-    return float(header) if header else None
-
 # One Limiter per API key — every job that spends this quota shares it.
 limiter = Limiter(RateLimit(450, "minute", burst=10))
 
@@ -40,11 +34,11 @@ result = parallel_map(
     classify, tickets,
     workers=10,
     rate_limit=limiter,
-    retry=Retry(
+    retry=Retry.for_http(               # 429 + Retry-After, prewired (v0.9)
         attempts=4,
         backoff=2.0,
         on=(openai.RateLimitError, openai.APIConnectionError, openai.InternalServerError),
-        wait_from=retry_after,          # a 429 pauses the WHOLE pool
+        statuses={429, 500, 502, 503, 504},
     ),
     checkpoint="classify.ckpt",         # paid-for answers survive a crash
     max_errors=20,                      # dead API → abort near 20 failures, not at 20,000
@@ -58,10 +52,14 @@ for idx, exc in result.failures():
 
 Why each policy is there:
 
-- **`wait_from=retry_after`** — when the provider says `Retry-After: 30`,
-  that wait replaces the backoff *and* pauses the shared limiter. One
-  throttled call slows the whole pool; without it, all 10 workers
-  discover the 429 separately and the retry storm makes it worse.
+- **`Retry.for_http()`** — when the provider says `Retry-After: 30`
+  (numeric *or* HTTP-date form), that wait replaces the backoff *and*
+  pauses the shared limiter. One throttled call slows the whole pool;
+  without it, all 10 workers discover the 429 separately and the retry
+  storm makes it worse. `statuses=` widens the default `{429, 503}` to
+  the 5xx codes `openai.InternalServerError` represents;
+  `APIConnectionError` carries no status, so the type filter alone
+  decides for it. (Verified against the real `openai` exception types.)
 - **`checkpoint=`** — LLM calls cost real money. Completed answers are
   persisted as they finish; a crash at item 8,000 of 10,000 resumes
   with 2,000 calls, not 10,000. Inputs that evolve between runs? Key
