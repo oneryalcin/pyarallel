@@ -141,9 +141,13 @@ can proceed in parallel.
 - **Resource-lifecycle examples** — one reusable HTTP client around the
   fan-out; fix the `AsyncClient`-per-item pattern in README/cookbook
   (flagged in the very first external review).
-- **Committed benchmark lab** — the free-threading/interpreter numbers
-  (2.4×/3.4×) come from throwaway scripts on one machine; commit a
-  reproducible harness so the claims are re-runnable.
+- **Committed benchmark lab** *(done — on `v0.10-benchmark-lab`)* — the
+  free-threading/interpreter numbers (2.4×/3.4×) came from throwaway
+  scripts on one machine; `benchmarks/bench.py` is now a single
+  stdlib-only harness whose benchmarks map 1:1 to those claims, with
+  recorded runs in `benchmarks/RESULTS.md`. Not in CI (shared runners
+  make wall-clock claims dishonest) — it's for humans re-verifying on
+  their own hardware.
 - **Executable cookbook examples** *(done — on `v0.10-executable-docs`)*
   — all 110 user-facing doc blocks compile-gated and API-shape-gated
   (keywords checked against real signatures); the flagship LLM recipe
