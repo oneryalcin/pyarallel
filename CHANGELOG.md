@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- New: **the resilience demo** (`examples/resilience_demo.py`) — every
+  headline claim proven locally in ~10s with zero credentials and zero
+  extra dependencies (stdlib fake API + stdlib client): a full-speed
+  pool draws a 429 and ONE `Retry-After` pauses the whole pool (gap
+  measured server-side, ~1 wasted call instead of a per-worker storm);
+  a client-side `RateLimit` prevents throttling entirely; a
+  checkpointed run is SIGKILLed mid-flight and the rerun resumes from
+  SQLite without repeating paid-for calls (server request counter as
+  the receipt). Self-asserting — exits non-zero if any claim fails.
 - New: **cooperative stop** — `stop=StopToken()` on the collected map
   APIs (`parallel_map` / `async_parallel_map` / decorator `.map()`;
   starmap keeps its smaller surface, streaming needs no token).

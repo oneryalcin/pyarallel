@@ -103,11 +103,12 @@ honest:
   asymmetry is documented as intentional.
 - **Resource-lifecycle examples** — one reusable HTTP client around the
   fan-out; fix the `AsyncClient`-per-item pattern in README/cookbook.
-- **The resilience demo** — deterministic, zero-credential, local: a
-  fake API enforcing a quota, 429 + `Retry-After` pausing the whole
-  pool, a mid-run kill, a rerun that resumes from SQLite, and a final
-  report of avoided calls. One demo that proves the entire thesis — and
-  doubles as the launch write-up's centerpiece.
+- **The resilience demo** *(done — on `v0.9-resilience-demo`)* —
+  deterministic, zero-credential, local: a fake API enforcing a quota,
+  429 + `Retry-After` pausing the whole pool (gap measured
+  server-side), a real SIGKILL mid-run, a rerun that resumes from
+  SQLite, and a final report of avoided calls. Proves the entire
+  thesis — and doubles as the launch write-up's centerpiece.
 
 Design spikes (pre-freeze checks, no shipping):
 

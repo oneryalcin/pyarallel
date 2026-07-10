@@ -232,6 +232,23 @@ Async mirrors: `async_parallel_map`, `async_parallel_starmap`, `async_parallel_i
 
 Works with instance methods and static methods via `@parallel` decorator — see [full docs](https://oneryalcin.github.io/pyarallel/).
 
+## See It Prove Itself
+
+Every claim above, verified locally in ~10 seconds — no credentials, no
+dependencies, one file:
+
+```bash
+python examples/resilience_demo.py
+```
+
+A fake quota-enforcing API comes up on localhost; a full-speed pool
+draws a 429 and you watch **one** `Retry-After` pause the whole pool
+(the server measures the gap); the same job with a client-side
+`RateLimit` never gets throttled at all; then a checkpointed run is
+**SIGKILLed mid-flight** and rerun — it resumes from SQLite, and the
+server's request counter proves the paid-for calls were not repeated.
+The demo asserts its own claims and exits non-zero if any fail.
+
 ## Documentation
 
 [Full docs](https://oneryalcin.github.io/pyarallel/) — API reference, advanced features, best practices.
