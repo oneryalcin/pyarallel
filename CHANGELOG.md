@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- New: **`ParallelResult.item_results()`** — the per-item `attempts` and
+  `duration` the workers already compute now survive a *collected* map,
+  not just streaming. `parallel_map(...).item_results()` returns a
+  `list[ItemResult[R]]` in input order — the same index/value/error/
+  attempts/duration vocabulary `parallel_iter` yields — so a retry count
+  or a latency budget is one call away without switching to streaming.
+  Never raises (a partial-results accessor, like `.successes()`).
+  Honest zeros where nothing ran *this* run: a checkpoint cache hit and
+  a timeout/abort placeholder both carry `attempts=0, duration=0.0`. A
+  hand-constructed `ParallelResult` has no metadata and synthesizes
+  `attempts=1, duration=0.0`.
 - New: **`checkpoint_version=`** — a user-supplied semantic token
   (`str`/`int`/`bytes` or a tuple: `("classify-v3", MODEL, PROMPT_SHA)`)
   joining checkpoint identity, for the config automatic function

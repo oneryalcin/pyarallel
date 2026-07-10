@@ -475,6 +475,7 @@ instead of quietly returning a partial list. Use `.successes()` /
 | `.ok_values()` | `list[R]` | Values of successful tasks only, in input order. Never raises |
 | `.successes()` | `list[tuple[int, R]]` | `(index, value)` for each success |
 | `.failures()` | `list[tuple[int, Exception]]` | `(index, exception)` for each failure |
+| `.item_results()` | `list[ItemResult[R]]` | Every item as an `ItemResult` (index/value/error/**attempts/duration**), input order. Never raises. The collected mirror of streaming `ItemResult`. Checkpoint hits and truncation placeholders carry `attempts=0, duration=0.0` (nothing ran this run) |
 | `.raise_on_failure()` | `None` | Raises `ExceptionGroup` if any task failed; each sub-exception carries its item index as a PEP 678 note (`except*` matching untouched) |
 | `len(result)` | `int` | Number of tasks with a result entry |
 | `result[i]` | `R` | Index into values (raises on failure/truncation) |

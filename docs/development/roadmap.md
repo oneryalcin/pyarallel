@@ -93,10 +93,11 @@ honest:
   queued work, preserves checkpoints, and reports
   `RunStatus.CANCELLED`. Honest about running sync threads being
   uninterruptible.
-- **Collected-result metadata** — expose the `attempts`/`duration`
-  already computed per item (today discarded by collected maps).
-  Smallest surface first; a stats object must be earned by concrete
-  use cases.
+- **Collected-result metadata** *(done — on `v0.9-collected-metadata`)* —
+  `ParallelResult.item_results()` exposes the `attempts`/`duration`
+  already computed per item (previously discarded by collected maps),
+  reusing the streaming `ItemResult` type. Smallest surface first; a
+  stats object must be earned by concrete use cases.
 - **Decorator default surface** — decide whether decorator defaults
   widen beyond `workers`/`executor`/`rate_limit` (e.g. `retry=`), or the
   asymmetry is documented as intentional.
