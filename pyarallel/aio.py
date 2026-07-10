@@ -50,6 +50,17 @@ from .result import (
 )
 from .stop import StopToken
 
+_SOURCE_EXHAUSTED: Any = object()
+
+
+async def _pull_once(source: AsyncIterator[Any]) -> Any:
+    """One anext as a task-safe coroutine — StopAsyncIteration must not
+    cross a Task boundary, so exhaustion travels as a sentinel."""
+    try:
+        return await anext(source)
+    except StopAsyncIteration:
+        return _SOURCE_EXHAUSTED
+
 
 def _aiter_source(items: Iterable[Any] | AsyncIterable[Any]) -> AsyncIterator[Any]:
     """Normalize any source to an async iterator (v0.9).
@@ -344,9 +355,11 @@ async def _async_collected_map(
         stop_event = asyncio.Event()
 
         def _wake_driver() -> None:
-            # call_soon_threadsafe returns a Handle; the token wants a
-            # bare thunk — and this must work from any thread.
-            loop.call_soon_threadsafe(stop_event.set)
+            # Must work from any thread (signal handlers, watchdogs).
+            # The run may have ended between stop()'s callback copy and
+            # this call — a closed loop is a no-op, not an error.
+            with contextlib.suppress(RuntimeError):
+                loop.call_soon_threadsafe(stop_event.set)
 
         unregister = stop._register(_wake_driver)
         stop_task = asyncio.create_task(stop_event.wait())
@@ -382,10 +395,28 @@ async def _async_collected_map(
             if deadline is not None and time.monotonic() >= deadline:
                 halt.stop(RunStatus.TIMED_OUT)
                 return False
-            try:
-                item = await anext(source)
-            except StopAsyncIteration:
-                return False
+            if stop_task is None:
+                try:
+                    item = await anext(source)
+                except StopAsyncIteration:
+                    return False
+            else:
+                # Race the pull against the stop token (Codex adversarial:
+                # a wedged cursor made cancel latency = source latency).
+                # Cancelling the losing pull lands in the source and runs
+                # its finally — the documented closure-contract exception.
+                pull = asyncio.ensure_future(_pull_once(source))
+                race: set[asyncio.Task[Any]] = {pull, stop_task}
+                await asyncio.wait(race, return_when=asyncio.FIRST_COMPLETED)
+                if not pull.done():
+                    pull.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await pull
+                    halt.stop(RunStatus.CANCELLED)
+                    return False
+                item = pull.result()  # source errors propagate here
+                if item is _SOURCE_EXHAUSTED:
+                    return False
             idx = len(results)
             results.append(_PENDING)
             meta.append((0, 0.0))
@@ -456,7 +487,10 @@ async def _async_collected_map(
                 break
 
     try:
-        if timeout is not None and timeout <= 0:
+        if stop is not None and stop.stopped:
+            # Stop beats the clock — same ordering as every sync gate.
+            halt.stop(RunStatus.CANCELLED)
+        elif timeout is not None and timeout <= 0:
             # Already expired: admit no work (asyncio.timeout alone
             # cancels only at the first suspension point).
             halt.stop(RunStatus.TIMED_OUT)

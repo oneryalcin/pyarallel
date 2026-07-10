@@ -320,3 +320,18 @@ class TestOkValues:
 
 def _double_for_process(x):
     return x * 2
+
+
+class TestMetaAlignmentGuard:
+    """The meta list is hand-aligned with results across three engines —
+    an invariant a future edit can silently break (it nearly did: the
+    cooperative-stop branch added three padding sites the same week this
+    landed). The constructor now refuses misaligned metadata loudly."""
+
+    def test_misaligned_meta_rejected(self):
+        import pytest
+
+        from pyarallel import ParallelResult
+
+        with pytest.raises(RuntimeError):
+            ParallelResult([1, 2, 3], meta=[(1, 0.0)])

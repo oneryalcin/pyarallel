@@ -218,3 +218,84 @@ class TestTokenReuse:
         r2 = parallel_map(_double, (i for i in range(3)), stop=t)
         assert r1.status is RunStatus.CANCELLED
         assert r2.status is RunStatus.CANCELLED
+
+
+class TestAdversarialReviewFindings:
+    """Codex adversarial review of v0.9-cooperative-stop: four contract
+    holes, each pinned here before its fix."""
+
+    async def test_stop_lands_while_async_source_pull_blocked(self):
+        """[high] The stop bridge woke stop_event, but during admission
+        the driver was parked in `await anext(source)` — cancel latency
+        became source-pull latency (a wedged cursor blocked the stop)."""
+        import asyncio
+
+        async def stuck_source():
+            yield 1
+            await asyncio.Event().wait()  # page fetch never returns
+            yield 2
+
+        async def instant(x):
+            return x
+
+        t = StopToken()
+        asyncio.get_event_loop().call_later(0.3, t.stop)
+        start = time.monotonic()
+        r = await asyncio.wait_for(
+            async_parallel_map(instant, stuck_source(), stop=t), timeout=5.0
+        )
+        assert r.status is RunStatus.CANCELLED
+        assert time.monotonic() - start < 2.0
+
+    def test_dead_callback_does_not_block_stop_delivery(self):
+        """[high] One stale registration (e.g. a closed event loop's
+        call_soon_threadsafe raising RuntimeError) must neither escape
+        stop() nor prevent later callbacks from firing."""
+        t = StopToken()
+        fired = []
+
+        def dead():
+            raise RuntimeError("Event loop is closed")
+
+        t._register(dead)
+        t._register(lambda: fired.append(True))
+        t.stop()  # must not raise
+        assert fired == [True]
+
+    def test_sequential_rate_limited_stop_is_prompt_and_final(self):
+        """[medium] Sequential pacing waits ignored the token, and after
+        the wait the item ran anyway — post-cancel work executed."""
+        from pyarallel import RateLimit
+
+        t = StopToken()
+        ran = []
+
+        def work(x):
+            ran.append(x)
+            return x
+
+        threading.Timer(0.3, t.stop).start()
+        start = time.monotonic()
+        r = parallel_map(
+            work,
+            [1, 2, 3],
+            sequential=True,
+            rate_limit=RateLimit(1, "minute"),  # second item paces ~60s
+            stop=t,
+        )
+        assert r.status is RunStatus.CANCELLED
+        assert time.monotonic() - start < 3.0
+        assert ran == [1]  # the post-cancel item never ran
+
+    async def test_async_prestopped_token_beats_timeout_zero(self):
+        """[medium] The async timeout<=0 fast path declared TIMED_OUT
+        before consulting the token — sync and async disagreed on
+        stop-beats-clock ordering."""
+        t = StopToken()
+        t.stop()
+
+        async def afn(x):
+            return x
+
+        r = await async_parallel_map(afn, [1, 2], stop=t, timeout=0)
+        assert r.status is RunStatus.CANCELLED

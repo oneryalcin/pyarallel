@@ -14,6 +14,7 @@ with ``timeout=``.
 
 from __future__ import annotations
 
+import contextlib
 import threading
 from collections.abc import Callable
 
@@ -53,7 +54,12 @@ class StopToken:
             self._event.set()
             callbacks, self._callbacks = self._callbacks, []
         for cb in callbacks:
-            cb()
+            # Best-effort fanout: a stale registration (a run that ended
+            # between the copy above and this call — e.g. its event loop
+            # already closed) must neither escape stop() nor block
+            # delivery to the other runs holding this token.
+            with contextlib.suppress(Exception):
+                cb()
 
     @property
     def stopped(self) -> bool:

@@ -908,14 +908,40 @@ def _sequential_collected_map(
                         on_progress(completed, _progress_total(total, results))
                     continue
             if bucket is not None:
-                budget: float | None = None
-                if deadline is not None:
-                    budget = max(0.0, deadline - time.monotonic())
-                if not bucket.wait(timeout=budget):
-                    assert timeout is not None
-                    results[idx] = _timeout_failure(timeout, idx)
-                    halt.stop(RunStatus.TIMED_OUT)
+                # Same sliced pacing as the windowed engine: a cancel
+                # lands within ~100ms even while rate-limited, and the
+                # item must NOT run once the token has stopped.
+                paced_out = False
+                while True:
+                    budget: float | None = None
+                    if deadline is not None:
+                        budget = max(0.0, deadline - time.monotonic())
+                    slice_budget = budget
+                    if stop is not None:
+                        slice_budget = 0.1 if budget is None else min(budget, 0.1)
+                    if bucket.wait(timeout=slice_budget):
+                        break
+                    if stop is not None and stop.stopped:
+                        results[idx] = _Failure(
+                            Cancelled("cancelled while waiting for a rate-limit slot")
+                        )
+                        halt.stop(RunStatus.CANCELLED)
+                        paced_out = True
+                        break
+                    if deadline is not None and time.monotonic() >= deadline:
+                        assert timeout is not None
+                        results[idx] = _timeout_failure(timeout, idx)
+                        halt.stop(RunStatus.TIMED_OUT)
+                        paced_out = True
+                        break
+                if paced_out:
                     break
+            if stop is not None and stop.stopped:
+                # The token flipped while this item paced or queued —
+                # running it now would be post-cancel work.
+                results[idx] = _Failure(Cancelled("cancelled by StopToken"))
+                halt.stop(RunStatus.CANCELLED)
+                break
             outcome = task_fn(item)
             meta[idx] = (outcome.attempts, outcome.duration)
             if outcome.error is not None:

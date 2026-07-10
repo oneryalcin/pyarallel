@@ -175,6 +175,14 @@ class ParallelResult[R]:
             raise RuntimeError(
                 "internal error: unfilled result slot leaked into ParallelResult"
             )
+        # The meta list is hand-aligned with entries at every site that
+        # grows results, across three engines — misalignment is a bug in
+        # an engine, and it must fail here, not as a wrong receipt later.
+        if meta is not None and len(meta) != len(entries):
+            raise RuntimeError(
+                "internal error: metadata misaligned with results "
+                f"({len(meta)} != {len(entries)})"
+            )
         self._entries = entries
         # Per-index (attempts, duration), index-aligned with entries. The
         # engines fill it; hand-constructed results leave it None and
