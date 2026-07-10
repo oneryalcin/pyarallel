@@ -109,6 +109,12 @@ jobs:
           assert r.status is RunStatus.COMPLETED
           print('installed', pyarallel.__version__, 'OK')
           "
+      # The resilience demo is an executable contract: it asserts the
+      # headline claims (429 pool-pause, zero-429 pacing, SIGKILL
+      # resume) against the installed wheel and exits non-zero if any
+      # fail. ~10s.
+      - name: Resilience demo against the installed wheel
+        run: /tmp/smoke/bin/python examples/resilience_demo.py
       - name: py.typed ships and types resolve from the installed package
         run: |
           test -f "$(/tmp/smoke/bin/python -c 'import pyarallel, os; print(os.path.dirname(pyarallel.__file__))')/py.typed"
