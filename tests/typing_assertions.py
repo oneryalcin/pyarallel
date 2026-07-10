@@ -45,6 +45,7 @@ def check_parallel_map() -> None:
     assert_type(result, ParallelResult[dict[str, int]])
     assert_type(result.values(), list[dict[str, int]])
     assert_type(result.successes(), list[tuple[int, dict[str, int]]])
+    assert_type(result.item_results(), list[ItemResult[dict[str, int]]])
 
     parallel_map(fetch, [1, 2])  # type: ignore[arg-type]  # wrong item type
 

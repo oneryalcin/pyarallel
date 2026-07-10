@@ -151,13 +151,14 @@ class ParallelResult[R]:
     not a completion.
     """
 
-    __slots__ = ("_entries", "_status")
+    __slots__ = ("_entries", "_meta", "_status")
 
     def __init__(
         self,
         entries: list[Any],
         *,
         status: RunStatus = RunStatus.COMPLETED,
+        meta: list[tuple[int, float]] | None = None,
     ) -> None:
         # A leaked unfilled slot must fail loudly here, not surface later
         # as a silent "success" value from .values()/.ok.
@@ -166,6 +167,10 @@ class ParallelResult[R]:
                 "internal error: unfilled result slot leaked into ParallelResult"
             )
         self._entries = entries
+        # Per-index (attempts, duration), index-aligned with entries. The
+        # engines fill it; hand-constructed results leave it None and
+        # item_results() synthesizes honest defaults.
+        self._meta = meta
         self._status = status
 
     # --- Introspection ---
@@ -256,6 +261,37 @@ class ParallelResult[R]:
             for i, f in enumerate(self._entries)
             if isinstance(f, _Failure)
         ]
+
+    def item_results(self) -> list[ItemResult[R]]:
+        """Every item as an ``ItemResult``, in input order. Never raises.
+
+        The collected mirror of the streaming ``ItemResult`` — same
+        vocabulary (index/value/error/attempts/duration) so a collected
+        run and a streamed run read identically. A partial-results
+        accessor, like ``.successes()``: it does not raise on failures
+        or truncation.
+
+        ``attempts``/``duration`` are the receipts the workers already
+        computed. Two honest special cases carry ``attempts=0,
+        duration=0.0`` — nothing ran *this* run: a checkpoint cache hit
+        and a truncation placeholder (timeout/abort). The ``ItemResult``
+        docstring's "1 = no retry" applies to items that actually ran.
+
+        Hand-constructed results have no metadata; each item then
+        synthesizes ``attempts=1, duration=0.0`` (metadata unavailable).
+        """
+        out: list[ItemResult[R]] = []
+        for i, e in enumerate(self._entries):
+            attempts, duration = self._meta[i] if self._meta is not None else (1, 0.0)
+            if isinstance(e, _Failure):
+                out.append(
+                    ItemResult(
+                        i, error=e.exception, attempts=attempts, duration=duration
+                    )
+                )
+            else:
+                out.append(ItemResult(i, value=e, attempts=attempts, duration=duration))
+        return out
 
     def raise_on_failure(self) -> None:
         """Raise ``ExceptionGroup`` containing all task failures.

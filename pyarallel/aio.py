@@ -310,6 +310,10 @@ async def _async_collected_map(
     total = _total_if_known(items)
     source = _aiter_source(items)
     results: list[Any] = []
+    # Per-index (attempts, duration), grown in lockstep with results.
+    # Default (0, 0.0) = "nothing ran this run" (cache hit / truncation
+    # placeholder); _absorb overwrites with the task's real receipt.
+    meta: list[tuple[int, float]] = []
     in_flight: dict[asyncio.Task[_Outcome], int] = {}
     completed = 0
     failures = 0
@@ -357,6 +361,7 @@ async def _async_collected_map(
                 return False
             idx = len(results)
             results.append(_PENDING)
+            meta.append((0, 0.0))
             if store is not None:
                 cached = store.lookup(idx, item)
                 if cached is not None:
@@ -374,8 +379,12 @@ async def _async_collected_map(
             outcome = task.result()
         except Exception as exc:
             error = exc  # infrastructure failure — task errors ride the outcome
+            # No _Outcome (task crashed at infra level): one dispatch,
+            # duration unmeasured. Never 0 — the item did run.
+            meta[idx] = (1, 0.0)
         else:
             error = outcome.error
+            meta[idx] = (outcome.attempts, outcome.duration)
         if error is not None:
             results[idx] = _Failure(error)
             failures += 1
@@ -442,6 +451,7 @@ async def _async_collected_map(
             if total is not None:
                 for idx in range(len(results), total):
                     results.append(_timeout_failure(timeout, idx))
+                    meta.append((0, 0.0))
         elif halt.aborted:
             # Salvage completions that raced the stop, cancel the rest.
             for task in [t for t in in_flight if t.done()]:
@@ -454,9 +464,9 @@ async def _async_collected_map(
             # infinite input must not be consumed post-abort. Sized inputs
             # get placeholders by count; unsized yield a shorter result.
             if total is not None:
-                results.extend(
-                    _Failure(Aborted(reason)) for _ in range(total - len(results))
-                )
+                pad = total - len(results)
+                results.extend(_Failure(Aborted(reason)) for _ in range(pad))
+                meta.extend((0, 0.0) for _ in range(pad))
     finally:
         for task in in_flight:
             task.cancel()
@@ -466,7 +476,7 @@ async def _async_collected_map(
         if store is not None:
             store.close()
 
-    return ParallelResult(results, status=halt.status)
+    return ParallelResult(results, status=halt.status, meta=meta)
 
 
 async def async_parallel_starmap[R](

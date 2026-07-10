@@ -593,6 +593,11 @@ def _collected_map(
     total = _total_if_known(items)
     source = iter(items)
     results: list[Any] = []
+    # Per-index (attempts, duration), grown in lockstep with results.
+    # Default (0, 0.0) = "nothing ran this run" — the honest value a cache
+    # hit or truncation placeholder keeps; _absorb overwrites with the
+    # worker's real receipt.
+    meta: list[tuple[int, float]] = []
     in_flight: dict[Future[_Outcome], int] = {}
     completed = 0
     failures = 0
@@ -625,6 +630,7 @@ def _collected_map(
                 return False
             idx = len(results)
             results.append(_PENDING)
+            meta.append((0, 0.0))
             if store is not None:
                 cached = store.lookup(idx, item)
                 if cached is not None:
@@ -653,8 +659,12 @@ def _collected_map(
             outcome = future.result()
         except Exception as exc:
             error = exc  # infrastructure failure — task errors ride the outcome
+            # No _Outcome came back (pool/worker died): one dispatch,
+            # duration unmeasured. Never 0 — the item did run.
+            meta[idx] = (1, 0.0)
         else:
             error = outcome.error
+            meta[idx] = (outcome.attempts, outcome.duration)
         if error is not None:
             results[idx] = _Failure(error)
             failures += 1
@@ -741,6 +751,7 @@ def _collected_map(
             if total is not None:
                 for idx in range(len(results), total):
                     results.append(_timeout_failure(timeout, idx))
+                    meta.append((0, 0.0))
         elif halt.aborted:
             # Salvage completions that raced the stop, drop the rest.
             done, pending = wait(in_flight, timeout=0)
@@ -753,9 +764,9 @@ def _collected_map(
                 if results[idx] is _PENDING:
                     results[idx] = _Failure(Aborted(reason))
             if total is not None:
-                results.extend(
-                    _Failure(Aborted(reason)) for _ in range(total - len(results))
-                )
+                pad = total - len(results)
+                results.extend(_Failure(Aborted(reason)) for _ in range(pad))
+                meta.extend((0, 0.0) for _ in range(pad))
     finally:
         # Every stop — timeout, abort, or an escaping driver error
         # (source iterator, checkpoint write, progress callback) —
@@ -768,7 +779,7 @@ def _collected_map(
         if store is not None:
             store.close()
 
-    return ParallelResult(results, status=halt.status)
+    return ParallelResult(results, status=halt.status, meta=meta)
 
 
 def _sequential_collected_map(
@@ -798,6 +809,10 @@ def _sequential_collected_map(
     total = _total_if_known(items)
     deadline = (time.monotonic() + timeout) if timeout is not None else None
     results: list[Any] = []
+    # Per-index (attempts, duration), grown in lockstep with results —
+    # same contract as the windowed engine (default (0, 0.0) = nothing ran
+    # this run; overwritten with the task's real receipt).
+    meta: list[tuple[int, float]] = []
     completed = 0
     failures = 0
     halt = _RunStop()
@@ -816,6 +831,7 @@ def _sequential_collected_map(
                 halt.stop(RunStatus.TIMED_OUT)
                 break
             results.append(_PENDING)
+            meta.append((0, 0.0))
             if store is not None:
                 cached = store.lookup(idx, item)
                 if cached is not None:
@@ -834,6 +850,7 @@ def _sequential_collected_map(
                     halt.stop(RunStatus.TIMED_OUT)
                     break
             outcome = task_fn(item)
+            meta[idx] = (outcome.attempts, outcome.duration)
             if outcome.error is not None:
                 results[idx] = _Failure(outcome.error)
                 failures += 1
@@ -854,16 +871,17 @@ def _sequential_collected_map(
             assert timeout is not None
             for idx in range(len(results), total):
                 results.append(_timeout_failure(timeout, idx))
+                meta.append((0, 0.0))
         elif halt.aborted and total is not None:
             reason = f"aborted after {failures} failures (max_errors={max_errors})"
-            results.extend(
-                _Failure(Aborted(reason)) for _ in range(total - len(results))
-            )
+            pad = total - len(results)
+            results.extend(_Failure(Aborted(reason)) for _ in range(pad))
+            meta.extend((0, 0.0) for _ in range(pad))
     finally:
         if store is not None:
             store.close()
 
-    return ParallelResult(results, status=halt.status)
+    return ParallelResult(results, status=halt.status, meta=meta)
 
 
 def _sequential_iter(
