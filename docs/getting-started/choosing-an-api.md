@@ -18,6 +18,19 @@ Is your function async (async def)?
                            async_parallel_starmap(fn, pairs)
 ```
 
+One caveat on the starmap branch: the starmaps cover the common
+"unpack these tuples" case but don't take `checkpoint=`, `max_errors=`,
+or `stop=`. If you need those, wrap the call into a single-argument
+function and use `parallel_map`:
+
+```python
+def process(pair: tuple[str, int]) -> dict:
+    name, count = pair
+    return upload(name, count)
+
+result = parallel_map(process, pairs, checkpoint="run.ckpt")
+```
+
 ## Collected vs streaming
 
 | | Collected | Streaming |
@@ -75,7 +88,7 @@ event loop, no pool involved.
 |---|---|---|
 | `"thread"` (default) | I/O: HTTP, DBs, files | Right for ~90% of uses. On free-threaded Python (3.13t/3.14t) threads also parallelize CPU work |
 | `"process"` | CPU-bound work | Function + items must pickle, module-scope functions only; ~70ms+ startup per worker |
-| `"interpreter"` | CPU-bound, Python 3.14+ | One OS process, GIL-free parallelism; ~50ms startup per worker (measured, machine-dependent); same module-scope constraint |
+| `"interpreter"` | CPU-bound, Python 3.14+ | One OS process, GIL-free parallelism; ~50ms startup per worker on a standard build (~100ms free-threaded; machine-dependent); same module-scope constraint |
 
 Numbers and methodology: [`benchmarks/`](https://github.com/oneryalcin/pyarallel/tree/main/benchmarks).
 

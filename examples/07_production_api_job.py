@@ -20,6 +20,9 @@ Every production pattern, wired together the recommended way:
   - explicit ``RunStatus`` handling — partial results processed honestly
 
 The script asserts its own claims and exits non-zero if any fail.
+Press Ctrl-C mid-run to watch the graceful path for real: in-flight
+items finish, completed work is committed, the exit code is 128+signal
+— and rerunning the same command resumes instead of re-spending.
 Port 8974 in use? Set ``DEMO_PORT`` to any free port.
 """
 
@@ -29,6 +32,7 @@ import json
 import os
 import signal
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -85,15 +89,18 @@ def fetch_user(record: dict[str, str]) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 STOP = StopToken()
+_STOP_SIGNUM: list[int] = []  # which signal asked us to stop
 
 
 def _request_stop(signum: int, frame: object) -> None:
-    print(f"\n  signal {signum} received — draining, checkpoint stays valid…")
+    print(f"\n  signal {signum} received — draining; completed items are committed…")
+    _STOP_SIGNUM.append(signum)
     STOP.stop()
 
 
-signal.signal(signal.SIGTERM, _request_stop)
-signal.signal(signal.SIGINT, _request_stop)
+# Registration happens inside main(), NOT at import time: handlers can
+# only be installed from the main thread, and an importable module must
+# never hijack its importer's signals.
 
 
 # ---------------------------------------------------------------------------
@@ -136,8 +143,10 @@ def report(result: ParallelResult[dict[str, str]]) -> int:
     if result.status is RunStatus.CANCELLED:
         saved = result.ok_values()
         print(f"  cancelled — {len(saved)} completed items are in the checkpoint;")
-        print("  rerun the same command to resume.")
-        return 143  # 128 + SIGTERM, so orchestrators see a signal exit
+        print("  rerun the same command to resume where this left off.")
+        # 128 + signal (143 for SIGTERM, 130 for SIGINT): orchestrators
+        # and shells recognize a signal exit.
+        return (128 + _STOP_SIGNUM[0]) if _STOP_SIGNUM else 1
     if result.status is RunStatus.TIMED_OUT:
         print(f"  hit the wall-clock budget with {len(result.ok_values())} done;")
         print("  rerun to resume from the checkpoint.")
@@ -217,10 +226,11 @@ def _serve(api: _FakeAPI) -> ThreadingHTTPServer:
 
 
 def main() -> None:
-    import tempfile
-
     print("production API job template — local fake API, zero credentials")
     print(f"  API: {BASE} (quota 40/s → 429; some users 503 on first call)\n")
+
+    signal.signal(signal.SIGTERM, _request_stop)
+    signal.signal(signal.SIGINT, _request_stop)
 
     api = _FakeAPI(quota_per_second=40)
     try:
@@ -231,21 +241,34 @@ def main() -> None:
         )
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
+    # A real job uses a stable path — that's the whole point of resume.
+    # (A fresh temp dir here would make "rerun to resume" a lie.)
+    ckpt = os.path.join(tempfile.gettempdir(), "pyarallel-example-07.ckpt")
+    fresh_run = not os.path.exists(ckpt)
+    if not fresh_run:
+        print(f"  found {ckpt} — resuming a previously interrupted run\n")
+
     records = [{"user_id": f"u{i:04d}"} for i in range(60)]
     try:
-        with tempfile.TemporaryDirectory() as tmp:
-            result = run_job(records, os.path.join(tmp, "users.ckpt"))
-            code = report(result)
+        result = run_job(records, ckpt)
+        code = report(result)
     finally:
         server.shutdown()
+        server.server_close()
 
-    # The template asserts its own claims (CI runs this file):
-    assert result.status is RunStatus.COMPLETED, result.status
-    assert result.ok and len(result.values()) == 60
-    retried = [r for r in result.item_results() if r.attempts > 1]
-    assert len(retried) >= 6, "the transient 503s must be retried, not fatal"
-    assert api.throttled == 0, "the client-side limit should prevent all 429s"
-    print("\nall assertions passed — this file is the shape to copy.")
+    if result.status is not RunStatus.COMPLETED:
+        sys.exit(code)  # interrupted/aborted: keep the checkpoint for resume
+
+    os.remove(ckpt)  # complete: the next run starts fresh
+    if fresh_run:
+        # The template asserts its own claims (CI runs this file). A
+        # resumed run skips them: cached items never hit the server, so
+        # the retry/throttle counts below only hold for a full run.
+        assert result.ok and len(result.values()) == 60
+        retried = [r for r in result.item_results() if r.attempts > 1]
+        assert len(retried) >= 6, "the transient 503s must be retried, not fatal"
+        assert api.throttled == 0, "the client-side limit should prevent all 429s"
+        print("\nall assertions passed — this file is the shape to copy.")
     sys.exit(code)
 
 
