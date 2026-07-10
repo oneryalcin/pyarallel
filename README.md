@@ -90,6 +90,7 @@ pip install pyarallel
 - **Server-driven backoff** — `retry=Retry.for_http(on=(httpx.HTTPStatusError,))`: 429/503 + `Retry-After` (numeric *and* HTTP-date form) prewired, no client import; the wait also pauses the shared limiter so one throttled task slows the whole pool. Custom policies via `retry_if=`/`wait_from=`
 - **Checkpoint/resume** — `checkpoint="run.ckpt"`: a crash at item 40,000 resumes instead of restarting from zero; `checkpoint_key=lambda u: u.id` keys rows by identity so evolving inputs keep completed work
 - **Early abort** — `max_errors=10`: a dead API costs tens of calls, not thousands; unrun items are marked `Aborted`, partial results returned
+- **Cooperative stop** — `stop=StopToken()`: SIGTERM/notebook-stop lands the plane — admission ceases, checkpoint rows kept, `RunStatus.CANCELLED` reported
 - **One windowed engine** — every API (collected and streaming, sync and async) admits work through a bounded in-flight window: lazy input, generators never materialized, no batch barriers, a straggler never stalls the items behind it
 - **Streaming** — `parallel_iter` / `async_parallel_iter`: `ordered=True` for input-order yields, per-item `attempts`/`duration`
 - **Async sources** — async cursors and paginated generators feed `async_parallel_*` directly, with backpressure to the producer — no draining into a list first

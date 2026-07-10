@@ -32,7 +32,16 @@ class RunStatus(enum.Enum):
     COMPLETED = "completed"
     TIMED_OUT = "timed_out"
     ABORTED = "aborted"
-    # CANCELLED joins in v0.9 with cooperative stop.
+    CANCELLED = "cancelled"  # cooperative stop (v0.9): StopToken.stop()
+
+
+class Cancelled(RuntimeError):
+    """The run stopped because its ``StopToken`` was stopped.
+
+    Items that never ran (or, async, were cancelled in flight) are
+    marked with this — distinguishable from genuine failures:
+    ``isinstance(exc, Cancelled)``.
+    """
 
 
 class Aborted(RuntimeError):
@@ -229,6 +238,12 @@ class ParallelResult[R]:
         if self._status is RunStatus.ABORTED:
             raise Aborted(
                 f"run aborted (max_errors) after {len(self._entries)} "
+                "items — partial results. Use .successes() / .ok_values() "
+                "to consume them."
+            )
+        if self._status is RunStatus.CANCELLED:
+            raise Cancelled(
+                f"run cancelled (StopToken) after {len(self._entries)} "
                 "items — partial results. Use .successes() / .ok_values() "
                 "to consume them."
             )

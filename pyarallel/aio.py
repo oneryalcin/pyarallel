@@ -40,6 +40,7 @@ from .policies import RateLimit, Retry
 from .result import (
     _PENDING,
     Aborted,
+    Cancelled,
     ItemResult,
     ParallelResult,
     RunStatus,
@@ -47,6 +48,7 @@ from .result import (
     _item_result,
     _Outcome,
 )
+from .stop import StopToken
 
 
 def _aiter_source(items: Iterable[Any] | AsyncIterable[Any]) -> AsyncIterator[Any]:
@@ -96,6 +98,7 @@ class AsyncMapOptions(TypedDict, total=False):
     checkpoint_key: Callable[[Any], str | int | bytes] | None
     checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None
     max_errors: int | None
+    stop: StopToken | None
 
 
 class AsyncStarmapOptions(TypedDict, total=False):
@@ -189,6 +192,7 @@ async def async_parallel_map[T, R](
     checkpoint_key: Callable[[T], str | int | bytes] | None = None,
     checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None = None,
     max_errors: int | None = None,
+    stop: StopToken | None = None,
 ) -> ParallelResult[R]:
     """Execute an async *fn* over *items* concurrently.
 
@@ -277,6 +281,7 @@ async def async_parallel_map[T, R](
         checkpoint_key=checkpoint_key,
         checkpoint_version=checkpoint_version,
         max_errors=max_errors,
+        stop=stop,
     )
 
 
@@ -295,6 +300,7 @@ async def _async_collected_map(
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
     checkpoint_version: Any = None,
     max_errors: int | None,
+    stop: StopToken | None = None,
 ) -> ParallelResult[Any]:
     """The async collected-map engine: bounded admission through a window.
 
@@ -328,6 +334,23 @@ async def _async_collected_map(
         else None
     )
 
+    # StopToken bridge: stop() may arrive from any thread (a signal
+    # handler, a watchdog) — call_soon_threadsafe wakes the driver's
+    # wait, where the stop task sits beside the workers.
+    stop_task: asyncio.Task[Any] | None = None
+    unregister: Callable[[], None] | None = None
+    if stop is not None:
+        loop = asyncio.get_running_loop()
+        stop_event = asyncio.Event()
+
+        def _wake_driver() -> None:
+            # call_soon_threadsafe returns a Handle; the token wants a
+            # bare thunk — and this must work from any thread.
+            loop.call_soon_threadsafe(stop_event.set)
+
+        unregister = stop._register(_wake_driver)
+        stop_task = asyncio.create_task(stop_event.wait())
+
     async def _run(item: Any) -> _Outcome:
         async with semaphore:
             if limiter:
@@ -352,6 +375,10 @@ async def _async_collected_map(
             # CancelledError and blocks is a hang, as everywhere in
             # asyncio. The cancellation lands in the source and runs its
             # finally — the documented exception to never-touching it.)
+            # Stop first: a user's cancel beats the clock.
+            if stop is not None and stop.stopped:
+                halt.stop(RunStatus.CANCELLED)
+                return False
             if deadline is not None and time.monotonic() >= deadline:
                 halt.stop(RunStatus.TIMED_OUT)
                 return False
@@ -412,11 +439,19 @@ async def _async_collected_map(
                 pass
             if halt.stopped or not in_flight:
                 break
+            waiting: set[asyncio.Task[Any]] = set(in_flight)
+            if stop_task is not None:
+                waiting.add(stop_task)
             done, _pending = await asyncio.wait(
-                in_flight, return_when=asyncio.FIRST_COMPLETED
+                waiting, return_when=asyncio.FIRST_COMPLETED
             )
+            stopped_now = stop_task is not None and stop_task in done
+            if stop_task is not None:
+                done.discard(stop_task)
             for task in done:
                 _absorb(task, in_flight.pop(task))
+            if stopped_now:
+                halt.stop(RunStatus.CANCELLED)
             if halt.stopped:
                 break
 
@@ -467,7 +502,29 @@ async def _async_collected_map(
                 pad = total - len(results)
                 results.extend(_Failure(Aborted(reason)) for _ in range(pad))
                 meta.extend((0, 0.0) for _ in range(pad))
+        elif halt.cancelled:
+            # Salvage completions that raced the stop; asyncio CAN
+            # cancel in-flight tasks (the honest asymmetry vs sync,
+            # where running threads finish in the background). The
+            # cancellations happen in the finally below; here every
+            # unresolved slot is marked.
+            for task in [t for t in in_flight if t.done()]:
+                _absorb(task, in_flight.pop(task))
+            reason = "cancelled by StopToken"
+            for idx in in_flight.values():
+                if results[idx] is _PENDING:
+                    results[idx] = _Failure(Cancelled(reason))
+            if total is not None:
+                pad = total - len(results)
+                results.extend(_Failure(Cancelled(reason)) for _ in range(pad))
+                meta.extend((0, 0.0) for _ in range(pad))
     finally:
+        if unregister is not None:
+            unregister()
+        if stop_task is not None:
+            stop_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await stop_task
         for task in in_flight:
             task.cancel()
         for task in in_flight:

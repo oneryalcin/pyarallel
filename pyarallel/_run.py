@@ -56,6 +56,10 @@ class _RunStop:
     def aborted(self) -> bool:
         return self.reason is RunStatus.ABORTED
 
+    @property
+    def cancelled(self) -> bool:
+        return self.reason is RunStatus.CANCELLED
+
 
 def _validate_max_errors(max_errors: int | None) -> None:
     """Shared max_errors validation for sync and async entry points."""

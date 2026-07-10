@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- New: **cooperative stop** — `stop=StopToken()` on the collected APIs.
+  `token.stop()` (thread-safe, idempotent, signal-handler-safe) ceases
+  admission, cancels what can be cancelled, keeps completed checkpoint
+  rows, and reports `RunStatus.CANCELLED`; unresolved items are marked
+  with the new `Cancelled` exception and `values()`/iteration raise on
+  the truncation like every stop. ~100ms cancel latency even while
+  rate-limit-paced. Honest asymmetry: async cancels in-flight tasks;
+  sync threads finish their current item in the background. Streaming
+  APIs don't take a token — `break`/`aclose` already are cooperative
+  stop.
 - New: **`ParallelResult.item_results()`** — the per-item `attempts` and
   `duration` the workers already compute now survive a *collected* map,
   not just streaming. `parallel_map(...).item_results()` returns a

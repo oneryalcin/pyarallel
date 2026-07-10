@@ -240,6 +240,40 @@ Safety guards, stated honestly:
 
 Available on `parallel_map`, `async_parallel_map`, and `.map()`.
 
+## Cooperative Stop — `StopToken`
+
+SIGTERM during a deploy, the notebook stop button, a spend-limit
+watchdog: long runs need a way to say *land the plane* (v0.9):
+
+```python
+import signal
+from pyarallel import StopToken, RunStatus, parallel_map
+
+token = StopToken()
+signal.signal(signal.SIGTERM, lambda *_: token.stop())
+
+result = parallel_map(call_api, items, stop=token, checkpoint="run.ckpt")
+if result.status is RunStatus.CANCELLED:
+    ...  # completed rows are already in the checkpoint; rerun resumes
+```
+
+`stop()` is thread-safe, idempotent, and signal-handler-safe. On stop:
+admission ceases, cancellable work is cancelled, completed checkpoint
+rows are kept, and the result reports `RunStatus.CANCELLED` with
+unresolved slots marked `Cancelled`. Cancel latency is ~100ms even
+while rate-limit-paced (waits are sliced when a token is present).
+
+Stated honestly: the **async** engine cancels in-flight tasks; the
+**sync** engine cannot kill running threads — in-flight items finish in
+the background (their slots still read `Cancelled`: the result was not
+delivered to this run). A token is a latch, not a pulse — once stopped,
+every run given it cancels immediately; use a fresh token per campaign.
+
+Collected APIs only (`parallel_map` / `async_parallel_map` and
+decorator `.map()`): streaming already has cooperative stop by
+construction — `break` out of the loop (sync) or close the stream
+(async, `aclosing`).
+
 ## Early Abort — `max_errors`
 
 Stop paying for a dead API. With `max_errors=N` the run aborts once N
