@@ -249,6 +249,10 @@ def test_decorated_function():
     assert list(double.map([1, 2, 3])) == [2, 4, 6]
 ```
 
+The full playbook — retries without sleeping, manufacturing every
+`RunStatus`, checkpoint and `Retry-After` tests — is in the
+[testing guide](testing.md).
+
 ## Performance Tips
 
 1. **Match workers to workload** — too many workers waste resources on context switching

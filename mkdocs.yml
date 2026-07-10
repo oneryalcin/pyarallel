@@ -23,6 +23,7 @@ nav:
   - Getting Started:
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quickstart.md
+    - Which API Should I Use?: getting-started/choosing-an-api.md
     - Comparison: getting-started/comparison.md
   - Cookbook:
     - Overview: cookbook/index.md
@@ -40,6 +41,8 @@ nav:
   - User Guide:
     - Advanced Features: user-guide/advanced-features.md
     - Best Practices: user-guide/best-practices.md
+    - Testing: user-guide/testing.md
+    - Troubleshooting: user-guide/troubleshooting.md
   - API Reference:
     - Core: api-reference/core.md
     - Async: api-reference/async.md

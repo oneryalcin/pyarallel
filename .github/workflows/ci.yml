@@ -127,6 +127,12 @@ jobs:
       # fail. ~10s.
       - name: Resilience demo against the installed wheel
         run: /tmp/smoke/bin/python examples/resilience_demo.py
+      # The production golden template is executable documentation the
+      # same way: it asserts the recommended job shape (shared limiter,
+      # for_http retry, checkpoint, SIGTERM token, RunStatus handling)
+      # still works against the installed wheel. ~5s.
+      - name: Production template against the installed wheel
+        run: /tmp/smoke/bin/python examples/07_production_api_job.py
       - name: py.typed ships and types resolve from the installed package
         run: |
           test -f "$(/tmp/smoke/bin/python -c 'import pyarallel, os; print(os.path.dirname(pyarallel.__file__))')/py.typed"

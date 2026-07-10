@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+- New: **production golden template**
+  (`examples/07_production_api_job.py`) — every recommended pattern in
+  one runnable, zero-credential file: shared client + `Limiter`,
+  `Retry.for_http`, checkpoint with stable key and version, `max_errors`,
+  SIGTERM/SIGINT → `StopToken`, and explicit `RunStatus` handling of
+  partial results. Self-asserting; CI runs it against the built wheel.
+- Docs: **three new pages** — "Which API Should I Use?" (one decision
+  tree for the whole surface), a testing guide (deterministic tests
+  without sleeps or real HTTP; every `RunStatus` manufactured cheaply),
+  and a troubleshooting page (symptom-first entries for 429s-despite-
+  limits, pool pauses, checkpoint refusals, pickling, provisional
+  totals, truncation raises). All code blocks pass the executable-docs
+  gates like the rest of the site.
+- Docs: `examples/README.md` caught up with the library — it now covers
+  `resilience_demo.py` and the new golden template.
+- Planning: post-1.0 feature candidates consolidated into
+  [#32](https://github.com/oneryalcin/pyarallel/issues/32) and linked
+  from the roadmap; 1.0 remains feature-frozen.
+
 ## 0.10.0 — 2026-07-11 — prove and package
 
 - New: **committed benchmark lab** (`benchmarks/bench.py`) — the

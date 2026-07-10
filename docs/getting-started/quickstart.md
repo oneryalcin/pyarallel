@@ -189,6 +189,8 @@ await client.aclose()
 
 ## Next Steps
 
+- [Which API Should I Use?](choosing-an-api.md) — one decision tree for the whole surface
 - [Advanced Features](../user-guide/advanced-features.md) — timeouts, progress, methods
 - [Best Practices](../user-guide/best-practices.md) — choosing executors, error patterns
+- [Testing](../user-guide/testing.md) — deterministic tests without sleeps or real HTTP
 - [API Reference](../api-reference/core.md) — full parameter docs
