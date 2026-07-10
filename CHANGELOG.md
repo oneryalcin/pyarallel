@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- New: **committed benchmark lab** (`benchmarks/bench.py`) — the
+  free-threading/interpreter performance numbers (1.0×/2.4× thread
+  scaling, 3.4× interpreter-over-threads on a GIL build, ~30 ms worker
+  start-up, O(n) engine overhead) used to rest on throwaway scripts run
+  once on one machine. Now a single stdlib-only harness maps 1:1 to each
+  documented claim, prints its machine/Python/GIL context, and records
+  runs in `benchmarks/RESULTS.md`. Deliberately **not** in CI: shared
+  runners make wall-clock claims dishonest, so the lab is for humans
+  re-verifying on their own hardware (`--json`, `--quick` flags; runs on
+  free-threaded builds via `uv run --python 3.14t`).
 - New: **executable documentation gates** — every ```python block in the
   user-facing docs (110 blocks across README, quickstart, cookbook, API
   reference, guides) is now CI-tested on three levels: it must compile
