@@ -1,6 +1,12 @@
 # Release to PyPI via trusted publishing (OIDC) — no API tokens, no
-# laptop uploads. Triggered by pushing a version tag; the tag must match
-# the package version, and the artifacts get PEP 740 attestations.
+# laptop uploads. Triggered by pushing a version tag.
+#
+# Release integrity (v0.10 review): a tag must pass the COMPLETE gate —
+# the entire CI workflow (lint, mypy + pyright, full test matrix,
+# free-threaded builds, macOS/Windows smoke, wheel/sdist install gate,
+# resilience demo, strict docs) — and must point at a commit reachable
+# from main. Docs deploy from the exact release tag after publishing,
+# so artifacts and documentation share provenance.
 #
 # One-time PyPI setup (project maintainer): pypi.org → pyarallel →
 # Publishing → add GitHub publisher: owner=oneryalcin, repo=pyarallel,
@@ -12,24 +18,39 @@ on:
     tags: ["v*"]
 
 jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Tag commit is reachable from main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+            || { echo "tag $GITHUB_REF_NAME is not on main"; exit 1; }
+      - name: Tag matches package version
+        run: |
+          PKG=$(uv run --no-project --with . python -c "import pyarallel; print(pyarallel.__version__)")
+          TAG="${GITHUB_REF_NAME#v}"
+          test "$PKG" = "$TAG" || { echo "tag v$TAG != package $PKG"; exit 1; }
+
+  # The complete gate — the same workflow every push runs.
+  verify:
+    needs: guard
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-      - name: Tag matches package version
-        run: |
-          PKG=$(uv run --no-project --with . python -c "import pyarallel; print(pyarallel.__version__)")
-          TAG="${GITHUB_REF_NAME#v}"
-          test "$PKG" = "$TAG" || { echo "tag v$TAG != package $PKG"; exit 1; }
-      # A tag on a red commit must not ship (v0.8 review): the tests gate
-      # the publish even though CI also runs them on push.
-      - name: Tests
-        run: |
-          uv sync --no-default-groups --group test
-          uv run --no-sync pytest -q
       - name: Build
         run: uv build
       - uses: actions/upload-artifact@v4
@@ -50,3 +71,25 @@ jobs:
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
         # attestations are on by default with trusted publishing
+
+  # Docs deploy from the exact tag (roadmap 1.0 criterion: artifacts and
+  # docs generated from the same tag).
+  docs:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # push to gh-pages
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Install docs toolchain
+        run: uv sync --group dev
+      - name: Deploy docs from the release tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          DISABLE_MKDOCS_2_WARNING=true uv run mkdocs gh-deploy --force

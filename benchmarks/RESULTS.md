@@ -99,3 +99,25 @@ maintainer.
 build, not ~3.4× — the 40-item run is dominated by the one-time ~50 ms pool
 start-up. This is expected and documented; use the default pass to read the
 steady-state CPU-parallelism ratio.
+
+
+## Addendum — 2026-07-11, harness v2 (two-size engine-overhead)
+
+The engine-overhead benchmark now measures two input sizes a decade
+apart (one size cannot demonstrate linearity — flat per-item overhead
+across a 10× range is the actual evidence). Standard build, same
+machine as above, `--quick`:
+
+```
+[engine-overhead]  no-op items, two sizes (flat per-item = linear)
+  n=   500
+    parallel_map         9.145 us/item   (+9.113 us/item engine)
+    parallel_iter       10.564 us/item   (+10.532 us/item engine)
+  n=  5000
+    parallel_map         8.994 us/item   (+8.965 us/item engine)
+    parallel_iter       10.035 us/item   (+10.006 us/item engine)
+```
+
+Per-item overhead is flat across the range (9.11 → 8.97 µs/item):
+the O(n)-driver claim holds as *measured linearity*, not extrapolation.
+The single-size numbers in the runs above remain valid as recorded.

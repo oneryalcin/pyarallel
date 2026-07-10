@@ -14,11 +14,21 @@ the diff then shows the change explicitly in review:
 
 import enum
 import inspect
+import re
 from pathlib import Path
 
 import pyarallel
 
 SNAPSHOT = Path(__file__).parent / "api_snapshot.txt"
+
+
+_ADDR = re.compile(r"<object object at 0x[0-9a-f]+>")
+
+
+def _stable(sig: str) -> str:
+    """Sentinel defaults repr with a memory address — normalize, or the
+    snapshot differs on every interpreter run."""
+    return _ADDR.sub("<sentinel>", sig)
 
 
 def render_api() -> str:
@@ -35,7 +45,13 @@ def render_api() -> str:
                     f"{', '.join(b.__name__ for b in obj.__bases__)})"
                 )
             else:
-                lines.append(f"{name} (class)")
+                # Constructor signature IS public surface (v0.10 review:
+                # omitting it let a breaking Retry(...) change pass CI).
+                try:
+                    ctor = _stable(str(inspect.signature(obj)))
+                except (TypeError, ValueError):
+                    ctor = "(...)"
+                lines.append(f"{name} (class){ctor}")
                 for attr in sorted(vars(obj)):
                     if attr.startswith("_"):
                         continue
@@ -47,7 +63,7 @@ def render_api() -> str:
                     ):
                         fn = getattr(obj, attr)
                         try:
-                            sig = str(inspect.signature(fn))
+                            sig = _stable(str(inspect.signature(fn)))
                         except (TypeError, ValueError):
                             sig = "(...)"
                         lines.append(f"  {name}.{attr}{sig}")
@@ -55,13 +71,45 @@ def render_api() -> str:
                         lines.append(f"  {name}.{attr} (attribute)")
         elif callable(obj):
             try:
-                sig = str(inspect.signature(obj))
+                sig = _stable(str(inspect.signature(obj)))
             except (TypeError, ValueError):
                 sig = "(...)"
             lines.append(f"{name}{sig}")
         else:
             lines.append(f"{name} = {obj!r}")
+
+    # The decorator per-call option surfaces are documented API too —
+    # the TypedDicts aren't in __all__ but their keys are the contract
+    # behind .map()/.starmap()/.stream() kwargs.
+    from pyarallel import aio as _aio
+    from pyarallel import core as _core
+
+    for td_name in (
+        "SyncMapOptions",
+        "SyncStarmapOptions",
+        "SyncStreamOptions",
+        "AsyncMapOptions",
+        "AsyncStarmapOptions",
+        "AsyncStreamOptions",
+    ):
+        td = getattr(_core, td_name, None) or getattr(_aio, td_name)
+        keys = ", ".join(sorted(td.__annotations__))
+        lines.append(f"{td_name} (options): {keys}")
     return "\n".join(lines) + "\n"
+
+
+def test_constructor_mutation_trips_the_gate(monkeypatch):
+    """Regression for the gate itself: a changed constructor signature
+    must change the rendering (the v1 snapshot listed classes without
+    constructors, so a breaking Retry(...) change passed CI)."""
+    baseline = render_api()
+    assert "Retry (class)(" in baseline  # constructors are rendered
+
+    class MutatedRetry:
+        def __init__(self, totally_new_arg: int) -> None: ...
+
+    monkeypatch.setattr(pyarallel, "Retry", MutatedRetry)
+    assert render_api() != baseline
 
 
 def test_public_api_matches_snapshot():

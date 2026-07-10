@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Reusable: the release workflow calls this so a v* tag must pass the
+  # COMPLETE gate — lint, both type checkers, full matrix, free-threaded,
+  # OS smoke, wheel gate, resilience demo, strict docs — not just pytest.
+  workflow_call:
 
 jobs:
   checks:
@@ -97,6 +101,14 @@ jobs:
           python-version: "3.12"
       - name: Build wheel + sdist
         run: uv build
+      # Both artifacts must install (v0.10 review: wheel-only left the
+      # sdist path untested); the sdist installs into its own venv, the
+      # wheel into the venv the rest of the gates use.
+      - name: Clean-install sdist
+        run: |
+          uv venv /tmp/sdist-smoke --python 3.12
+          uv pip install --python /tmp/sdist-smoke/bin/python dist/*.tar.gz
+          /tmp/sdist-smoke/bin/python -c "import pyarallel; print('sdist OK', pyarallel.__version__)"
       - name: Clean-install wheel and smoke it
         run: |
           uv venv /tmp/smoke --python 3.12

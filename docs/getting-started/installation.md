@@ -12,10 +12,14 @@ pip install pyarallel
 
 ## Development Install
 
+The dev toolchain is a [dependency group](https://peps.python.org/pep-0735/)
+(not a `[dev]` extra), managed with [uv](https://docs.astral.sh/uv/):
+
 ```bash
 git clone https://github.com/oneryalcin/pyarallel.git
 cd pyarallel
-pip install -e ".[dev]"
+uv sync --group dev     # editable install + test/lint/type/docs toolchain
+uv run pytest -q        # should be all green
 ```
 
 ## Verify

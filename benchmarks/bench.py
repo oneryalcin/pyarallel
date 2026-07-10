@@ -18,9 +18,13 @@ Claims mapped 1:1 (docs/user-guide/best-practices.md, roadmap.md):
                    a GIL build -> "3.4x, interpreters get true CPU
                    parallelism on standard builds".
   engine-overhead  per-item driver cost of parallel_map / parallel_iter
-                   over a plain loop -> "one windowed engine, O(n) driver".
+                   over a plain loop, at two sizes a decade apart —
+                   flat per-item overhead is the evidence behind
+                   "one windowed engine, O(n) driver".
   worker-startup   time to first result on a cold pool per executor ->
-                   "~30 ms interpreter workers instead of fork/spawn".
+                   interpreter cold-start vs process fork/spawn
+                   (measured ~50 ms vs ~72 ms on the reference machine;
+                   machine-dependent).
 
 Why the ratios need enough items: parallel_map builds a *fresh* pool per
 call, so interpreter/process pay their cold-start on every call. The CPU
@@ -116,25 +120,33 @@ def bench_cpu_scaling(reps: int, items: int) -> dict[str, Any]:
 
 
 def bench_engine_overhead(reps: int, items: int) -> dict[str, Any]:
-    """Per-item driver cost: the windowed engine should be O(n), a few us/item."""
-    data = list(range(items))
+    """Per-item driver cost at two sizes a decade apart.
 
-    loop_ms = _median_ms(lambda: [noop(x) for x in data], reps)
-    map_ms = _median_ms(lambda: parallel_map(noop, data, workers=4), reps)
-    iter_ms = _median_ms(
-        lambda: [r for r in parallel_iter(noop, data, workers=4)], reps
-    )
-
-    per = 1000.0 / items  # ms -> us/item
-    return {
-        "items": items,
-        "loop_us_per_item": round(loop_ms * per, 3),
-        "parallel_map_us_per_item": round(map_ms * per, 3),
-        "parallel_iter_us_per_item": round(iter_ms * per, 3),
-        # Overhead the engine adds over a bare loop, per item.
-        "parallel_map_overhead_us": round((map_ms - loop_ms) * per, 3),
-        "parallel_iter_overhead_us": round((iter_ms - loop_ms) * per, 3),
-    }
+    One size cannot demonstrate linearity (v0.10 review) — a flat
+    per-item overhead across a 10x size range is the actual evidence
+    that the windowed driver is O(n).
+    """
+    sizes = [max(items // 10, 100), items]
+    per_size: list[dict[str, Any]] = []
+    for n in sizes:
+        data = list(range(n))
+        loop_ms = _median_ms(lambda d=data: [noop(x) for x in d], reps)
+        map_ms = _median_ms(lambda d=data: parallel_map(noop, d, workers=4), reps)
+        iter_ms = _median_ms(
+            lambda d=data: [r for r in parallel_iter(noop, d, workers=4)], reps
+        )
+        per = 1000.0 / n  # ms -> us/item
+        per_size.append(
+            {
+                "items": n,
+                "loop_us_per_item": round(loop_ms * per, 3),
+                "parallel_map_us_per_item": round(map_ms * per, 3),
+                "parallel_iter_us_per_item": round(iter_ms * per, 3),
+                "parallel_map_overhead_us": round((map_ms - loop_ms) * per, 3),
+                "parallel_iter_overhead_us": round((iter_ms - loop_ms) * per, 3),
+            }
+        )
+    return {"sizes": per_size}
 
 
 def bench_worker_startup(reps: int) -> dict[str, Any]:
@@ -211,16 +223,18 @@ def print_human(report: dict[str, Any]) -> None:
     print()
 
     eo = report["engine_overhead"]
-    print(f"[engine-overhead]  {eo['items']} no-op items (O(n) driver)")
-    print(f"  plain loop       {eo['loop_us_per_item']:>9.3f} us/item")
-    print(
-        f"  parallel_map     {eo['parallel_map_us_per_item']:>9.3f} us/item   "
-        f"(+{eo['parallel_map_overhead_us']} us/item engine)"
-    )
-    print(
-        f"  parallel_iter    {eo['parallel_iter_us_per_item']:>9.3f} us/item   "
-        f"(+{eo['parallel_iter_overhead_us']} us/item engine)"
-    )
+    print("[engine-overhead]  no-op items, two sizes (flat per-item = linear)")
+    for row in eo["sizes"]:
+        print(f"  n={row['items']:>6}")
+        print(f"    plain loop       {row['loop_us_per_item']:>9.3f} us/item")
+        print(
+            f"    parallel_map     {row['parallel_map_us_per_item']:>9.3f} us/item   "
+            f"(+{row['parallel_map_overhead_us']} us/item engine)"
+        )
+        print(
+            f"    parallel_iter    {row['parallel_iter_us_per_item']:>9.3f} us/item   "
+            f"(+{row['parallel_iter_overhead_us']} us/item engine)"
+        )
     print()
 
     ws = report["worker_startup"]
@@ -228,7 +242,7 @@ def print_human(report: dict[str, Any]) -> None:
     for ex in report["config"]["executors"]:
         key = f"{ex}_first_result_ms"
         if key in ws:
-            note = "  (claim: ~30 ms)" if ex == "interpreter" else ""
+            note = "  (claim: beats process fork/spawn)" if ex == "interpreter" else ""
             print(f"  {ex:<12}   {ws[key]:>9.2f} ms{note}")
 
 

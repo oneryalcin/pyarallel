@@ -1,18 +1,18 @@
 Aborted (exception, bases: RuntimeError)
 Cancelled (exception, bases: RuntimeError)
 CheckpointError (exception, bases: RuntimeError)
-ItemResult (class)
+ItemResult (class)(index: 'int', value: 'R | None | object' = <sentinel>, error: 'Exception | None | object' = <sentinel>, attempts: 'int' = 1, duration: 'float' = 0.0) -> 'None'
   ItemResult.attempts (attribute)
   ItemResult.duration (attribute)
   ItemResult.error (attribute)
   ItemResult.index (attribute)
   ItemResult.ok (property)
   ItemResult.value (attribute)
-Limiter (class)
+Limiter (class)(rate_limit: 'RateLimit') -> 'None'
   Limiter.pause(self, seconds: 'float') -> 'None'
   Limiter.wait(self, timeout: 'float | None' = None) -> 'bool'
   Limiter.wait_async(self) -> 'None'
-ParallelResult (class)
+ParallelResult (class)(entries: 'list[Any]', *, status: 'RunStatus' = <RunStatus.COMPLETED: 'completed'>, meta: 'list[tuple[int, float]] | None' = None) -> 'None'
   ParallelResult.aborted (property)
   ParallelResult.complete (property)
   ParallelResult.failures(self) -> 'list[tuple[int, Exception]]'
@@ -24,12 +24,12 @@ ParallelResult (class)
   ParallelResult.successes(self) -> 'list[tuple[int, R]]'
   ParallelResult.timed_out (property)
   ParallelResult.values(self) -> 'list[R]'
-RateLimit (class)
+RateLimit (class)(count: 'float', per: "Literal['second', 'minute', 'hour']" = 'second', burst: 'int' = 1) -> None
   RateLimit.burst (attribute)
   RateLimit.count (attribute)
   RateLimit.per (attribute)
   RateLimit.per_second (property)
-Retry (class)
+Retry (class)(attempts: 'int' = 3, backoff: 'float' = 1.0, max_delay: 'float' = 60.0, jitter: 'bool' = True, on: 'tuple[type[Exception], ...] | None' = None, retry_if: 'Callable[[Exception], bool] | None' = None, wait_from: 'Callable[[Exception], float | None] | None' = None, max_server_wait: 'float | None' = 600.0) -> None
   Retry.attempts (attribute)
   Retry.backoff (attribute)
   Retry.for_http(*, on: 'tuple[type[Exception], ...]', statuses: 'set[int] | frozenset[int]' = frozenset({429, 503}), response: 'Callable[[Exception], Any] | None' = None, attempts: 'int' = 3, backoff: 'float' = 1.0, max_delay: 'float' = 60.0, jitter: 'bool' = True, max_server_wait: 'float | None' = 600.0) -> 'Retry'
@@ -40,7 +40,7 @@ Retry (class)
   Retry.retry_if (attribute)
   Retry.wait_from (attribute)
 RunStatus (enum): COMPLETED, TIMED_OUT, ABORTED, CANCELLED
-StopToken (class)
+StopToken (class)() -> 'None'
   StopToken.stop(self) -> 'None'
   StopToken.stopped (property)
 async_parallel(fn: 'Callable[..., Any] | None' = None, *, concurrency: 'int' = 4, rate_limit: 'Limiter | RateLimit | float | None' = None, retry: 'Retry | None' = None, timeout: 'float | None' = None, task_timeout: 'float | None' = None, window_size: 'int | None' = None, max_errors: 'int | None' = None, on_progress: 'Callable[[int, int], None] | None' = None) -> 'Any'
@@ -51,3 +51,9 @@ parallel(fn: 'Callable[..., Any] | None' = None, *, workers: 'int | None' = None
 parallel_iter(fn: 'Callable[[T], R]', items: 'Iterable[T]', *, workers: 'int | None' = None, executor: 'ExecutorType' = 'thread', rate_limit: 'Limiter | RateLimit | float | None' = None, window_size: 'int | None' = None, retry: 'Retry | None' = None, ordered: 'bool' = False, on_progress: 'Callable[[int, int], None] | None' = None, max_errors: 'int | None' = None, sequential: 'bool' = False, worker_init: 'Callable[[], None] | None' = None, max_tasks_per_worker: 'int | None' = None) -> 'Iterator[ItemResult[R]]'
 parallel_map(fn: 'Callable[[T], R]', items: 'Iterable[T]', *, workers: 'int | None' = None, executor: 'ExecutorType' = 'thread', rate_limit: 'Limiter | RateLimit | float | None' = None, timeout: 'float | None' = None, on_progress: 'Callable[[int, int], None] | None' = None, window_size: 'int | None' = None, retry: 'Retry | None' = None, checkpoint: 'str | Path | None' = None, checkpoint_key: 'Callable[[T], str | int | bytes] | None' = None, checkpoint_version: 'str | int | bytes | tuple[str | int | bytes, ...] | None' = None, max_errors: 'int | None' = None, stop: 'StopToken | None' = None, sequential: 'bool' = False, worker_init: 'Callable[[], None] | None' = None, max_tasks_per_worker: 'int | None' = None) -> 'ParallelResult[R]'
 parallel_starmap(fn: 'Callable[..., R]', items: 'Iterable[tuple[Any, ...]]', *, workers: 'int | None' = None, executor: 'ExecutorType' = 'thread', rate_limit: 'Limiter | RateLimit | float | None' = None, timeout: 'float | None' = None, on_progress: 'Callable[[int, int], None] | None' = None, window_size: 'int | None' = None, retry: 'Retry | None' = None, sequential: 'bool' = False, worker_init: 'Callable[[], None] | None' = None, max_tasks_per_worker: 'int | None' = None) -> 'ParallelResult[R]'
+SyncMapOptions (options): checkpoint, checkpoint_key, checkpoint_version, executor, max_errors, max_tasks_per_worker, on_progress, rate_limit, retry, sequential, stop, timeout, window_size, worker_init, workers
+SyncStarmapOptions (options): executor, max_tasks_per_worker, on_progress, rate_limit, retry, sequential, timeout, window_size, worker_init, workers
+SyncStreamOptions (options): executor, max_errors, max_tasks_per_worker, on_progress, ordered, rate_limit, retry, sequential, window_size, worker_init, workers
+AsyncMapOptions (options): checkpoint, checkpoint_key, checkpoint_version, concurrency, max_errors, on_progress, rate_limit, retry, stop, task_timeout, timeout, window_size
+AsyncStarmapOptions (options): concurrency, on_progress, rate_limit, retry, task_timeout, timeout, window_size
+AsyncStreamOptions (options): concurrency, max_errors, on_progress, ordered, rate_limit, retry, task_timeout, window_size

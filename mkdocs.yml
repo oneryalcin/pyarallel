@@ -54,6 +54,7 @@ nav:
     - v0.6 Ledger Refactor Plan: development/plans/v0.6-ledger-refactor.md
     - v0.7 Free-Threaded & Interpreters Plan: development/plans/v0.7-free-threaded-and-interpreters.md
     - v0.8 Honest Contract Plan: development/plans/v0.8-honest-contract.md
+    - Pre-1.0 Design Spike Records: development/plans/design-spikes-pre-1.0.md
 
 plugins:
   - search

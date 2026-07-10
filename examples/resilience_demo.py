@@ -197,11 +197,11 @@ def act1_429s_pause_the_pool() -> None:
     throttled = int(stats["throttled"])
     print(f"  items completed : {len(result.ok_values())}/80 (every 429 retried)")
     print(f"  429s drawn      : {throttled} — and THAT is the point:")
-    print("                    8 uncoordinated workers rediscover a quota")
-    print("                    once per worker per window (dozens of wasted")
-    print("                    calls). Here a single 429 paused the whole")
-    print(f"                    pool — the server measured {stats['pool_silence']}s of")
-    print("                    total silence — so almost no second one happened.")
+    print("                    without a shared limiter, each worker")
+    print("                    independently rediscovers the quota. Here a")
+    print("                    single 429 paused the whole pool — the server")
+    print(f"                    measured {stats['pool_silence']}s of total silence —")
+    print("                    so almost no second one ever happened.")
     assert result.ok, "Act 1: all items must complete despite throttling"
     assert throttled >= 1, "Act 1: the demo needs at least one real 429"
     assert throttled <= 16, "Act 1: pool pause should prevent a 429 storm"

@@ -42,8 +42,9 @@ stack traces. `workers=None` defaults to one worker per core.
 Two variants worth knowing:
 
 - **Pure-Python CPU work on Python 3.14+**: `executor="interpreter"`
-  gives the same true parallelism with ~30 ms workers and no OS
-  processes — but C extensions like Pillow/numpy don't support
+  gives the same true parallelism with faster worker startup than
+  process fork/spawn (~50 ms vs ~72 ms measured; machine-dependent) and
+  no OS processes — but C extensions like Pillow/numpy don't support
   subinterpreters yet, so *this* recipe stays on `"process"`. See
   [choosing the right executor](../user-guide/best-practices.md#interpreters-executorinterpreter-python-314).
 - **Heavy multiprocessing** (shared memory, per-worker state, CPU
