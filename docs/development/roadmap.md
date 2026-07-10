@@ -108,11 +108,6 @@ honest:
   already computed per item (previously discarded by collected maps),
   reusing the streaming `ItemResult` type. Smallest surface first; a
   stats object must be earned by concrete use cases.
-- **Decorator default surface** — decide whether decorator defaults
-  widen beyond `workers`/`executor`/`rate_limit` (e.g. `retry=`), or the
-  asymmetry is documented as intentional.
-- **Resource-lifecycle examples** — one reusable HTTP client around the
-  fan-out; fix the `AsyncClient`-per-item pattern in README/cookbook.
 - **The resilience demo** *(done — on `v0.9-resilience-demo`)* —
   deterministic, zero-credential, local: a fake API enforcing a quota,
   429 + `Retry-After` pausing the whole pool (gap measured
@@ -127,6 +122,35 @@ Design spikes (pre-freeze checks, no shipping):
   headline at most.
 - **Streaming checkpoint** — "cached computation" ≠ "sink committed";
   needs crisp at-least-once replay semantics before any implementation.
+
+## v0.10 — Prove and package
+
+The last stop before freeze — the items the external review's original
+v0.10 proposed that weren't absorbed into v0.8/v0.9, plus two v0.9
+stragglers. Nothing here changes the API's meaning; the launch write-up
+can proceed in parallel.
+
+- **Decorator default surface** — DECIDED: widen. `@parallel` /
+  `@async_parallel` accept `retry`, `timeout` (+ `task_timeout` async),
+  `window_size`, `max_errors`, and `on_progress` as defaults — they are
+  properties of the function's behavior. `checkpoint*` and `stop` stay
+  per-call-only with documented reasoning: a checkpoint file names a
+  run (a shared default file means duplicate keys and wrong resumes)
+  and a stop token is a campaign latch. Presence-sentinel merge rules
+  (v0.8) apply unchanged.
+- **Resource-lifecycle examples** — one reusable HTTP client around the
+  fan-out; fix the `AsyncClient`-per-item pattern in README/cookbook
+  (flagged in the very first external review).
+- **Committed benchmark lab** — the free-threading/interpreter numbers
+  (2.4×/3.4×) come from throwaway scripts on one machine; commit a
+  reproducible harness so the claims are re-runnable.
+- **Executable cookbook examples** — the resilience demo is CI-enforced;
+  the cookbook recipes are still prose that can drift. Executable
+  contract tests where feasible (fakes for the external services).
+- **Compatibility & deprecation policy** — documented, plus checkpoint
+  persistence guarantees across versions.
+- **Public API snapshot in CI** — the exported-surface diff gate that
+  makes an accidental break a red build.
 
 ## v1.0 — Freeze
 

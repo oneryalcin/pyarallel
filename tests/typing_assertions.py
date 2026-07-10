@@ -77,6 +77,19 @@ def triple(x: int) -> str:
     return str(x * 3)
 
 
+# v0.10: decorator defaults widened — properties of the function's
+# behavior are declarable at the decorator; run-scoped options
+# (checkpoint*, stop) stay per-call-only.
+@parallel(workers=2, retry=Retry(attempts=2), timeout=30.0, max_errors=5)
+def widened(x: int) -> int:
+    return x
+
+
+def check_widened_decorator_defaults() -> None:
+    assert_type(widened.map([1]), ParallelResult[int])
+    parallel(checkpoint="run.ckpt")  # type: ignore[call-overload]  # run-scoped
+
+
 @parallel
 def concat(a: int, b: str) -> bytes:
     return b""

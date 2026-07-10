@@ -57,7 +57,7 @@ from .core import (
     parallel_starmap,
 )
 from .limiter import Limiter
-from .policies import RateLimit
+from .policies import RateLimit, Retry
 from .result import ItemResult, ParallelResult
 
 
@@ -108,7 +108,9 @@ class _BoundParallel[R]:
         self, items: Iterable[Any], **opts: Unpack[SyncStreamOptions]
     ) -> Iterator[ItemResult[R]]:
         """Yield ``ItemResult`` as tasks finish — constant memory."""
-        return parallel_iter(self._fn, items, **_merge_opts(self._defaults, dict(opts)))
+        merged = _merge_opts(self._defaults, dict(opts))
+        merged.pop("timeout", None)  # collected-only: streaming has no deadline
+        return parallel_iter(self._fn, items, **merged)
 
 
 class _ParallelFunc[**P, R]:
@@ -125,13 +127,27 @@ class _ParallelFunc[**P, R]:
         workers: int | None,
         executor: ExecutorType,
         rate_limit: Limiter | RateLimit | float | None,
+        retry: Retry | None = None,
+        timeout: float | None = None,
+        window_size: int | None = None,
+        max_errors: int | None = None,
+        on_progress: Callable[[int, int], None] | None = None,
     ) -> None:
         self.__wrapped__: Callable[P, R] = fn
         self._defaults: dict[str, Any] = {"executor": executor}
-        if workers is not None:
-            self._defaults["workers"] = workers
-        if rate_limit is not None:
-            self._defaults["rate_limit"] = rate_limit
+        # None at the DECORATOR level means "no default" (there is
+        # nothing above the decorator to inherit from) — per-call
+        # presence-sentinel semantics are unchanged.
+        optional = {
+            "workers": workers,
+            "rate_limit": rate_limit,
+            "retry": retry,
+            "timeout": timeout,
+            "window_size": window_size,
+            "max_errors": max_errors,
+            "on_progress": on_progress,
+        }
+        self._defaults.update({k: v for k, v in optional.items() if v is not None})
         functools.update_wrapper(self, fn)
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
@@ -173,10 +189,12 @@ class _ParallelFunc[**P, R]:
         self, items: Iterable[Any], **opts: Unpack[SyncStreamOptions]
     ) -> Iterator[ItemResult[R]]:
         """Yield ``ItemResult`` as tasks finish — constant memory."""
+        merged = _merge_opts(self._defaults, dict(opts))
+        merged.pop("timeout", None)  # collected-only: streaming has no deadline
         return parallel_iter(
             cast("Callable[[Any], R]", self.__wrapped__),
             items,
-            **_merge_opts(self._defaults, dict(opts)),
+            **merged,
         )
 
 
@@ -228,6 +246,11 @@ def parallel(
     workers: int | None = None,
     executor: ExecutorType = "thread",
     rate_limit: Limiter | RateLimit | float | None = None,
+    retry: Retry | None = None,
+    timeout: float | None = None,
+    window_size: int | None = None,
+    max_errors: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> _ParallelDecorator: ...
 def parallel(
     fn: Callable[..., Any] | None = None,
@@ -235,6 +258,11 @@ def parallel(
     workers: int | None = None,
     executor: ExecutorType = "thread",
     rate_limit: Limiter | RateLimit | float | None = None,
+    retry: Retry | None = None,
+    timeout: float | None = None,
+    window_size: int | None = None,
+    max_errors: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> Any:
     """Decorator: adds ``.map()`` for parallel execution.
 
@@ -266,6 +294,11 @@ def parallel(
         "workers": workers,
         "executor": executor,
         "rate_limit": rate_limit,
+        "retry": retry,
+        "timeout": timeout,
+        "window_size": window_size,
+        "max_errors": max_errors,
+        "on_progress": on_progress,
     }
     if fn is not None:
         return _UnaryParallelFunc(fn, **kw)
@@ -312,9 +345,9 @@ class _BoundAsyncParallel[R]:
         items: Iterable[Any] | AsyncIterable[Any],
         **opts: Unpack[AsyncStreamOptions],
     ) -> AsyncIterator[ItemResult[R]]:
-        async for item in async_parallel_iter(
-            self._fn, items, **_merge_opts(self._defaults, dict(opts))
-        ):
+        merged = _merge_opts(self._defaults, dict(opts))
+        merged.pop("timeout", None)  # collected-only: streaming has no deadline
+        async for item in async_parallel_iter(self._fn, items, **merged):
             yield item
 
 
@@ -327,11 +360,25 @@ class _AsyncParallelFunc[**P, R]:
         *,
         concurrency: int,
         rate_limit: Limiter | RateLimit | float | None,
+        retry: Retry | None = None,
+        timeout: float | None = None,
+        task_timeout: float | None = None,
+        window_size: int | None = None,
+        max_errors: int | None = None,
+        on_progress: Callable[[int, int], None] | None = None,
     ) -> None:
         self.__wrapped__: Callable[P, Awaitable[R]] = fn
         self._defaults: dict[str, Any] = {"concurrency": concurrency}
-        if rate_limit is not None:
-            self._defaults["rate_limit"] = rate_limit
+        optional = {
+            "rate_limit": rate_limit,
+            "retry": retry,
+            "timeout": timeout,
+            "task_timeout": task_timeout,
+            "window_size": window_size,
+            "max_errors": max_errors,
+            "on_progress": on_progress,
+        }
+        self._defaults.update({k: v for k, v in optional.items() if v is not None})
         functools.update_wrapper(self, fn)
 
     async def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
@@ -376,10 +423,12 @@ class _AsyncParallelFunc[**P, R]:
         items: Iterable[Any] | AsyncIterable[Any],
         **opts: Unpack[AsyncStreamOptions],
     ) -> AsyncIterator[ItemResult[R]]:
+        merged = _merge_opts(self._defaults, dict(opts))
+        merged.pop("timeout", None)  # collected-only: streaming has no deadline
         async for item in async_parallel_iter(
             cast("Callable[[Any], Awaitable[R]]", self.__wrapped__),
             items,
-            **_merge_opts(self._defaults, dict(opts)),
+            **merged,
         ):
             yield item
 
@@ -436,12 +485,24 @@ def async_parallel(
     *,
     concurrency: int = 4,
     rate_limit: Limiter | RateLimit | float | None = None,
+    retry: Retry | None = None,
+    timeout: float | None = None,
+    task_timeout: float | None = None,
+    window_size: int | None = None,
+    max_errors: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> _AsyncParallelDecorator: ...
 def async_parallel(
     fn: Callable[..., Any] | None = None,
     *,
     concurrency: int = 4,
     rate_limit: Limiter | RateLimit | float | None = None,
+    retry: Retry | None = None,
+    timeout: float | None = None,
+    task_timeout: float | None = None,
+    window_size: int | None = None,
+    max_errors: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> Any:
     """Decorator: adds ``.map()`` for async parallel execution.
 
@@ -455,7 +516,16 @@ def async_parallel(
         data   = await fetch("http://example.com")       # normal call
         results = await fetch.map(["u1", "u2", "u3"])     # parallel
     """
-    kw: dict[str, Any] = {"concurrency": concurrency, "rate_limit": rate_limit}
+    kw: dict[str, Any] = {
+        "concurrency": concurrency,
+        "rate_limit": rate_limit,
+        "retry": retry,
+        "timeout": timeout,
+        "task_timeout": task_timeout,
+        "window_size": window_size,
+        "max_errors": max_errors,
+        "on_progress": on_progress,
+    }
     if fn is not None:
         return _UnaryAsyncParallelFunc(fn, **kw)
     return _AsyncParallelDecorator(kw)
