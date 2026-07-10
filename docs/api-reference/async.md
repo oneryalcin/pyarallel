@@ -33,7 +33,7 @@ results = await async_parallel_map(
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `fn` | async `Callable` | required | Async function to apply to each item |
-| `items` | `Iterable \| AsyncIterable` | required | Sync or async source (v0.9). Async cursors and paginated generators are consumed directly with end-to-end backpressure — one item pulled as a window slot frees, never materialized. The engine never closes the source |
+| `items` | `Iterable \| AsyncIterable` | required | Sync or async source (v0.9). Async cursors and paginated generators are consumed directly with end-to-end backpressure — one item pulled as a window slot frees, never materialized. An idle source is never touched; a pull in progress at stop/close is cancelled (its `finally` runs) — final closing is the caller's job |
 | `concurrency` | `int` | `4` | Maximum concurrent tasks |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting. Pass a shared `Limiter` to draw from one budget across calls |
 | `timeout` | `float \| None` | `None` | **Total** wall-clock timeout — mirror of the sync `timeout`. Unfinished tasks are cancelled, `result.timed_out` is set; sized slots are marked `TimeoutError`, unsized inputs return a shorter result (the source is never drained) |

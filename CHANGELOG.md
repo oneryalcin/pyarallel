@@ -7,10 +7,15 @@
   async sources directly: DB cursors, paginated API generators. No more
   draining a million-row cursor into a list to feed it back out —
   backpressure reaches the producer (one item pulled as one window slot
-  frees), a stopped run leaves the source un-drained, and the engine
-  never closes it (wrap in `aclosing()` if you want that). Bonus over
-  sync sources: `timeout=` binds *during* a stuck source await — a dead
-  paginator cannot outlive the deadline. Sync iterables unchanged.
+  frees), a stopped run never pulls from the source again, and an *idle*
+  source is never touched — a pull in progress at a stop/close is
+  cancelled (your `finally` runs; standard asyncio pipeline semantics);
+  final closing stays the caller's job (`aclosing()`). In streaming,
+  the pull races beside the workers, so a stalled page fetch delays
+  only admission — completed results keep yielding. Bonus over sync
+  sources: `timeout=` binds *during* a stuck source await — a dead
+  paginator cannot outlive the deadline (unless it swallows
+  cancellation). Sync iterables unchanged.
 - New: **`Retry.for_http()`** — the 429/`Retry-After` dance, prewired
   and dependency-free. Handles both header dialects (numeric seconds
   *and* HTTP-date — homemade parsers routinely crash or stampede on the

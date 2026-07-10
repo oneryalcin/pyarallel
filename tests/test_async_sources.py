@@ -222,3 +222,101 @@ class TestComposition:
         )
         assert totals  # fired
         assert all(t <= 6 for t in totals)
+
+
+class TestStalledProducerDoesNotStallYields:
+    """v0.9 review (Codex adversarial + deep review, converging): the
+    driver parked in `await anext(source)` — before or between
+    asyncio.wait calls — hid already-completed results from the
+    consumer. A paginated API source stalls on every page fetch, so the
+    headline use case systematically batched yields behind pulls. The
+    pull now races as a task inside asyncio.wait."""
+
+    async def test_completed_results_yield_while_source_stalled(self):
+        gate = asyncio.Event()
+
+        async def source():
+            yield 1
+            yield 2
+            await gate.wait()  # page fetch stalls here
+            yield 3
+
+        async def instant(x):
+            return x * 10
+
+        got = []
+        stream = async_parallel_iter(instant, source(), concurrency=2)
+        # bounded anext: red = TimeoutError, never a hung test run
+        got.append((await asyncio.wait_for(anext(stream), timeout=2.0)).value)
+        got.append((await asyncio.wait_for(anext(stream), timeout=2.0)).value)
+        await stream.aclose()
+        assert sorted(got) == [10, 20]
+        gate.set()
+
+    async def test_first_result_yields_when_second_pull_stalls(self):
+        """Deep-review probe 3b: stall on the SECOND pull previously hid
+        even the first completed result."""
+
+        async def source():
+            yield 1
+            await asyncio.Event().wait()  # never set
+            yield 2
+
+        async def instant(x):
+            return x * 10
+
+        stream = async_parallel_iter(instant, source(), concurrency=2)
+        first = await asyncio.wait_for(anext(stream), timeout=2.0)
+        assert first.value == 10
+        await stream.aclose()
+
+    async def test_ordered_mode_also_yields_through_stall(self):
+        async def source():
+            yield 1
+            yield 2
+            await asyncio.Event().wait()
+            yield 3
+
+        async def instant(x):
+            return x * 10
+
+        got = []
+        stream = async_parallel_iter(instant, source(), concurrency=2, ordered=True)
+        for _ in range(2):
+            item = await asyncio.wait_for(anext(stream), timeout=2.0)
+            got.append((item.index, item.value))
+        await stream.aclose()
+        assert got == [(0, 10), (1, 20)]
+
+
+class TestPullCancellationContract:
+    """Honest closure contract (v0.9 review): an IDLE source is never
+    touched — but a pull in progress at stop/close is cancelled, and
+    cancellation runs the source's finally (standard asyncio pipeline
+    semantics, same as chained async generators)."""
+
+    async def test_inflight_pull_cancelled_on_close_runs_finally(self):
+        finalized = False
+
+        async def source():
+            nonlocal finalized
+            try:
+                yield 1
+                await asyncio.Event().wait()  # pull in progress forever
+                yield 2
+            finally:
+                finalized = True
+
+        async def instant(x):
+            return x
+
+        stream = async_parallel_iter(instant, source(), concurrency=2)
+        first = await asyncio.wait_for(anext(stream), timeout=2.0)
+        assert first.value == 1
+        await stream.aclose()  # cancels the in-progress pull
+        await asyncio.sleep(0)  # let cancellation land
+        assert finalized is True
+
+    async def test_exhausted_source_needs_no_close(self):
+        r = [i.value async for i in async_parallel_iter(_double, _agen(3))]
+        assert sorted(r) == [0, 2, 4]
