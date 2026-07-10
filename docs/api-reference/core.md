@@ -4,6 +4,7 @@
 
 Execute a function over items in parallel, returning ordered results.
 
+<!-- docs-check: skip -->
 ```python
 from pyarallel import parallel_map
 

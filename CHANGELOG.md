@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- New: **executable documentation gates** — every ```python block in the
+  user-facing docs (110 blocks across README, quickstart, cookbook, API
+  reference, guides) is now CI-tested on three levels: it must compile
+  (top-level `await` allowed), every keyword passed to a pyarallel
+  callable must exist in the real signature (the gate that would have
+  caught `batch_size=` lingering after the v0.8 rename), and the
+  feasible pages — the flagship LLM recipe against a fake `openai`
+  module, the streaming ETL page against a fake cursor — execute end to
+  end as written. First run caught a real indentation bug in the
+  bulk-download recipe.
 - New: **public-API snapshot gate** — `tests/api_snapshot.txt` is a
   committed, human-readable rendering of every export, signature,
   method, and enum member; CI diffs the live surface against it, so an

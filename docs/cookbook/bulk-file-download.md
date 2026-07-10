@@ -22,7 +22,7 @@ async def download(url):
     r.raise_for_status()
     filename = Path("downloads") / url.split("/")[-1]
     filename.write_bytes(r.content)
-        return {"url": url, "size": len(r.content)}
+    return {"url": url, "size": len(r.content)}
 
 urls = [...]  # hundreds of file URLs
 
