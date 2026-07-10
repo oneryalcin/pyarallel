@@ -11,7 +11,7 @@ from pyarallel import async_parallel_map
 
 results = await async_parallel_map(
     fn,                              # Async function
-    items,                           # Any iterable
+    items,                           # Any iterable — sync OR async (v0.9)
     *,
     concurrency=4,                   # Max concurrent tasks
     rate_limit=None,                 # RateLimit spec, shared Limiter, or ops/second
@@ -33,7 +33,7 @@ results = await async_parallel_map(
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `fn` | async `Callable` | required | Async function to apply to each item |
-| `items` | `Iterable` | required | Any iterable |
+| `items` | `Iterable \| AsyncIterable` | required | Sync or async source (v0.9). Async cursors and paginated generators are consumed directly with end-to-end backpressure — one item pulled as a window slot frees, never materialized. The engine never closes the source |
 | `concurrency` | `int` | `4` | Maximum concurrent tasks |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting. Pass a shared `Limiter` to draw from one budget across calls |
 | `timeout` | `float \| None` | `None` | **Total** wall-clock timeout — mirror of the sync `timeout`. Unfinished tasks are cancelled, `result.timed_out` is set; sized slots are marked `TimeoutError`, unsized inputs return a shorter result (the source is never drained) |

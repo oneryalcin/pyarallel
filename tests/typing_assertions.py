@@ -28,6 +28,10 @@ def fetch(url: str) -> dict[str, int]:
     return {}
 
 
+async def _ints() -> AsyncIterator[int]:
+    yield 1
+
+
 def add(a: int, b: int) -> int:
     return a + b
 
@@ -135,6 +139,14 @@ async def fetch_many(url: str) -> bytes:
 async def check_async_decorator() -> None:
     assert_type(await fetch_many("u"), bytes)
     assert_type(await fetch_many.map(["u"]), ParallelResult[bytes])
+
+    # v0.9: AsyncIterable sources accepted, item types still bind
+    async def urls() -> AsyncIterator[str]:
+        yield "u"
+
+    assert_type(await fetch_many.map(urls()), ParallelResult[bytes])
+    assert_type(await async_parallel_map(fetch_async, urls()), ParallelResult[bytes])
+    await fetch_many.map(_ints())  # type: ignore[arg-type]  # wrong item type
 
     # v0.8 unary item typing, async side
     await fetch_many.map([1])  # type: ignore[list-item]  # int is not str
