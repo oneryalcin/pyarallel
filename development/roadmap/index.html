@@ -1246,10 +1246,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#current-070-on-pypi-08-on-main" class="md-nav__link">
+  <a href="#current-090-on-pypi" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current (0.7.0 on PyPI, 0.8 on main)
+        Current (0.9.0 on PyPI)
       
     </span>
   </a>
@@ -1257,10 +1257,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#v08-honest-contract-in-progress-on-v08-honest-contract" class="md-nav__link">
+  <a href="#v08-honest-contract-shipped-in-080" class="md-nav__link">
     <span class="md-ellipsis">
       
-        v0.8 — Honest contract (in progress on v0.8-honest-contract)
+        v0.8 — Honest contract (shipped in 0.8.0)
       
     </span>
   </a>
@@ -1268,10 +1268,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#v09-real-job-ux" class="md-nav__link">
+  <a href="#v09-real-job-ux-shipped-in-090" class="md-nav__link">
     <span class="md-ellipsis">
       
-        v0.9 — Real-job UX
+        v0.9 — Real-job UX (shipped in 0.9.0)
       
     </span>
   </a>
@@ -1505,10 +1505,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#current-070-on-pypi-08-on-main" class="md-nav__link">
+  <a href="#current-090-on-pypi" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current (0.7.0 on PyPI, 0.8 on main)
+        Current (0.9.0 on PyPI)
       
     </span>
   </a>
@@ -1516,10 +1516,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#v08-honest-contract-in-progress-on-v08-honest-contract" class="md-nav__link">
+  <a href="#v08-honest-contract-shipped-in-080" class="md-nav__link">
     <span class="md-ellipsis">
       
-        v0.8 — Honest contract (in progress on v0.8-honest-contract)
+        v0.8 — Honest contract (shipped in 0.8.0)
       
     </span>
   </a>
@@ -1527,10 +1527,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#v09-real-job-ux" class="md-nav__link">
+  <a href="#v09-real-job-ux-shipped-in-090" class="md-nav__link">
     <span class="md-ellipsis">
       
-        v0.9 — Real-job UX
+        v0.9 — Real-job UX (shipped in 0.9.0)
       
     </span>
   </a>
@@ -1609,7 +1609,7 @@ decisively better than hand-rolling for API fan-out?</em></p>
 <p>The best direction toward 1.0 is not more kinds of parallelism — it is being
 <strong>the most trustworthy single-machine runtime for expensive, rate-limited
 fan-out jobs</strong>.</p>
-<h2 id="current-070-on-pypi-08-on-main">Current (0.7.0 on PyPI, 0.8 on main)<a class="headerlink" href="#current-070-on-pypi-08-on-main" title="Permanent link">&para;</a></h2>
+<h2 id="current-090-on-pypi">Current (0.9.0 on PyPI)<a class="headerlink" href="#current-090-on-pypi" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>parallel_map()</code> / <code>parallel_starmap()</code> / <code>parallel_iter()</code> and async
   mirrors; <code>@parallel</code> / <code>@async_parallel</code> decorators with <code>.map()</code> /
@@ -1620,11 +1620,21 @@ fan-out jobs</strong>.</p>
 <li><code>RateLimit</code> (token bucket with <code>burst</code>) + shareable <code>Limiter</code> (one
   budget across calls, functions, sync and async)</li>
 <li><code>Retry</code> with backoff, jitter, <code>on</code>/<code>retry_if</code> filtering, and
-  <code>wait_from</code> server-driven waits that pause the shared limiter</li>
-<li><code>checkpoint=</code> / <code>checkpoint_key=</code> — SQLite resume, fail-closed
-  function identity, <code>0o600</code> creation, corruption → <code>CheckpointError</code></li>
+  <code>wait_from</code> server-driven waits that pause the shared limiter;
+  <code>Retry.for_http()</code> prewires the 429/<code>Retry-After</code> dance (both header
+  dialects, no HTTP client import)</li>
+<li><code>checkpoint=</code> / <code>checkpoint_key=</code> / <code>checkpoint_version=</code> — SQLite
+  resume, fail-closed function identity + semantic version token,
+  <code>0o600</code> creation, corruption → <code>CheckpointError</code></li>
 <li><code>max_errors=</code> early abort; <code>timeout=</code> total (sync + async),
-  <code>task_timeout=</code> (async)</li>
+  <code>task_timeout=</code> (async); <code>stop=StopToken()</code> cooperative cancel
+  (<code>RunStatus.CANCELLED</code>, checkpoint rows kept)</li>
+<li><code>AsyncIterable</code> sources with end-to-end backpressure; the streaming
+  pull races beside the workers</li>
+<li><code>ParallelResult.item_results()</code> — per-item <code>attempts</code>/<code>duration</code> on
+  collected maps</li>
+<li>The resilience demo (<code>examples/resilience_demo.py</code>) — headline claims
+  self-asserted in CI against the installed wheel</li>
 <li><code>ParallelResult</code> with <code>RunStatus</code> (<code>.ok</code> = completed AND all
   succeeded; truncated runs never read as clean), PEP 678 failure
   provenance; <code>ItemResult</code> with <code>attempts</code>/<code>duration</code></li>
@@ -1643,7 +1653,7 @@ documents: <a href="../plans/v0.5.0/">v0.5</a>,
 <a href="../plans/v0.7-free-threaded-and-interpreters/">v0.7 free-threaded &amp; interpreters</a>,
 <a href="../plans/v0.8-honest-contract/">v0.8 honest contract</a>.</p>
 <hr />
-<h2 id="v08-honest-contract-in-progress-on-v08-honest-contract">v0.8 — Honest contract <em>(in progress on <code>v0.8-honest-contract</code>)</em><a class="headerlink" href="#v08-honest-contract-in-progress-on-v08-honest-contract" title="Permanent link">&para;</a></h2>
+<h2 id="v08-honest-contract-shipped-in-080">v0.8 — Honest contract <em>(shipped in 0.8.0)</em><a class="headerlink" href="#v08-honest-contract-shipped-in-080" title="Permanent link">&para;</a></h2>
 <p>One deliberate contract-breaking release; everything conceptually wrong
 with the public API fixed together, before 1.0 freezes it. Scope,
 ground truth, and amendments: <a href="../plans/v0.8-honest-contract/">v0.8 plan</a>.
@@ -1652,37 +1662,43 @@ invariant hardening, failure provenance, typed unary <code>.map()</code>, decora
 override sentinel, policy numeric validation, checkpoint
 security/corruption handling, CI/release trust (wheel gate, OS lanes,
 trusted publishing), this roadmap rewrite.</p>
-<h2 id="v09-real-job-ux">v0.9 — Real-job UX<a class="headerlink" href="#v09-real-job-ux" title="Permanent link">&para;</a></h2>
+<h2 id="v09-real-job-ux-shipped-in-090">v0.9 — Real-job UX <em>(shipped in 0.9.0)</em><a class="headerlink" href="#v09-real-job-ux-shipped-in-090" title="Permanent link">&para;</a></h2>
 <p>Features earned by real workloads, sequenced after the contract is
 honest:</p>
 <ul>
-<li><strong><code>Retry.for_http()</code></strong> — dependency-free helper for the 429/<code>Retry-After</code>
-  dance every recipe currently hand-rolls: numeric <em>and</em> date-form
-  <code>Retry-After</code>, clean fallback on malformed values, explicit response
-  extraction, no HTTP client import.</li>
-<li><strong><code>AsyncIterable</code> sources</strong> — async cursors and paginated generators
-  with end-to-end backpressure (no-drain, closure, cancellation tests).</li>
-<li><strong><code>checkpoint_version=</code></strong> — a user-supplied semantic token
-  (model name, prompt SHA…) joining checkpoint identity, for the config
-  automatic function inspection cannot see.</li>
-<li><strong>Cooperative stop</strong> — a stop token that ceases admission, cancels
-  queued work, preserves checkpoints, and reports
-  <code>RunStatus.CANCELLED</code>. Honest about running sync threads being
-  uninterruptible.</li>
-<li><strong>Collected-result metadata</strong> — expose the <code>attempts</code>/<code>duration</code>
-  already computed per item (today discarded by collected maps).
-  Smallest surface first; a stats object must be earned by concrete
-  use cases.</li>
+<li><strong><code>Retry.for_http()</code></strong> <em>(done — on <code>v0.9-retry-for-http</code>)</em> —
+  dependency-free helper for the 429/<code>Retry-After</code> dance every recipe
+  hand-rolled: numeric <em>and</em> date-form <code>Retry-After</code>, clean fallback on
+  malformed values, duck-typed response extraction, no HTTP client
+  import.</li>
+<li><strong><code>AsyncIterable</code> sources</strong> <em>(done — on <code>v0.9-async-sources</code>)</em> —
+  async cursors and paginated generators with end-to-end backpressure
+  (no-drain, closure, cancellation tests); <code>timeout=</code> binds during a
+  stuck source await.</li>
+<li><strong><code>checkpoint_version=</code></strong> <em>(done — on <code>v0.9-checkpoint-version</code>)</em> —
+  a user-supplied semantic token (model name, prompt SHA…) joining
+  checkpoint identity, for the config automatic function inspection
+  cannot see. Fails closed on change, both tokens in the error.</li>
+<li><strong>Cooperative stop</strong> <em>(done — on <code>v0.9-cooperative-stop</code>)</em> — a stop
+  token that ceases admission, cancels queued work, preserves
+  checkpoints, and reports <code>RunStatus.CANCELLED</code>. Honest about running
+  sync threads being uninterruptible.</li>
+<li><strong>Collected-result metadata</strong> <em>(done — on <code>v0.9-collected-metadata</code>)</em> —
+  <code>ParallelResult.item_results()</code> exposes the <code>attempts</code>/<code>duration</code>
+  already computed per item (previously discarded by collected maps),
+  reusing the streaming <code>ItemResult</code> type. Smallest surface first; a
+  stats object must be earned by concrete use cases.</li>
 <li><strong>Decorator default surface</strong> — decide whether decorator defaults
   widen beyond <code>workers</code>/<code>executor</code>/<code>rate_limit</code> (e.g. <code>retry=</code>), or the
   asymmetry is documented as intentional.</li>
 <li><strong>Resource-lifecycle examples</strong> — one reusable HTTP client around the
   fan-out; fix the <code>AsyncClient</code>-per-item pattern in README/cookbook.</li>
-<li><strong>The resilience demo</strong> — deterministic, zero-credential, local: a
-  fake API enforcing a quota, 429 + <code>Retry-After</code> pausing the whole
-  pool, a mid-run kill, a rerun that resumes from SQLite, and a final
-  report of avoided calls. One demo that proves the entire thesis — and
-  doubles as the launch write-up's centerpiece.</li>
+<li><strong>The resilience demo</strong> <em>(done — on <code>v0.9-resilience-demo</code>)</em> —
+  deterministic, zero-credential, local: a fake API enforcing a quota,
+  429 + <code>Retry-After</code> pausing the whole pool (gap measured
+  server-side), a real SIGKILL mid-run, a rerun that resumes from
+  SQLite, and a final report of avoided calls. Proves the entire
+  thesis — and doubles as the launch write-up's centerpiece.</li>
 </ul>
 <p>Design spikes (pre-freeze checks, no shipping):</p>
 <ul>

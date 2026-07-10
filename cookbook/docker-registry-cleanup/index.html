@@ -1427,23 +1427,16 @@ changes.</p>
     <span class="n">r</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">tag</span><span class="o">.</span><span class="n">name</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">is_throttled</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
-    <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="n">httpx</span><span class="o">.</span><span class="n">HTTPStatusError</span><span class="p">)</span> <span class="ow">and</span> <span class="n">exc</span><span class="o">.</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">429</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">retry_after</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
-    <span class="n">value</span> <span class="o">=</span> <span class="n">exc</span><span class="o">.</span><span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;retry-after&quot;</span><span class="p">)</span>
-    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">if</span> <span class="n">value</span> <span class="k">else</span> <span class="kc">None</span>
-
 <span class="n">stale_tags</span> <span class="o">=</span> <span class="n">find_stale_tags</span><span class="p">(</span><span class="n">REPO</span><span class="p">)</span>   <span class="c1"># thousands</span>
 
 <span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
     <span class="n">delete_manifest</span><span class="p">,</span> <span class="n">stale_tags</span><span class="p">,</span>
     <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
     <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">),</span>   <span class="c1"># stay UNDER the limit, don&#39;t discover it via 429</span>
-    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="o">.</span><span class="n">for_http</span><span class="p">(</span>                  <span class="c1"># only 429s retried; Retry-After honored</span>
         <span class="n">attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
-        <span class="n">retry_if</span><span class="o">=</span><span class="n">is_throttled</span><span class="p">,</span>
-        <span class="n">wait_from</span><span class="o">=</span><span class="n">retry_after</span><span class="p">,</span>             <span class="c1"># honor the registry&#39;s Retry-After</span>
+        <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">httpx</span><span class="o">.</span><span class="n">HTTPStatusError</span><span class="p">,),</span>
+        <span class="n">statuses</span><span class="o">=</span><span class="p">{</span><span class="mi">429</span><span class="p">},</span>
     <span class="p">),</span>
     <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;cleanup.ckpt&quot;</span><span class="p">,</span>             <span class="c1"># crash partway? the rerun resumes</span>
     <span class="n">checkpoint_key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">digest</span><span class="p">,</span>     <span class="c1"># idempotent by digest — never re-delete</span>

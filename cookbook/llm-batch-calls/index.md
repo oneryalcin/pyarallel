@@ -18,12 +18,6 @@ def classify(ticket):
     )
     return response.choices[0].message.content
 
-def retry_after(exc):
-    """Honor the server's Retry-After header when present."""
-    response = getattr(exc, "response", None)
-    header = response.headers.get("retry-after") if response else None
-    return float(header) if header else None
-
 # One Limiter per API key — every job that spends this quota shares it.
 limiter = Limiter(RateLimit(450, "minute", burst=10))
 
@@ -31,11 +25,11 @@ result = parallel_map(
     classify, tickets,
     workers=10,
     rate_limit=limiter,
-    retry=Retry(
+    retry=Retry.for_http(               # 429 + Retry-After, prewired (v0.9)
         attempts=4,
         backoff=2.0,
         on=(openai.RateLimitError, openai.APIConnectionError, openai.InternalServerError),
-        wait_from=retry_after,          # a 429 pauses the WHOLE pool
+        statuses={429, 500, 502, 503, 504},
     ),
     checkpoint="classify.ckpt",         # paid-for answers survive a crash
     max_errors=20,                      # dead API → abort near 20 failures, not at 20,000
@@ -49,8 +43,8 @@ for idx, exc in result.failures():
 
 Why each policy is there:
 
-- **`wait_from=retry_after`** — when the provider says `Retry-After: 30`, that wait replaces the backoff *and* pauses the shared limiter. One throttled call slows the whole pool; without it, all 10 workers discover the 429 separately and the retry storm makes it worse.
-- **`checkpoint=`** — LLM calls cost real money. Completed answers are persisted as they finish; a crash at item 8,000 of 10,000 resumes with 2,000 calls, not 10,000. Inputs that evolve between runs? Key rows by identity with `checkpoint_key=lambda t: t.id`.
+- **`Retry.for_http()`** — when the provider says `Retry-After: 30` (numeric *or* HTTP-date form), that wait replaces the backoff *and* pauses the shared limiter. One throttled call slows the whole pool; without it, all 10 workers discover the 429 separately and the retry storm makes it worse. `statuses=` widens the default `{429, 503}` to the 5xx codes `openai.InternalServerError` represents; `APIConnectionError` carries no status, so the type filter alone decides for it. (Verified against the real `openai` exception types.)
+- **`checkpoint=`** — LLM calls cost real money. Completed answers are persisted as they finish; a crash at item 8,000 of 10,000 resumes with 2,000 calls, not 10,000. Inputs that evolve between runs? Key rows by identity with `checkpoint_key=lambda t: t.id`. Prompt or model changes are invisible to code inspection — declare them: `checkpoint_version=("classify-v3", MODEL)` fails closed on change instead of stitching old-prompt answers to new ones.
 - **`max_errors=20`** — the overnight-job guard. If the API dies, the run stops admitting work once the 20th post-retry failure lands — at most one admission window (default `2 × workers`) is still in flight — and returns partial results; the morning rerun resumes from the checkpoint. Shrink `window_size` to tighten that bound on expensive calls, at some throughput cost.
 
 The recipe is client-agnostic: swap the `openai` call for [LiteLLM](https://docs.litellm.ai/) (multi-provider routing), or raw `httpx` — pyarallel only sees a function and its exceptions.

@@ -103,22 +103,27 @@ Retries happen *inside the worker* — only the failing item is retried, never i
 
 ### Server-Driven Backoff (429 / Retry-After)
 
-Real APIs tell you how long to back off. `retry_if` decides retryability from the exception *instance*; `wait_from` extracts the server-mandated wait, which replaces the backoff delay (no jitter) and pauses the shared limiter so the whole pool slows down:
+Real APIs tell you how long to back off. For the standard HTTP dance, `Retry.for_http()` (v0.9) is prewired — both `Retry-After` dialects (numeric seconds *and* HTTP-date), malformed values falling back to exponential backoff, duck-typed against httpx/requests/aiohttp exception shapes with no client import:
 
 ```
-def retry_after(exc):
-    response = getattr(exc, "response", None)
-    header = response.headers.get("retry-after") if response else None
-    return float(header) if header else None   # None → exponential backoff
-
 results = parallel_map(
     call_api, ids,
     rate_limit=limiter,   # a shared Limiter — see below
+    retry=Retry.for_http(on=(httpx.HTTPStatusError,)),   # 429/503 default
+)
+```
+
+Under the hood it fills two hooks you can also wire yourself when the policy isn't plain HTTP: `retry_if` decides retryability from the exception *instance*; `wait_from` extracts the server-mandated wait, which replaces the backoff delay (no jitter) and pauses the shared limiter so the whole pool slows down:
+
+```
+results = parallel_map(
+    call_api, ids,
+    rate_limit=limiter,
     retry=Retry(
         attempts=5,
         on=(httpx.HTTPStatusError,),
         retry_if=lambda exc: exc.response.status_code in (429, 503),
-        wait_from=retry_after,
+        wait_from=lambda exc: parse_retry_after(exc.response),
     ),
 )
 ```
@@ -154,7 +159,15 @@ result = parallel_map(embed, chunks, checkpoint="embeddings.ckpt")
 Safety guards, stated honestly:
 
 - The file is bound to the mapped function's identity: name, code digest, and visible captured config (default values, closure values, `functools.partial` arguments). An edited function or a changed `factor=3` raises `CheckpointError` — stale reuse fails closed, never silently.
-- Live objects in captured state (clients, sessions) count by *type* only — config hidden inside them is invisible. Delete the checkpoint when it changes. Bound methods and callable objects are rejected outright: their entire state is opaque.
+- Live objects in captured state (clients, sessions) count by *type* only — config hidden inside them is invisible to inspection. For exactly that config — a prompt, a model name, an environment — declare it (v0.9):
+
+```
+result = parallel_map(classify, tickets, checkpoint="classify.ckpt",
+                      checkpoint_version=("classify-v3", MODEL, PROMPT_SHA))
+```
+
+Change the prompt → the token changes → the rerun fails closed with both tokens in the error, instead of silently stitching 40k old-prompt answers to 10k new-prompt ones. Tokens are `str`/`int`/`bytes` or tuples of those (stable reprs only — a dict would invalidate on every run). Bound methods and callable objects are rejected outright: their entire state is opaque.
+
 - A changed input at the same position is recomputed, never served stale.
 - Rows are positional by default: reordering or inserting inputs forces shifted items to recompute. For evolving inputs, key rows by identity:
 
@@ -175,6 +188,28 @@ Checkpoint files are code, not data
 Rows are stored as **pickle** — resuming from a checkpoint executes whatever its pickle streams contain. Anyone who can *write* the file can run code in your process on the next resume. Never resume from a file you didn't create; never accept one from an untrusted source (a bug report, a shared bucket). Pyarallel creates new checkpoint files owner-only (`0o600`, POSIX) and leaves existing files' permissions alone — but a directory writable by others (`/tmp`-like locations) is not a safe home for one regardless.
 
 Available on `parallel_map`, `async_parallel_map`, and `.map()`.
+
+## Cooperative Stop — `StopToken`
+
+SIGTERM during a deploy, the notebook stop button, a spend-limit watchdog: long runs need a way to say *land the plane* (v0.9):
+
+```
+import signal
+from pyarallel import StopToken, RunStatus, parallel_map
+
+token = StopToken()
+signal.signal(signal.SIGTERM, lambda *_: token.stop())
+
+result = parallel_map(call_api, items, stop=token, checkpoint="run.ckpt")
+if result.status is RunStatus.CANCELLED:
+    ...  # completed rows are already in the checkpoint; rerun resumes
+```
+
+`stop()` is thread-safe, idempotent, and signal-handler-safe. On stop: admission ceases, cancellable work is cancelled, completed checkpoint rows are kept, and the result reports `RunStatus.CANCELLED` with unresolved slots marked `Cancelled`. Cancel latency is ~100ms even while rate-limit-paced (waits are sliced when a token is present).
+
+Stated honestly: the **async** engine cancels in-flight tasks; the **sync** engine cannot kill running threads — in-flight items finish in the background (their slots still read `Cancelled`: the result was not delivered to this run). A token is a latch, not a pulse — once stopped, every run given it cancels immediately; use a fresh token per campaign.
+
+Collected APIs only (`parallel_map` / `async_parallel_map` and decorator `.map()`): streaming already has cooperative stop by construction — `break` out of the loop (sync) or close the stream (async, `aclosing`).
 
 ## Early Abort — `max_errors`
 

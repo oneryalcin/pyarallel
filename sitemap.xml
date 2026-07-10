@@ -2,118 +2,118 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/api-reference/async/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/api-reference/core/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/api-reference/rate-limiting/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/bulk-file-download/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/cpu-fanout/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/dataset-enrichment/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/docker-registry-cleanup/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/embeddings/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/github-bulk-repo-changes/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/llm-batch-calls/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/ncbi-entrez-batch/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/secrets-rotation/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/streaming-etl/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/cookbook/web-scraping/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/CONTRIBUTING/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/devx-principles/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/roadmap/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/plans/v0.5.0/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/plans/v0.6-engine-unification/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/plans/v0.6-ledger-refactor/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/plans/v0.7-free-threaded-and-interpreters/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/development/plans/v0.8-honest-contract/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/getting-started/comparison/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/getting-started/installation/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/getting-started/quickstart/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/user-guide/advanced-features/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
     <url>
          <loc>https://oneryalcin.github.io/pyarallel/user-guide/best-practices/</loc>
-         <lastmod>2026-07-09</lastmod>
+         <lastmod>2026-07-10</lastmod>
     </url>
 </urlset>

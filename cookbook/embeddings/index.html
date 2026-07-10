@@ -1408,14 +1408,6 @@ Works with OpenAI, Cohere, HuggingFace Inference API, or any HTTP endpoint.</p>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">embedding</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">retry_after</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Honor the server&#39;s Retry-After header when present.&quot;&quot;&quot;</span>
-    <span class="n">response</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;response&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">response</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">return</span> <span class="kc">None</span>
-    <span class="n">header</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;retry-after&quot;</span><span class="p">)</span>
-    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="p">)</span> <span class="k">if</span> <span class="n">header</span> <span class="k">else</span> <span class="kc">None</span>
-
 <span class="n">texts</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;document one&quot;</span><span class="p">,</span> <span class="s2">&quot;document two&quot;</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>  <span class="c1"># thousands of texts</span>
 
 <span class="c1"># One Limiter = one budget. Reuse it across every call that spends</span>
@@ -1426,11 +1418,10 @@ Works with OpenAI, Cohere, HuggingFace Inference API, or any HTTP endpoint.</p>
     <span class="n">embed</span><span class="p">,</span> <span class="n">texts</span><span class="p">,</span>
     <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
     <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">,</span>
-    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="o">.</span><span class="n">for_http</span><span class="p">(</span>               <span class="c1"># 429 + Retry-After, prewired (v0.9)</span>
         <span class="n">attempts</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
         <span class="n">backoff</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
         <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">openai</span><span class="o">.</span><span class="n">RateLimitError</span><span class="p">,</span> <span class="n">openai</span><span class="o">.</span><span class="n">APIConnectionError</span><span class="p">),</span>
-        <span class="n">wait_from</span><span class="o">=</span><span class="n">retry_after</span><span class="p">,</span>              <span class="c1"># a 429 pauses the WHOLE pool</span>
     <span class="p">),</span>
     <span class="n">window_size</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>                         <span class="c1"># in-flight window (default 2 x workers)</span>
     <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;embeddings.ckpt&quot;</span><span class="p">,</span>           <span class="c1"># crash at item 40k? rerun resumes</span>
@@ -1444,10 +1435,11 @@ Works with OpenAI, Cohere, HuggingFace Inference API, or any HTTP endpoint.</p>
   Pass the same instance to other jobs against the same key and they draw
   from one budget. Retries draw tokens too — a retry storm can't blow
   through the limit.</li>
-<li><strong><code>wait_from</code></strong> — when the API returns 429 with <code>Retry-After</code>, that wait
-  replaces the backoff <em>and</em> pauses the shared limiter, so one throttled
-  task slows the whole pool instead of every worker discovering the limit
-  separately.</li>
+<li><strong><code>Retry.for_http()</code></strong> — when the API returns 429 with <code>Retry-After</code>
+  (numeric or HTTP-date form), that wait replaces the backoff <em>and</em>
+  pauses the shared limiter, so one throttled task slows the whole pool
+  instead of every worker discovering the limit separately.
+  <code>APIConnectionError</code> carries no status; the type filter decides for it.</li>
 <li><strong><code>checkpoint=</code></strong> — every completed embedding is persisted (SQLite).
   If the run dies at item 40,000, rerunning the same line executes only
   the remainder. Delete the file when inputs or model change semantics

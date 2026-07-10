@@ -1414,12 +1414,6 @@ twice, and a dead API at 2 a.m. must not burn the quota retrying forever.</p>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">choices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">content</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">retry_after</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Honor the server&#39;s Retry-After header when present.&quot;&quot;&quot;</span>
-    <span class="n">response</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;response&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-    <span class="n">header</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;retry-after&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">response</span> <span class="k">else</span> <span class="kc">None</span>
-    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="p">)</span> <span class="k">if</span> <span class="n">header</span> <span class="k">else</span> <span class="kc">None</span>
-
 <span class="c1"># One Limiter per API key — every job that spends this quota shares it.</span>
 <span class="n">limiter</span> <span class="o">=</span> <span class="n">Limiter</span><span class="p">(</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">450</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">,</span> <span class="n">burst</span><span class="o">=</span><span class="mi">10</span><span class="p">))</span>
 
@@ -1427,11 +1421,11 @@ twice, and a dead API at 2 a.m. must not burn the quota retrying forever.</p>
     <span class="n">classify</span><span class="p">,</span> <span class="n">tickets</span><span class="p">,</span>
     <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
     <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">,</span>
-    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="o">.</span><span class="n">for_http</span><span class="p">(</span>               <span class="c1"># 429 + Retry-After, prewired (v0.9)</span>
         <span class="n">attempts</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
         <span class="n">backoff</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
         <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">openai</span><span class="o">.</span><span class="n">RateLimitError</span><span class="p">,</span> <span class="n">openai</span><span class="o">.</span><span class="n">APIConnectionError</span><span class="p">,</span> <span class="n">openai</span><span class="o">.</span><span class="n">InternalServerError</span><span class="p">),</span>
-        <span class="n">wait_from</span><span class="o">=</span><span class="n">retry_after</span><span class="p">,</span>          <span class="c1"># a 429 pauses the WHOLE pool</span>
+        <span class="n">statuses</span><span class="o">=</span><span class="p">{</span><span class="mi">429</span><span class="p">,</span> <span class="mi">500</span><span class="p">,</span> <span class="mi">502</span><span class="p">,</span> <span class="mi">503</span><span class="p">,</span> <span class="mi">504</span><span class="p">},</span>
     <span class="p">),</span>
     <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;classify.ckpt&quot;</span><span class="p">,</span>         <span class="c1"># paid-for answers survive a crash</span>
     <span class="n">max_errors</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>                      <span class="c1"># dead API → abort near 20 failures, not at 20,000</span>
@@ -1444,14 +1438,21 @@ twice, and a dead API at 2 a.m. must not burn the quota retrying forever.</p>
 </code></pre></div>
 <p>Why each policy is there:</p>
 <ul>
-<li><strong><code>wait_from=retry_after</code></strong> — when the provider says <code>Retry-After: 30</code>,
-  that wait replaces the backoff <em>and</em> pauses the shared limiter. One
-  throttled call slows the whole pool; without it, all 10 workers
-  discover the 429 separately and the retry storm makes it worse.</li>
+<li><strong><code>Retry.for_http()</code></strong> — when the provider says <code>Retry-After: 30</code>
+  (numeric <em>or</em> HTTP-date form), that wait replaces the backoff <em>and</em>
+  pauses the shared limiter. One throttled call slows the whole pool;
+  without it, all 10 workers discover the 429 separately and the retry
+  storm makes it worse. <code>statuses=</code> widens the default <code>{429, 503}</code> to
+  the 5xx codes <code>openai.InternalServerError</code> represents;
+  <code>APIConnectionError</code> carries no status, so the type filter alone
+  decides for it. (Verified against the real <code>openai</code> exception types.)</li>
 <li><strong><code>checkpoint=</code></strong> — LLM calls cost real money. Completed answers are
   persisted as they finish; a crash at item 8,000 of 10,000 resumes
   with 2,000 calls, not 10,000. Inputs that evolve between runs? Key
-  rows by identity with <code>checkpoint_key=lambda t: t.id</code>.</li>
+  rows by identity with <code>checkpoint_key=lambda t: t.id</code>. Prompt or
+  model changes are invisible to code inspection — declare them:
+  <code>checkpoint_version=("classify-v3", MODEL)</code> fails closed on change
+  instead of stitching old-prompt answers to new ones.</li>
 <li><strong><code>max_errors=20</code></strong> — the overnight-job guard. If the API dies, the
   run stops admitting work once the 20th post-retry failure lands — at
   most one admission window (default <code>2 × workers</code>) is still in flight —

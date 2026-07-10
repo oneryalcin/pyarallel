@@ -1473,10 +1473,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#server-driven-backoff" class="md-nav__link">
+  <a href="#retryfor_http-the-prewired-http-policy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Server-Driven Backoff
+        Retry.for_http() — the prewired HTTP policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#server-driven-backoff-under-the-hood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server-Driven Backoff (under the hood)
       
     </span>
   </a>
@@ -2311,10 +2322,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#server-driven-backoff" class="md-nav__link">
+  <a href="#retryfor_http-the-prewired-http-policy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Server-Driven Backoff
+        Retry.for_http() — the prewired HTTP policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#server-driven-backoff-under-the-hood" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server-Driven Backoff (under the hood)
       
     </span>
   </a>
@@ -2449,10 +2471,22 @@
 <td>Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires <code>checkpoint=</code></td>
 </tr>
 <tr>
+<td><code>checkpoint_version</code></td>
+<td><code>str \| int \| bytes \| tuple \| None</code></td>
+<td><code>None</code></td>
+<td>Semantic token joining checkpoint identity — the config function inspection can't see (prompt, model). Changed token fails closed with both versions in the error. Requires <code>checkpoint=</code></td>
+</tr>
+<tr>
 <td><code>max_errors</code></td>
 <td><code>int \| None</code></td>
 <td><code>None</code></td>
 <td>Abort after this many failures (counted after retries). Unrun items are marked <code>Aborted</code></td>
+</tr>
+<tr>
+<td><code>stop</code></td>
+<td><code>StopToken \| None</code></td>
+<td><code>None</code></td>
+<td>Cooperative cancel: <code>token.stop()</code> (thread/signal-safe) ceases admission, keeps completed checkpoint rows, reports <code>RunStatus.CANCELLED</code>, marks unresolved items <code>Cancelled</code>. See <a href="../../user-guide/advanced-features/#cooperative-stop-stoptoken">Cooperative Stop</a></td>
 </tr>
 <tr>
 <td><code>sequential</code></td>
@@ -2962,6 +2996,11 @@ instead of quietly returning a partial list. Use <code>.successes()</code> /
 <td><code>(index, exception)</code> for each failure</td>
 </tr>
 <tr>
+<td><code>.item_results()</code></td>
+<td><code>list[ItemResult[R]]</code></td>
+<td>Every item as an <code>ItemResult</code> (index/value/error/<strong>attempts/duration</strong>), input order. Never raises. The collected mirror of streaming <code>ItemResult</code>. Checkpoint hits and truncation placeholders carry <code>attempts=0, duration=0.0</code> (nothing ran this run)</td>
+</tr>
+<tr>
 <td><code>.raise_on_failure()</code></td>
 <td><code>None</code></td>
 <td>Raises <code>ExceptionGroup</code> if any task failed; each sub-exception carries its item index as a PEP 678 note (<code>except*</code> matching untouched)</td>
@@ -3153,11 +3192,66 @@ multiplied by jitter.</p>
     <span class="n">window_size</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
 <span class="p">)</span>
 </code></pre></div>
-<h3 id="server-driven-backoff">Server-Driven Backoff<a class="headerlink" href="#server-driven-backoff" title="Permanent link">&para;</a></h3>
+<h3 id="retryfor_http-the-prewired-http-policy"><code>Retry.for_http()</code> — the prewired HTTP policy<a class="headerlink" href="#retryfor_http-the-prewired-http-policy" title="Permanent link">&para;</a></h3>
+<p>The 429/<code>Retry-After</code> dance is one call (v0.9):</p>
+<div class="highlight"><pre><span></span><code><span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+    <span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span>
+    <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">,</span>   <span class="c1"># a shared Limiter</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="o">.</span><span class="n">for_http</span><span class="p">(</span><span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">httpx</span><span class="o">.</span><span class="n">HTTPStatusError</span><span class="p">,)),</span>
+<span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>on</code></td>
+<td><code>tuple[type[Exception], ...]</code></td>
+<td>required</td>
+<td>Exception types to consider</td>
+</tr>
+<tr>
+<td><code>statuses</code></td>
+<td><code>set[int]</code></td>
+<td><code>{429, 503}</code></td>
+<td>Retry only these HTTP statuses. Members of <code>on</code> carrying no status (connection errors) are always retried</td>
+</tr>
+<tr>
+<td><code>response</code></td>
+<td><code>Callable[[Exception], Any] \| None</code></td>
+<td><code>None</code></td>
+<td>How to find the response. Default duck-types: <code>exc.response</code> when present (httpx, requests), else the exception itself (aiohttp)</td>
+</tr>
+<tr>
+<td><code>attempts</code> / <code>backoff</code> / <code>max_delay</code> / <code>jitter</code> / <code>max_server_wait</code></td>
+<td>—</td>
+<td>as <code>Retry</code></td>
+<td>Passed through</td>
+</tr>
+</tbody>
+</table>
+<p>What it handles that hand-rolls routinely get wrong:</p>
+<ul>
+<li><strong>Both <code>Retry-After</code> dialects</strong> — numeric seconds <em>and</em> HTTP-date
+  (<code>Retry-After: Fri, 10 Jul 2026 08:00:00 GMT</code>). Homemade parsers hit
+  the date form and either crash or retry instantly — a stampede.</li>
+<li><strong>Malformed values fall back</strong> to exponential backoff, never raise.</li>
+<li><strong>No HTTP client import</strong> — pure duck typing; works with httpx,
+  requests, and aiohttp exception shapes out of the box.</li>
+<li>Returns a plain frozen <code>Retry</code>, so everything composes — including
+  the shared-limiter pause below, and process-executor pickling.</li>
+</ul>
+<h3 id="server-driven-backoff-under-the-hood">Server-Driven Backoff (under the hood)<a class="headerlink" href="#server-driven-backoff-under-the-hood" title="Permanent link">&para;</a></h3>
 <p>Real APIs speak 429 + <code>Retry-After</code>. <code>retry_if</code> decides retryability from the
 exception <em>instance</em>, and <code>wait_from</code> extracts the server-mandated wait — it
 replaces the backoff delay with no jitter and no <code>max_delay</code> cap, because the
-server knows better than we do:</p>
+server knows better than we do. <code>Retry.for_http()</code> is exactly this, prewired:</p>
 <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">parse_retry_after</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
     <span class="n">header</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="o">.</span><span class="n">response</span><span class="p">,</span> <span class="s2">&quot;headers&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;Retry-After&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="p">)</span> <span class="k">if</span> <span class="n">header</span> <span class="k">else</span> <span class="kc">None</span>

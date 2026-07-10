@@ -1454,6 +1454,11 @@ changes.</p>
         <span class="n">retry_if</span><span class="o">=</span><span class="n">is_rate_limit</span><span class="p">,</span>
         <span class="n">wait_from</span><span class="o">=</span><span class="n">github_wait</span><span class="p">,</span>          <span class="c1"># one worker&#39;s throttle wait pauses the whole pool</span>
     <span class="p">),</span>
+    <span class="c1"># Why not Retry.for_http()? GitHub signals rate limits as 403 WITH</span>
+    <span class="c1"># rate-limit headers — but plain 403 is also &quot;no permission&quot;, which</span>
+    <span class="c1"># must NOT be retried. Status alone can&#39;t tell them apart, so this</span>
+    <span class="c1"># recipe keeps its header-aware predicate. for_http covers APIs</span>
+    <span class="c1"># where status is the whole signal.</span>
     <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;codeowners.ckpt&quot;</span><span class="p">,</span>
     <span class="n">checkpoint_key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">name</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>   <span class="c1"># resume by repo — never re-mutate a done one</span>
     <span class="n">max_errors</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span>                      <span class="c1"># the kill-switch: abort the migration if it goes wrong</span>

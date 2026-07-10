@@ -1034,6 +1034,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cooperative-stop-stoptoken" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooperative Stop — StopToken
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#early-abort-max_errors" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1706,6 +1717,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#cooperative-stop-stoptoken" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cooperative Stop — StopToken
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#early-abort-max_errors" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1869,23 +1891,30 @@ whole. Consume partial results deliberately with <code>.successes()</code> or
 <p><strong>How backoff works:</strong> delay = <code>backoff * 2^attempt</code>, capped at <code>max_delay</code>. With <code>jitter=True</code> (default), the delay is multiplied by a random factor between 0.5 and 1.5 — this prevents all workers from retrying at the exact same moment when a service recovers.</p>
 <p>Retries happen <em>inside the worker</em> — only the failing item is retried, never its neighbors. This composes cleanly with rate limiting: <strong>every retry attempt draws a fresh rate-limit token</strong>, so a retry storm can never blow through your quota.</p>
 <h3 id="server-driven-backoff-429-retry-after">Server-Driven Backoff (429 / Retry-After)<a class="headerlink" href="#server-driven-backoff-429-retry-after" title="Permanent link">&para;</a></h3>
-<p>Real APIs tell you how long to back off. <code>retry_if</code> decides retryability
-from the exception <em>instance</em>; <code>wait_from</code> extracts the server-mandated
-wait, which replaces the backoff delay (no jitter) and pauses the shared
-limiter so the whole pool slows down:</p>
-<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">retry_after</span><span class="p">(</span><span class="n">exc</span><span class="p">):</span>
-    <span class="n">response</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="s2">&quot;response&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-    <span class="n">header</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;retry-after&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">response</span> <span class="k">else</span> <span class="kc">None</span>
-    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="p">)</span> <span class="k">if</span> <span class="n">header</span> <span class="k">else</span> <span class="kc">None</span>   <span class="c1"># None → exponential backoff</span>
-
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+<p>Real APIs tell you how long to back off. For the standard HTTP dance,
+<code>Retry.for_http()</code> (v0.9) is prewired — both <code>Retry-After</code> dialects
+(numeric seconds <em>and</em> HTTP-date), malformed values falling back to
+exponential backoff, duck-typed against httpx/requests/aiohttp exception
+shapes with no client import:</p>
+<div class="highlight"><pre><span></span><code><span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
     <span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span>
     <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">,</span>   <span class="c1"># a shared Limiter — see below</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="o">.</span><span class="n">for_http</span><span class="p">(</span><span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">httpx</span><span class="o">.</span><span class="n">HTTPStatusError</span><span class="p">,)),</span>   <span class="c1"># 429/503 default</span>
+<span class="p">)</span>
+</code></pre></div>
+<p>Under the hood it fills two hooks you can also wire yourself when the
+policy isn't plain HTTP: <code>retry_if</code> decides retryability from the
+exception <em>instance</em>; <code>wait_from</code> extracts the server-mandated wait,
+which replaces the backoff delay (no jitter) and pauses the shared
+limiter so the whole pool slows down:</p>
+<div class="highlight"><pre><span></span><code><span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+    <span class="n">call_api</span><span class="p">,</span> <span class="n">ids</span><span class="p">,</span>
+    <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">,</span>
     <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span>
         <span class="n">attempts</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
         <span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">httpx</span><span class="o">.</span><span class="n">HTTPStatusError</span><span class="p">,),</span>
         <span class="n">retry_if</span><span class="o">=</span><span class="k">lambda</span> <span class="n">exc</span><span class="p">:</span> <span class="n">exc</span><span class="o">.</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">429</span><span class="p">,</span> <span class="mi">503</span><span class="p">),</span>
-        <span class="n">wait_from</span><span class="o">=</span><span class="n">retry_after</span><span class="p">,</span>
+        <span class="n">wait_from</span><span class="o">=</span><span class="k">lambda</span> <span class="n">exc</span><span class="p">:</span> <span class="n">parse_retry_after</span><span class="p">(</span><span class="n">exc</span><span class="o">.</span><span class="n">response</span><span class="p">),</span>
     <span class="p">),</span>
 <span class="p">)</span>
 </code></pre></div>
@@ -1923,13 +1952,21 @@ load from disk, failed and unseen items execute:</p>
   <code>factor=3</code> raises <code>CheckpointError</code> — stale reuse fails closed, never
   silently.</li>
 <li>Live objects in captured state (clients, sessions) count by <em>type</em> only —
-  config hidden inside them is invisible. Delete the checkpoint when it
-  changes. Bound methods and callable objects are rejected outright: their
-  entire state is opaque.</li>
-<li>A changed input at the same position is recomputed, never served stale.</li>
-<li>Rows are positional by default: reordering or inserting inputs forces
-  shifted items to recompute. For evolving inputs, key rows by identity:</li>
+  config hidden inside them is invisible to inspection. For exactly that
+  config — a prompt, a model name, an environment — declare it (v0.9):</li>
 </ul>
+<div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">classify</span><span class="p">,</span> <span class="n">tickets</span><span class="p">,</span> <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;classify.ckpt&quot;</span><span class="p">,</span>
+                      <span class="n">checkpoint_version</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;classify-v3&quot;</span><span class="p">,</span> <span class="n">MODEL</span><span class="p">,</span> <span class="n">PROMPT_SHA</span><span class="p">))</span>
+</code></pre></div>
+<p>Change the prompt → the token changes → the rerun fails closed with
+  both tokens in the error, instead of silently stitching 40k old-prompt
+  answers to 10k new-prompt ones. Tokens are <code>str</code>/<code>int</code>/<code>bytes</code> or
+  tuples of those (stable reprs only — a dict would invalidate on every
+  run). Bound methods and callable objects are rejected outright: their
+  entire state is opaque.
+- A changed input at the same position is recomputed, never served stale.
+- Rows are positional by default: reordering or inserting inputs forces
+  shifted items to recompute. For evolving inputs, key rows by identity:</p>
 <div class="highlight"><pre><span></span><code><span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">users</span><span class="p">,</span> <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;run.ckpt&quot;</span><span class="p">,</span>
                       <span class="n">checkpoint_key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">u</span><span class="p">:</span> <span class="n">u</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
 <span class="c1"># next week: three new users prepended — only they run</span>
@@ -1954,6 +1991,33 @@ permissions alone — but a directory writable by others (<code>/tmp</code>-like
 locations) is not a safe home for one regardless.</p>
 </div>
 <p>Available on <code>parallel_map</code>, <code>async_parallel_map</code>, and <code>.map()</code>.</p>
+<h2 id="cooperative-stop-stoptoken">Cooperative Stop — <code>StopToken</code><a class="headerlink" href="#cooperative-stop-stoptoken" title="Permanent link">&para;</a></h2>
+<p>SIGTERM during a deploy, the notebook stop button, a spend-limit
+watchdog: long runs need a way to say <em>land the plane</em> (v0.9):</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">signal</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">StopToken</span><span class="p">,</span> <span class="n">RunStatus</span><span class="p">,</span> <span class="n">parallel_map</span>
+
+<span class="n">token</span> <span class="o">=</span> <span class="n">StopToken</span><span class="p">()</span>
+<span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGTERM</span><span class="p">,</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">_</span><span class="p">:</span> <span class="n">token</span><span class="o">.</span><span class="n">stop</span><span class="p">())</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">call_api</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">stop</span><span class="o">=</span><span class="n">token</span><span class="p">,</span> <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;run.ckpt&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">status</span> <span class="ow">is</span> <span class="n">RunStatus</span><span class="o">.</span><span class="n">CANCELLED</span><span class="p">:</span>
+    <span class="o">...</span>  <span class="c1"># completed rows are already in the checkpoint; rerun resumes</span>
+</code></pre></div>
+<p><code>stop()</code> is thread-safe, idempotent, and signal-handler-safe. On stop:
+admission ceases, cancellable work is cancelled, completed checkpoint
+rows are kept, and the result reports <code>RunStatus.CANCELLED</code> with
+unresolved slots marked <code>Cancelled</code>. Cancel latency is ~100ms even
+while rate-limit-paced (waits are sliced when a token is present).</p>
+<p>Stated honestly: the <strong>async</strong> engine cancels in-flight tasks; the
+<strong>sync</strong> engine cannot kill running threads — in-flight items finish in
+the background (their slots still read <code>Cancelled</code>: the result was not
+delivered to this run). A token is a latch, not a pulse — once stopped,
+every run given it cancels immediately; use a fresh token per campaign.</p>
+<p>Collected APIs only (<code>parallel_map</code> / <code>async_parallel_map</code> and
+decorator <code>.map()</code>): streaming already has cooperative stop by
+construction — <code>break</code> out of the loop (sync) or close the stream
+(async, <code>aclosing</code>).</p>
 <h2 id="early-abort-max_errors">Early Abort — <code>max_errors</code><a class="headerlink" href="#early-abort-max_errors" title="Permanent link">&para;</a></h2>
 <p>Stop paying for a dead API. With <code>max_errors=N</code> the run aborts once N
 items have failed (counted after retries are exhausted) and returns
