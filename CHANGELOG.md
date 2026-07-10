@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- New: **public-API snapshot gate** — `tests/api_snapshot.txt` is a
+  committed, human-readable rendering of every export, signature,
+  method, and enum member; CI diffs the live surface against it, so an
+  accidental API change is a red build and a deliberate one is a
+  reviewed diff.
+- Docs: **[Compatibility & Policies](https://oneryalcin.github.io/pyarallel/development/policies/)**
+  — semver-from-1.0, deprecation windows, checkpoint file persistence
+  guarantees (schema fail-closed, within-major readability, the pickle
+  boundary), and the Python-version support policy. Stated before the
+  freeze so 1.0 means something.
 - New: **decorator defaults widened** — `@parallel` / `@async_parallel`
   accept `retry`, `timeout` (+ `task_timeout` async), `window_size`,
   `max_errors`, and `on_progress` as defaults: they are properties of
