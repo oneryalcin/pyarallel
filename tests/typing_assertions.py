@@ -173,6 +173,7 @@ def check_decorator_option_keys() -> None:
             retry=Retry(attempts=2),
             checkpoint="run.ckpt",
             checkpoint_key=lambda item: str(item),
+            checkpoint_version=("classify-v3", "gpt-4o"),
             max_errors=10,
             sequential=True,
             worker_init=lambda: None,

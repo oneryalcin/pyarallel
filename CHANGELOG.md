@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- New: **`checkpoint_version=`** — a user-supplied semantic token
+  (`str`/`int`/`bytes` or a tuple: `("classify-v3", MODEL, PROMPT_SHA)`)
+  joining checkpoint identity, for the config automatic function
+  inspection cannot see. You change a prompt in a config file — the
+  function's bytes are identical — and the checkpoint would silently
+  stitch 40k old-prompt answers to 10k new ones; with the token, the
+  rerun fails closed showing both versions. Stored readable in the
+  checkpoint's meta table. Requires `checkpoint=`.
 - New: **`AsyncIterable` sources** — `async_parallel_map` / `_starmap` /
   `_iter` (and the decorator `.map()`/`.starmap()`/`.stream()`) accept
   async sources directly: DB cursors, paginated API generators. No more

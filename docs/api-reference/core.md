@@ -44,6 +44,7 @@ results = parallel_map(
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun. **Contains pickle: treat the file like code** — never resume from a file you didn't create ([details](../user-guide/advanced-features.md#checkpoint-resume)) |
 | `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires `checkpoint=` |
+| `checkpoint_version` | `str \| int \| bytes \| tuple \| None` | `None` | Semantic token joining checkpoint identity — the config function inspection can't see (prompt, model). Changed token fails closed with both versions in the error. Requires `checkpoint=` |
 | `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Unrun items are marked `Aborted` |
 | `sequential` | `bool` | `False` | Run every item inline in the calling thread — no pool, real stack traces, working breakpoints. `workers` is ignored |
 | `worker_init` | `Callable[[], None] \| None` | `None` | Run once per worker before it takes tasks (one DB connection / model per worker). Must be picklable for `executor="process"`; for `executor="interpreter"` it must be a module-level function in an importable module |

@@ -228,7 +228,9 @@ class _CheckpointStore:
 
     __slots__ = ("_conn",)
 
-    def __init__(self, path: str | Path, signature: str) -> None:
+    def __init__(
+        self, path: str | Path, signature: str, run_version: str | None = None
+    ) -> None:
         _create_secure(path)
         self._conn = sqlite3.connect(path)
         try:
@@ -242,6 +244,7 @@ class _CheckpointStore:
             )
             version = self._meta("schema_version")
             signature_row = self._meta("task_signature")
+            version_row = self._meta("checkpoint_version")
         except sqlite3.Error as exc:
             # A truncated write, disk corruption, or a non-database file
             # must fail closed with the same exception type as every
@@ -277,6 +280,11 @@ class _CheckpointStore:
                 " ('schema_version', ?), ('task_signature', ?)",
                 (_SCHEMA_VERSION, signature),
             )
+            if run_version is not None:
+                self._conn.execute(
+                    "INSERT INTO meta (key, value) VALUES ('checkpoint_version', ?)",
+                    (run_version,),
+                )
         elif version != _SCHEMA_VERSION:
             # One rule, no silent migration: anything not stamped v2 —
             # including v0.4-era positional files — fails closed.
@@ -293,6 +301,18 @@ class _CheckpointStore:
                 f"Checkpoint {str(path)!r} was created by a different function "
                 f"({signature_row}, now {signature}). Refusing to reuse its "
                 "results — delete the file or use a different checkpoint path."
+            )
+        elif version_row != run_version:
+            # The semantic version token: config the function inspection
+            # cannot see (a prompt, a model name) changed — mixing old
+            # rows with new computation is the exact disaster to prevent,
+            # and discarding paid-for results must be a conscious act.
+            self._conn.close()
+            raise CheckpointError(
+                f"Checkpoint {str(path)!r} was created with "
+                f"checkpoint_version={version_row}, now {run_version}. "
+                "Refusing to mix results across versions — delete the file "
+                "to recompute, or use a different checkpoint path."
             )
         self._conn.commit()
 
@@ -400,10 +420,39 @@ class _RunCheckpoint:
         self._store.close()
 
 
+_VERSION_TYPES = (str, int, bytes)
+
+
+def _encode_version(token: Any) -> str | None:
+    """Stable, injective, human-readable encoding of a version token.
+
+    Restricted to plain immutables (and tuples of them) because their
+    ``repr`` is stable across runs — a dict or object repr is not, and
+    an unstable token would fail-closed on every rerun. Readable on
+    purpose: the mismatch error shows both tokens verbatim.
+    """
+    if token is None:
+        return None
+    parts = token if isinstance(token, tuple) else (token,)
+    if not all(
+        isinstance(t, _VERSION_TYPES) and not isinstance(t, bool) for t in parts
+    ):
+        raise CheckpointError(
+            "checkpoint_version must be str, int, or bytes — or a tuple "
+            f"of those — got {token!r}. Unstable reprs (dicts, objects) "
+            "would invalidate the checkpoint on every rerun."
+        )
+    return repr(token)
+
+
 def _open_checkpoint(
     path: str | Path,
     fn: Any,
     key_fn: Callable[[Any], str | int | bytes] | None,
+    version: Any = None,
 ) -> _RunCheckpoint:
     """Open (or create) a checkpoint file for one run of *fn*."""
-    return _RunCheckpoint(_CheckpointStore(path, _task_signature(fn)), key_fn)
+    return _RunCheckpoint(
+        _CheckpointStore(path, _task_signature(fn), _encode_version(version)),
+        key_fn,
+    )

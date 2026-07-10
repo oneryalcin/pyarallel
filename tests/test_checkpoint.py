@@ -707,3 +707,91 @@ class TestSymlinkRejection:
         os.symlink(real, link)
         with pytest.raises(CheckpointError):
             parallel_map(_ckpt_double, [1], checkpoint=str(link))
+
+
+class TestCheckpointVersion:
+    """checkpoint_version= (v0.9): a user-supplied semantic token joining
+    checkpoint identity. Production bug this prevents: you change PROMPT
+    in a config file — the mapped function's code is byte-for-byte
+    identical, so automatic inspection sees nothing — and the checkpoint
+    silently serves 40k answers computed with the OLD prompt stitched to
+    10k with the new one. The token makes the invisible config visible."""
+
+    def test_same_version_resumes(self, tmp_path):
+        calls = {"n": 0}
+
+        def fn(x):
+            calls["n"] += 1
+            return x * 2
+
+        ckpt = str(tmp_path / "run.ckpt")
+        v = ("classify-v3", "gpt-4o-mini")
+        first = parallel_map(fn, [1, 2, 3], checkpoint=ckpt, checkpoint_version=v)
+        assert first.ok and calls["n"] == 3
+        second = parallel_map(fn, [1, 2, 3], checkpoint=ckpt, checkpoint_version=v)
+        assert second.values() == first.values()
+        assert calls["n"] == 3  # all served from cache
+
+    def test_changed_version_fails_closed_with_both_versions(self, tmp_path):
+        ckpt = str(tmp_path / "run.ckpt")
+        parallel_map(_ckpt_double, [1], checkpoint=ckpt, checkpoint_version="prompt-v2")
+        with pytest.raises(CheckpointError) as excinfo:
+            parallel_map(
+                _ckpt_double, [1], checkpoint=ckpt, checkpoint_version="prompt-v3"
+            )
+        msg = str(excinfo.value)
+        assert "prompt-v2" in msg and "prompt-v3" in msg
+
+    def test_version_added_to_unversioned_file_fails_closed(self, tmp_path):
+        ckpt = str(tmp_path / "run.ckpt")
+        parallel_map(_ckpt_double, [1], checkpoint=ckpt)
+        with pytest.raises(CheckpointError):
+            parallel_map(_ckpt_double, [1], checkpoint=ckpt, checkpoint_version="v1")
+
+    def test_version_removed_fails_closed(self, tmp_path):
+        ckpt = str(tmp_path / "run.ckpt")
+        parallel_map(_ckpt_double, [1], checkpoint=ckpt, checkpoint_version="v1")
+        with pytest.raises(CheckpointError):
+            parallel_map(_ckpt_double, [1], checkpoint=ckpt)
+
+    def test_version_without_checkpoint_rejected(self):
+        with pytest.raises(ValueError):
+            parallel_map(_ckpt_double, [1], checkpoint_version="v1")
+
+    def test_tuple_tokens_are_distinct_from_strings(self, tmp_path):
+        """('v1',) and 'v1' must not collide — encoding is injective."""
+        ckpt = str(tmp_path / "run.ckpt")
+        parallel_map(_ckpt_double, [1], checkpoint=ckpt, checkpoint_version=("v1",))
+        with pytest.raises(CheckpointError):
+            parallel_map(_ckpt_double, [1], checkpoint=ckpt, checkpoint_version="v1")
+
+    def test_unsupported_token_type_rejected(self, tmp_path):
+        ckpt = str(tmp_path / "run.ckpt")
+        with pytest.raises((ValueError, CheckpointError)):
+            parallel_map(
+                _ckpt_double,
+                [1],
+                checkpoint=ckpt,
+                checkpoint_version={"model": "gpt"},  # dicts: unstable repr
+            )
+
+    async def test_async_parity(self, tmp_path):
+        calls = {"n": 0}
+
+        async def afn(x):
+            calls["n"] += 1
+            return x * 2
+
+        ckpt = str(tmp_path / "run.ckpt")
+        r1 = await async_parallel_map(
+            afn, [1, 2], checkpoint=ckpt, checkpoint_version="v1"
+        )
+        assert r1.ok and calls["n"] == 2
+        r2 = await async_parallel_map(
+            afn, [1, 2], checkpoint=ckpt, checkpoint_version="v1"
+        )
+        assert calls["n"] == 2 and r2.values() == r1.values()
+        with pytest.raises(CheckpointError):
+            await async_parallel_map(
+                afn, [1, 2], checkpoint=ckpt, checkpoint_version="v2"
+            )

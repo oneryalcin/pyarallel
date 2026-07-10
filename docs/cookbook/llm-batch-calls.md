@@ -63,7 +63,10 @@ Why each policy is there:
 - **`checkpoint=`** — LLM calls cost real money. Completed answers are
   persisted as they finish; a crash at item 8,000 of 10,000 resumes
   with 2,000 calls, not 10,000. Inputs that evolve between runs? Key
-  rows by identity with `checkpoint_key=lambda t: t.id`.
+  rows by identity with `checkpoint_key=lambda t: t.id`. Prompt or
+  model changes are invisible to code inspection — declare them:
+  `checkpoint_version=("classify-v3", MODEL)` fails closed on change
+  instead of stitching old-prompt answers to new ones.
 - **`max_errors=20`** — the overnight-job guard. If the API dies, the
   run stops admitting work once the 20th post-retry failure lands — at
   most one admission window (default `2 × workers`) is still in flight —
