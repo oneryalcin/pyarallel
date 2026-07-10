@@ -1315,6 +1315,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/devx-principles/" class="md-nav__link">
         
   
@@ -1491,6 +1519,34 @@
     
   
     v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/design-spikes-pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
   
 
     
@@ -1811,11 +1867,13 @@ items behind it.</p>
 <p>Mirror API for async functions:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel_map</span>
 
+<span class="n">client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span>  <span class="c1"># ONE client — connections pooled across calls</span>
+
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
-    <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
-        <span class="k">return</span> <span class="p">(</span><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">))</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+    <span class="k">return</span> <span class="p">(</span><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">))</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
 
 <span class="n">results</span> <span class="o">=</span> <span class="k">await</span> <span class="n">async_parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">concurrency</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">aclose</span><span class="p">()</span>
 </code></pre></div>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>

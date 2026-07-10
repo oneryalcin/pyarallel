@@ -1159,6 +1159,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/devx-principles/" class="md-nav__link">
         
   
@@ -1348,6 +1376,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/design-spikes-pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1449,16 +1505,17 @@ Works with OpenAI, Cohere, HuggingFace Inference API, or any HTTP endpoint.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">Retry</span>
 
+<span class="n">client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span>  <span class="c1"># ONE client — pooled connections, reused TLS</span>
+
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">embed</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
-    <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
-        <span class="n">r</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
-            <span class="s2">&quot;https://api.openai.com/v1/embeddings&quot;</span><span class="p">,</span>
-            <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">API_KEY</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">},</span>
-            <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="s2">&quot;text-embedding-3-small&quot;</span><span class="p">,</span> <span class="s2">&quot;input&quot;</span><span class="p">:</span> <span class="n">text</span><span class="p">},</span>
-            <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="n">r</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">r</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;embedding&quot;</span><span class="p">]</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
+        <span class="s2">&quot;https://api.openai.com/v1/embeddings&quot;</span><span class="p">,</span>
+        <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">API_KEY</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">},</span>
+        <span class="n">json</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;model&quot;</span><span class="p">:</span> <span class="s2">&quot;text-embedding-3-small&quot;</span><span class="p">,</span> <span class="s2">&quot;input&quot;</span><span class="p">:</span> <span class="n">text</span><span class="p">},</span>
+        <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">r</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">r</span><span class="o">.</span><span class="n">json</span><span class="p">()[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;embedding&quot;</span><span class="p">]</span>
 
 <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">async_parallel_map</span><span class="p">(</span>
     <span class="n">embed</span><span class="p">,</span> <span class="n">texts</span><span class="p">,</span>

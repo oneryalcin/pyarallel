@@ -1159,6 +1159,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/devx-principles/" class="md-nav__link">
         
   
@@ -1348,6 +1376,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/design-spikes-pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1427,8 +1483,9 @@ stack traces. <code>workers=None</code> defaults to one worker per core.</p>
 <p>Two variants worth knowing:</p>
 <ul>
 <li><strong>Pure-Python CPU work on Python 3.14+</strong>: <code>executor="interpreter"</code>
-  gives the same true parallelism with ~30 ms workers and no OS
-  processes — but C extensions like Pillow/numpy don't support
+  gives the same true parallelism with faster worker startup than
+  process fork/spawn (~50 ms vs ~72 ms measured; machine-dependent) and
+  no OS processes — but C extensions like Pillow/numpy don't support
   subinterpreters yet, so <em>this</em> recipe stays on <code>"process"</code>. See
   <a href="../../user-guide/best-practices/#interpreters-executorinterpreter-python-314">choosing the right executor</a>.</li>
 <li><strong>Heavy multiprocessing</strong> (shared memory, per-worker state, CPU

@@ -1159,6 +1159,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/devx-principles/" class="md-nav__link">
         
   
@@ -1348,6 +1376,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/design-spikes-pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1399,13 +1455,17 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">Retry</span>
 
+<span class="c1"># ONE client for the whole run: connection pooling + TLS session reuse.</span>
+<span class="c1"># A client-per-download renegotiates TLS on every file — the #1 async</span>
+<span class="c1"># HTTP anti-pattern.</span>
+<span class="n">client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span>
+
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">download</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
-    <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
-        <span class="n">r</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">follow_redirects</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="n">r</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
-        <span class="n">filename</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;downloads&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">url</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-        <span class="n">filename</span><span class="o">.</span><span class="n">write_bytes</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">content</span><span class="p">)</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="n">url</span><span class="p">,</span> <span class="s2">&quot;size&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">content</span><span class="p">)}</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">follow_redirects</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">r</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;downloads&quot;</span><span class="p">)</span> <span class="o">/</span> <span class="n">url</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">filename</span><span class="o">.</span><span class="n">write_bytes</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">content</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="n">url</span><span class="p">,</span> <span class="s2">&quot;size&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">content</span><span class="p">)}</span>
 
 <span class="n">urls</span> <span class="o">=</span> <span class="p">[</span><span class="o">...</span><span class="p">]</span>  <span class="c1"># hundreds of file URLs</span>
 

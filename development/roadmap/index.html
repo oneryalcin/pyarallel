@@ -1147,6 +1147,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../devx-principles/" class="md-nav__link">
         
   
@@ -1246,10 +1274,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#current-090-on-pypi" class="md-nav__link">
+  <a href="#current-0100-on-pypi" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current (0.9.0 on PyPI)
+        Current (0.10.0 on PyPI)
       
     </span>
   </a>
@@ -1272,6 +1300,17 @@
     <span class="md-ellipsis">
       
         v0.9 — Real-job UX (shipped in 0.9.0)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v010-prove-and-package-shipped-in-0100" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.10 — Prove and package (shipped in 0.10.0)
       
     </span>
   </a>
@@ -1460,6 +1499,34 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plans/design-spikes-pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1505,10 +1572,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#current-090-on-pypi" class="md-nav__link">
+  <a href="#current-0100-on-pypi" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current (0.9.0 on PyPI)
+        Current (0.10.0 on PyPI)
       
     </span>
   </a>
@@ -1531,6 +1598,17 @@
     <span class="md-ellipsis">
       
         v0.9 — Real-job UX (shipped in 0.9.0)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v010-prove-and-package-shipped-in-0100" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.10 — Prove and package (shipped in 0.10.0)
       
     </span>
   </a>
@@ -1609,7 +1687,7 @@ decisively better than hand-rolling for API fan-out?</em></p>
 <p>The best direction toward 1.0 is not more kinds of parallelism — it is being
 <strong>the most trustworthy single-machine runtime for expensive, rate-limited
 fan-out jobs</strong>.</p>
-<h2 id="current-090-on-pypi">Current (0.9.0 on PyPI)<a class="headerlink" href="#current-090-on-pypi" title="Permanent link">&para;</a></h2>
+<h2 id="current-0100-on-pypi">Current (0.10.0 on PyPI)<a class="headerlink" href="#current-0100-on-pypi" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>parallel_map()</code> / <code>parallel_starmap()</code> / <code>parallel_iter()</code> and async
   mirrors; <code>@parallel</code> / <code>@async_parallel</code> decorators with <code>.map()</code> /
@@ -1688,11 +1766,6 @@ honest:</p>
   already computed per item (previously discarded by collected maps),
   reusing the streaming <code>ItemResult</code> type. Smallest surface first; a
   stats object must be earned by concrete use cases.</li>
-<li><strong>Decorator default surface</strong> — decide whether decorator defaults
-  widen beyond <code>workers</code>/<code>executor</code>/<code>rate_limit</code> (e.g. <code>retry=</code>), or the
-  asymmetry is documented as intentional.</li>
-<li><strong>Resource-lifecycle examples</strong> — one reusable HTTP client around the
-  fan-out; fix the <code>AsyncClient</code>-per-item pattern in README/cookbook.</li>
 <li><strong>The resilience demo</strong> <em>(done — on <code>v0.9-resilience-demo</code>)</em> —
   deterministic, zero-credential, local: a fake API enforcing a quota,
   429 + <code>Retry-After</code> pausing the whole pool (gap measured
@@ -1707,6 +1780,42 @@ honest:</p>
   headline at most.</li>
 <li><strong>Streaming checkpoint</strong> — "cached computation" ≠ "sink committed";
   needs crisp at-least-once replay semantics before any implementation.</li>
+</ul>
+<h2 id="v010-prove-and-package-shipped-in-0100">v0.10 — Prove and package <em>(shipped in 0.10.0)</em><a class="headerlink" href="#v010-prove-and-package-shipped-in-0100" title="Permanent link">&para;</a></h2>
+<p>The last stop before freeze — the items the external review's original
+v0.10 proposed that weren't absorbed into v0.8/v0.9, plus two v0.9
+stragglers. Nothing here changes the API's meaning; the launch write-up
+can proceed in parallel.</p>
+<ul>
+<li><strong>Decorator default surface</strong> — DECIDED: widen. <code>@parallel</code> /
+  <code>@async_parallel</code> accept <code>retry</code>, <code>timeout</code> (+ <code>task_timeout</code> async),
+  <code>window_size</code>, <code>max_errors</code>, and <code>on_progress</code> as defaults — they are
+  properties of the function's behavior. <code>checkpoint*</code> and <code>stop</code> stay
+  per-call-only with documented reasoning: a checkpoint file names a
+  run (a shared default file means duplicate keys and wrong resumes)
+  and a stop token is a campaign latch. Presence-sentinel merge rules
+  (v0.8) apply unchanged.</li>
+<li><strong>Resource-lifecycle examples</strong> — one reusable HTTP client around the
+  fan-out; fix the <code>AsyncClient</code>-per-item pattern in README/cookbook
+  (flagged in the very first external review).</li>
+<li><strong>Committed benchmark lab</strong> <em>(done — on <code>v0.10-benchmark-lab</code>)</em> — the
+  free-threading/interpreter numbers (2.4×/3.4×) came from throwaway
+  scripts on one machine; <code>benchmarks/bench.py</code> is now a single
+  stdlib-only harness whose benchmarks map 1:1 to those claims, with
+  recorded runs in <code>benchmarks/RESULTS.md</code>. Not in CI (shared runners
+  make wall-clock claims dishonest) — it's for humans re-verifying on
+  their own hardware.</li>
+<li><strong>Executable cookbook examples</strong> <em>(done — on <code>v0.10-executable-docs</code>)</em>
+  — all 110 user-facing doc blocks compile-gated and API-shape-gated
+  (keywords checked against real signatures); the flagship LLM recipe
+  and streaming ETL execute end to end against fakes in CI.</li>
+<li><strong>Compatibility &amp; deprecation policy</strong> <em>(done — on
+  <code>v0.10-freeze-prep</code>)</em> — <a href="../policies/">Compatibility &amp; Policies</a>:
+  semver from 1.0, deprecation windows, checkpoint persistence
+  guarantees, Python-floor policy, and what "public" means.</li>
+<li><strong>Public API snapshot in CI</strong> <em>(done — on <code>v0.10-freeze-prep</code>)</em> —
+  <code>tests/api_snapshot.txt</code> renders the whole exported surface;
+  accidental changes are a red build, deliberate ones a reviewed diff.</li>
 </ul>
 <h2 id="v10-freeze">v1.0 — Freeze<a class="headerlink" href="#v10-freeze" title="Permanent link">&para;</a></h2>
 <p>Criteria, not features. No headline feature ships in 1.0.</p>

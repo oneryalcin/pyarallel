@@ -49,16 +49,17 @@ Async version with `httpx` for higher throughput:
 import httpx
 from pyarallel import async_parallel_map, RateLimit, Retry
 
+client = httpx.AsyncClient()  # ONE client — pooled connections, reused TLS
+
 async def embed(text):
-    async with httpx.AsyncClient() as client:
-        r = await client.post(
-            "https://api.openai.com/v1/embeddings",
-            headers={"Authorization": f"Bearer {API_KEY}"},
-            json={"model": "text-embedding-3-small", "input": text},
-            timeout=30,
-        )
-        r.raise_for_status()
-        return r.json()["data"][0]["embedding"]
+    r = await client.post(
+        "https://api.openai.com/v1/embeddings",
+        headers={"Authorization": f"Bearer {API_KEY}"},
+        json={"model": "text-embedding-3-small", "input": text},
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.json()["data"][0]["embedding"]
 
 result = await async_parallel_map(
     embed, texts,

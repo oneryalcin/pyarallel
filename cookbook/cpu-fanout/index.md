@@ -31,5 +31,5 @@ Everything else composes unchanged: `retry=` for flaky items, `on_progress=` for
 
 Two variants worth knowing:
 
-- **Pure-Python CPU work on Python 3.14+**: `executor="interpreter"` gives the same true parallelism with ~30 ms workers and no OS processes — but C extensions like Pillow/numpy don't support subinterpreters yet, so *this* recipe stays on `"process"`. See [choosing the right executor](https://oneryalcin.github.io/pyarallel/user-guide/best-practices/#interpreters-executorinterpreter-python-314).
+- **Pure-Python CPU work on Python 3.14+**: `executor="interpreter"` gives the same true parallelism with faster worker startup than process fork/spawn (~50 ms vs ~72 ms measured; machine-dependent) and no OS processes — but C extensions like Pillow/numpy don't support subinterpreters yet, so *this* recipe stays on `"process"`. See [choosing the right executor](https://oneryalcin.github.io/pyarallel/user-guide/best-practices/#interpreters-executorinterpreter-python-314).
 - **Heavy multiprocessing** (shared memory, per-worker state, CPU pinning) is [mpire](https://pypi.org/project/mpire/)'s specialty — see the [comparison](https://oneryalcin.github.io/pyarallel/getting-started/comparison/#vs-mpire) for where each tool wins.

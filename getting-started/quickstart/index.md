@@ -167,11 +167,13 @@ Mirror API for async functions:
 ```
 from pyarallel import async_parallel_map
 
+client = httpx.AsyncClient()  # ONE client — connections pooled across calls
+
 async def fetch(url):
-    async with httpx.AsyncClient() as client:
-        return (await client.get(url)).json()
+    return (await client.get(url)).json()
 
 results = await async_parallel_map(fetch, urls, concurrency=10)
+await client.aclose()
 ```
 
 ## Next Steps

@@ -37,7 +37,7 @@ Process executor requires picklable functions. Use module-level named functions,
 
 ### Interpreters (`executor="interpreter"`, Python 3.14+)
 
-Best for **pure-Python CPU-bound** work: true parallelism on standard GIL builds (a 4-worker spin benchmark measured 3.4× over threads) with ~30 ms worker startup instead of process fork/spawn, all in one OS process.
+Best for **pure-Python CPU-bound** work: true parallelism on standard GIL builds (a 4-worker spin benchmark measured 3.3× over threads) with worker startup measurably cheaper than process fork/spawn (~50 ms vs ~70 ms cold-pool time-to-first-result on the reference machine), all in one OS process. Re-run these numbers yourself: [`benchmarks/`](https://github.com/oneryalcin/pyarallel/tree/main/benchmarks).
 
 ```
 results = parallel_map(crunch, data, workers=4, executor="interpreter")

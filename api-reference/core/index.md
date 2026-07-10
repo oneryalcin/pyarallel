@@ -153,17 +153,28 @@ ______________________________________________________________________
 Decorator that adds `.map()` for parallel execution. The decorated function **keeps its original signature and return type**.
 
 ```
-@parallel(workers=4, executor="thread", rate_limit=None)
+@parallel(workers=4, executor="thread", rate_limit=None,
+          retry=None, timeout=None, window_size=None,
+          max_errors=None, on_progress=None)
 def fn(item): ...
 ```
 
 ### Parameters
 
-| Parameter    | Type                                     | Default    | Description                       |
-| ------------ | ---------------------------------------- | ---------- | --------------------------------- |
-| `workers`    | `int \| None`                            | `None`     | Default worker count for `.map()` |
-| `executor`   | `"thread" \| "process" \| "interpreter"` | `"thread"` | Default executor type             |
-| `rate_limit` | `Limiter \| RateLimit \| float \| None`  | `None`     | Default rate limiting             |
+Decorator defaults are *properties of the function's behavior* — "this fetcher retries 429s" belongs at the decorator. Any per-call keyword overrides them (presence is the sentinel: unpassed inherits, explicit — even `None` — overrides).
+
+| Parameter     | Type                                     | Default    | Description                                                                                               |
+| ------------- | ---------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
+| `workers`     | `int \| None`                            | `None`     | Default worker count for `.map()`                                                                         |
+| `executor`    | `"thread" \| "process" \| "interpreter"` | `"thread"` | Default executor type                                                                                     |
+| `rate_limit`  | `Limiter \| RateLimit \| float \| None`  | `None`     | Default rate limiting                                                                                     |
+| `retry`       | `Retry \| None`                          | `None`     | Default retry policy (v0.10)                                                                              |
+| `timeout`     | `float \| None`                          | `None`     | Default total timeout for `.map()`/`.starmap()` — ignored by `.stream()` (no total deadline in streaming) |
+| `window_size` | `int \| None`                            | `None`     | Default admission window                                                                                  |
+| `max_errors`  | `int \| None`                            | `None`     | Default early-abort threshold                                                                             |
+| `on_progress` | `Callable \| None`                       | `None`     | Default progress callback                                                                                 |
+
+**Deliberately not accepted** (run-scoped, not function-scoped): `checkpoint`/`checkpoint_key`/`checkpoint_version` — a checkpoint file names a *run*; two `.map()` calls sharing a default file would collide keys and serve wrong resumes. `stop` — a token is a campaign latch. Pass these per call.
 
 ### Usage
 

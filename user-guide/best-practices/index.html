@@ -1421,6 +1421,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/devx-principles/" class="md-nav__link">
         
   
@@ -1597,6 +1625,34 @@
     
   
     v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/design-spikes-pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
   
 
     
@@ -1924,9 +1980,10 @@ with the GIL off on both builds.</p>
 </div>
 <h3 id="interpreters-executorinterpreter-python-314">Interpreters (<code>executor="interpreter"</code>, Python 3.14+)<a class="headerlink" href="#interpreters-executorinterpreter-python-314" title="Permanent link">&para;</a></h3>
 <p>Best for <strong>pure-Python CPU-bound</strong> work: true parallelism on standard
-GIL builds (a 4-worker spin benchmark measured 3.4× over threads) with
-~30 ms worker startup instead of process fork/spawn, all in one OS
-process.</p>
+GIL builds (a 4-worker spin benchmark measured 3.3× over threads) with
+worker startup measurably cheaper than process fork/spawn (~50 ms vs
+~70 ms cold-pool time-to-first-result on the reference machine), all in
+one OS process. Re-run these numbers yourself: <a href="https://github.com/oneryalcin/pyarallel/tree/main/benchmarks"><code>benchmarks/</code></a>.</p>
 <div class="highlight"><pre><span></span><code><span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">crunch</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">executor</span><span class="o">=</span><span class="s2">&quot;interpreter&quot;</span><span class="p">)</span>
 </code></pre></div>
 <p>The process rules apply — importable module-level functions, picklable

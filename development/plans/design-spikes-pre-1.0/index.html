@@ -10,29 +10,29 @@
         <meta name="author" content="Mehmet Oner Yalcin">
       
       
-        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/">
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/development/plans/design-spikes-pre-1.0/">
       
       
+        <link rel="prev" href="../v0.8-honest-contract/">
       
-        <link rel="next" href="getting-started/installation/">
       
       
         
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Pyarallel</title>
+        <title>Pre-1.0 Design Spike Records - Pyarallel</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,7 +51,7 @@
       
     
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#pyarallel" class="md-skip">
+        <a href="#pre-10-design-spike-records" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +90,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+    <a href="../../.." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -110,7 +110,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              Pre-1.0 Design Spike Records
             
           </span>
         </div>
@@ -202,7 +202,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+    <a href="../../.." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -229,37 +229,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Home
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="." class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
         
   
   
@@ -275,70 +248,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Example
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        License
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -404,7 +313,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/installation/" class="md-nav__link">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -432,7 +341,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/quickstart/" class="md-nav__link">
+      <a href="../../../getting-started/quickstart/" class="md-nav__link">
         
   
   
@@ -460,7 +369,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/comparison/" class="md-nav__link">
+      <a href="../../../getting-started/comparison/" class="md-nav__link">
         
   
   
@@ -549,7 +458,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/" class="md-nav__link">
+      <a href="../../../cookbook/" class="md-nav__link">
         
   
   
@@ -577,7 +486,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/llm-batch-calls/" class="md-nav__link">
+      <a href="../../../cookbook/llm-batch-calls/" class="md-nav__link">
         
   
   
@@ -605,7 +514,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/embeddings/" class="md-nav__link">
+      <a href="../../../cookbook/embeddings/" class="md-nav__link">
         
   
   
@@ -633,7 +542,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/dataset-enrichment/" class="md-nav__link">
+      <a href="../../../cookbook/dataset-enrichment/" class="md-nav__link">
         
   
   
@@ -661,7 +570,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/web-scraping/" class="md-nav__link">
+      <a href="../../../cookbook/web-scraping/" class="md-nav__link">
         
   
   
@@ -689,7 +598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/bulk-file-download/" class="md-nav__link">
+      <a href="../../../cookbook/bulk-file-download/" class="md-nav__link">
         
   
   
@@ -717,7 +626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/github-bulk-repo-changes/" class="md-nav__link">
+      <a href="../../../cookbook/github-bulk-repo-changes/" class="md-nav__link">
         
   
   
@@ -745,7 +654,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/docker-registry-cleanup/" class="md-nav__link">
+      <a href="../../../cookbook/docker-registry-cleanup/" class="md-nav__link">
         
   
   
@@ -773,7 +682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/secrets-rotation/" class="md-nav__link">
+      <a href="../../../cookbook/secrets-rotation/" class="md-nav__link">
         
   
   
@@ -801,7 +710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/streaming-etl/" class="md-nav__link">
+      <a href="../../../cookbook/streaming-etl/" class="md-nav__link">
         
   
   
@@ -829,7 +738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/ncbi-entrez-batch/" class="md-nav__link">
+      <a href="../../../cookbook/ncbi-entrez-batch/" class="md-nav__link">
         
   
   
@@ -857,7 +766,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/cpu-fanout/" class="md-nav__link">
+      <a href="../../../cookbook/cpu-fanout/" class="md-nav__link">
         
   
   
@@ -946,7 +855,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/advanced-features/" class="md-nav__link">
+      <a href="../../../user-guide/advanced-features/" class="md-nav__link">
         
   
   
@@ -974,7 +883,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/best-practices/" class="md-nav__link">
+      <a href="../../../user-guide/best-practices/" class="md-nav__link">
         
   
   
@@ -1063,7 +972,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api-reference/core/" class="md-nav__link">
+      <a href="../../../api-reference/core/" class="md-nav__link">
         
   
   
@@ -1091,7 +1000,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api-reference/async/" class="md-nav__link">
+      <a href="../../../api-reference/async/" class="md-nav__link">
         
   
   
@@ -1119,7 +1028,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api-reference/rate-limiting/" class="md-nav__link">
+      <a href="../../../api-reference/rate-limiting/" class="md-nav__link">
         
   
   
@@ -1151,8 +1060,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -1163,13 +1074,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
@@ -1190,7 +1099,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1208,7 +1117,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/CONTRIBUTING/" class="md-nav__link">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
         
   
   
@@ -1236,7 +1145,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/policies/" class="md-nav__link">
+      <a href="../../policies/" class="md-nav__link">
         
   
   
@@ -1264,7 +1173,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/devx-principles/" class="md-nav__link">
+      <a href="../../devx-principles/" class="md-nav__link">
         
   
   
@@ -1292,7 +1201,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/roadmap/" class="md-nav__link">
+      <a href="../../roadmap/" class="md-nav__link">
         
   
   
@@ -1320,7 +1229,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/plans/v0.5.0/" class="md-nav__link">
+      <a href="../v0.5.0/" class="md-nav__link">
         
   
   
@@ -1348,7 +1257,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/plans/v0.6-engine-unification/" class="md-nav__link">
+      <a href="../v0.6-engine-unification/" class="md-nav__link">
         
   
   
@@ -1376,7 +1285,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/plans/v0.6-ledger-refactor/" class="md-nav__link">
+      <a href="../v0.6-ledger-refactor/" class="md-nav__link">
         
   
   
@@ -1404,7 +1313,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/plans/v0.7-free-threaded-and-interpreters/" class="md-nav__link">
+      <a href="../v0.7-free-threaded-and-interpreters/" class="md-nav__link">
         
   
   
@@ -1432,7 +1341,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/plans/v0.8-honest-contract/" class="md-nav__link">
+      <a href="../v0.8-honest-contract/" class="md-nav__link">
         
   
   
@@ -1457,10 +1366,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="development/plans/design-spikes-pre-1.0/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1476,6 +1412,48 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#spike-1-weighted-composite-quotas-deferred-to-11-additive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spike 1 — Weighted / composite quotas (deferred to 1.1, additive)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spike-2-streaming-checkpoint-deferred-contract-required-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Spike 2 — Streaming checkpoint (deferred, contract required first)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1515,10 +1493,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#spike-1-weighted-composite-quotas-deferred-to-11-additive" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Spike 1 — Weighted / composite quotas (deferred to 1.1, additive)
       
     </span>
   </a>
@@ -1526,32 +1504,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-example" class="md-nav__link">
+  <a href="#spike-2-streaming-checkpoint-deferred-contract-required-first" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Example
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        License
+        Spike 2 — Streaming checkpoint (deferred, contract required first)
       
     </span>
   </a>
@@ -1578,52 +1534,62 @@
   
 
 
-<h1 id="pyarallel">Pyarallel<a class="headerlink" href="#pyarallel" title="Permanent link">&para;</a></h1>
-<p>The fan-out layer for rate-limited APIs. Simple, explicit parallel execution for Python.</p>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Pyarallel is for "apply one function to many inputs" workloads against services that throttle you — LLM calls, embeddings, scraping, SaaS APIs — as well as general parallel processing. It wraps Python's <code>concurrent.futures</code> and <code>asyncio</code> with the policies that workload actually needs: rate limiting, per-item retry, structured error handling, and progress callbacks. Sync and async, zero dependencies.</p>
-<p><strong>Design principles:</strong></p>
+<h1 id="pre-10-design-spike-records">Pre-1.0 Design Spike Records<a class="headerlink" href="#pre-10-design-spike-records" title="Permanent link">&para;</a></h1>
+<p>The roadmap requires two pre-freeze checks — not implementations,
+decisions. Recorded here so the freeze doesn't rest on unwritten
+conclusions.</p>
+<h2 id="spike-1-weighted-composite-quotas-deferred-to-11-additive">Spike 1 — Weighted / composite quotas (deferred to 1.1, additive)<a class="headerlink" href="#spike-1-weighted-composite-quotas-deferred-to-11-additive" title="Permanent link">&para;</a></h2>
+<p><strong>Question:</strong> does freezing today's <code>Limiter</code> surface preclude weighted
+acquisition (an item consuming N tokens) or composite budgets
+(requests/min AND tokens/min acquired atomically)?</p>
+<p><strong>Conclusion: no — extension is purely additive.</strong> The reasoning:</p>
 <ul>
-<li><strong>Explicit over implicit</strong> — <code>.map()</code> for parallel, normal calls stay normal</li>
-<li><strong>No magic</strong> — no type-sniffing, no global config, no singletons</li>
-<li><strong>Structured errors</strong> — all failures collected via <code>ExceptionGroup</code>, never silently lost</li>
-<li><strong>Sync + async</strong> — mirror APIs, you choose explicitly</li>
+<li>Today's public <code>Limiter</code> surface is three methods: <code>wait(timeout=)</code>,
+  <code>wait_async()</code>, <code>pause(seconds)</code>. Weighted acquisition adds an
+  optional parameter (<code>wait(weight=1)</code>) with a default that preserves
+  every existing call site — no signature breaks.</li>
+<li>Composite budgets compose <em>around</em> the current type: a future
+  <code>Limiter.all(rpm_limiter, tpm_limiter)</code> (or a <code>CompositeLimiter</code>)
+  can implement the same three-method protocol; the engines call only
+  that protocol (<code>_as_limiter</code> normalizes at the boundary), so engine
+  code needs zero changes.</li>
+<li>Atomic multi-budget acquisition without leaks is an implementation
+  concern <em>inside</em> such a composite (acquire-all-or-release), invisible
+  to the engine contract.</li>
+<li>The one surface that would have blocked this — per-call weight needing
+  to reach the limiter from <code>parallel_map</code> — already has a home: a
+  future <code>rate_weight=</code> per-call option or a weight callable, both
+  additive keywords under the existing presence-sentinel rules.</li>
 </ul>
-<h2 id="quick-example">Quick Example<a class="headerlink" href="#quick-example" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span>
-
-<span class="c1"># Fan out 200 API calls, rate-limited to 100/min, with progress</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
-    <span class="n">fetch_url</span><span class="p">,</span>
-    <span class="n">urls</span><span class="p">,</span>
-    <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-    <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">),</span>
-    <span class="n">on_progress</span><span class="o">=</span><span class="k">lambda</span> <span class="n">done</span><span class="p">,</span> <span class="n">total</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">done</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span>
-<span class="p">)</span>
-
-<span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>        <span class="c1"># raises ExceptionGroup if any failed</span>
-    <span class="n">process</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
-</code></pre></div>
-<p>Or with the decorator:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel</span>
-
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
-
-<span class="n">data</span> <span class="o">=</span> <span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;http://example.com&quot;</span><span class="p">)</span>        <span class="c1"># normal call, returns dict</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">([</span><span class="s2">&quot;u1&quot;</span><span class="p">,</span> <span class="s2">&quot;u2&quot;</span><span class="p">,</span> <span class="s2">&quot;u3&quot;</span><span class="p">])</span>   <span class="c1"># parallel, returns ParallelResult</span>
-</code></pre></div>
-<h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h2>
+<p><strong>Therefore:</strong> the <code>Limiter</code> protocol freezes as-is at 1.0; weighted /
+composite lands additively in 1.1 if demand materializes.</p>
+<h2 id="spike-2-streaming-checkpoint-deferred-contract-required-first">Spike 2 — Streaming checkpoint (deferred, contract required first)<a class="headerlink" href="#spike-2-streaming-checkpoint-deferred-contract-required-first" title="Permanent link">&para;</a></h2>
+<p><strong>Question:</strong> why doesn't <code>parallel_iter</code> take <code>checkpoint=</code>?</p>
+<p><strong>Conclusion: deferred until an at-least-once contract can be stated
+crisply — shipping it sooner would undermine the reliability
+positioning.</strong> The core problem:</p>
 <ul>
-<li><a href="getting-started/installation/">Installation</a></li>
-<li><a href="getting-started/quickstart/">Quick Start</a></li>
-<li><a href="user-guide/advanced-features/">Advanced Features</a></li>
-<li><a href="user-guide/best-practices/">Best Practices</a></li>
-<li><a href="api-reference/core/">API Reference</a></li>
+<li>In collected maps, "row committed to SQLite" and "result delivered to
+  the caller" happen inside one call — the checkpoint's claim ("this
+  item is done") is unambiguous.</li>
+<li>In streaming, the caller consumes results <em>as a side effect</em> (writing
+  to a sink). A resumed stream must choose: skip checkpointed items
+  (then a sink that crashed after compute but before its own write
+  loses data silently) or re-yield them (then every consumer must be
+  idempotent — at-least-once delivery).</li>
+<li>"Cached computation" ≠ "sink committed." Any honest design must make
+  the consumer's idempotency obligation explicit — e.g.
+  <code>parallel_iter(..., checkpoint=..., replay="none" | "cached")</code> with
+  documentation that <code>replay="none"</code> trusts the sink and
+  <code>replay="cached"</code> requires idempotent writes.</li>
 </ul>
-<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
-<p>MIT — see <a href="https://github.com/oneryalcin/pyarallel/blob/main/LICENSE.md">LICENSE</a>.</p>
+<p><strong>Required before implementation</strong> (1.1 at the earliest): the replay
+semantics above, a decision on whether cached re-yields carry
+<code>attempts=0</code> metadata (consistent with <code>item_results()</code>), and tests
+proving no delivery state is claimed that the engine cannot know.
+Until then the documented guidance stands: streaming resume is the
+sink's job (skip rows whose output already exists), or use
+<code>parallel_map</code> with <code>checkpoint=</code> over a bounded <code>window_size</code>.</p>
 
 
 
@@ -1679,10 +1645,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>

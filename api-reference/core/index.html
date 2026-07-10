@@ -1660,6 +1660,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/devx-principles/" class="md-nav__link">
         
   
@@ -1836,6 +1864,34 @@
     
   
     v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/design-spikes-pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
   
 
     
@@ -2371,6 +2427,7 @@
 <h1 id="api-reference-core">API Reference: Core<a class="headerlink" href="#api-reference-core" title="Permanent link">&para;</a></h1>
 <h2 id="parallel_map"><code>parallel_map</code><a class="headerlink" href="#parallel_map" title="Permanent link">&para;</a></h2>
 <p>Execute a function over items in parallel, returning ordered results.</p>
+<!-- docs-check: skip -->
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span>
 
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
@@ -2645,10 +2702,16 @@ guaranteed final total.</p>
 <hr />
 <h2 id="parallel"><code>@parallel</code><a class="headerlink" href="#parallel" title="Permanent link">&para;</a></h2>
 <p>Decorator that adds <code>.map()</code> for parallel execution. The decorated function <strong>keeps its original signature and return type</strong>.</p>
-<div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">executor</span><span class="o">=</span><span class="s2">&quot;thread&quot;</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">executor</span><span class="o">=</span><span class="s2">&quot;thread&quot;</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+          <span class="n">retry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+          <span class="n">max_errors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">on_progress</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fn</span><span class="p">(</span><span class="n">item</span><span class="p">):</span> <span class="o">...</span>
 </code></pre></div>
 <h3 id="parameters_1">Parameters<a class="headerlink" href="#parameters_1" title="Permanent link">&para;</a></h3>
+<p>Decorator defaults are <em>properties of the function's behavior</em> — "this
+fetcher retries 429s" belongs at the decorator. Any per-call keyword
+overrides them (presence is the sentinel: unpassed inherits, explicit —
+even <code>None</code> — overrides).</p>
 <table>
 <thead>
 <tr>
@@ -2677,8 +2740,43 @@ guaranteed final total.</p>
 <td><code>None</code></td>
 <td>Default rate limiting</td>
 </tr>
+<tr>
+<td><code>retry</code></td>
+<td><code>Retry \| None</code></td>
+<td><code>None</code></td>
+<td>Default retry policy (v0.10)</td>
+</tr>
+<tr>
+<td><code>timeout</code></td>
+<td><code>float \| None</code></td>
+<td><code>None</code></td>
+<td>Default total timeout for <code>.map()</code>/<code>.starmap()</code> — ignored by <code>.stream()</code> (no total deadline in streaming)</td>
+</tr>
+<tr>
+<td><code>window_size</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>Default admission window</td>
+</tr>
+<tr>
+<td><code>max_errors</code></td>
+<td><code>int \| None</code></td>
+<td><code>None</code></td>
+<td>Default early-abort threshold</td>
+</tr>
+<tr>
+<td><code>on_progress</code></td>
+<td><code>Callable \| None</code></td>
+<td><code>None</code></td>
+<td>Default progress callback</td>
+</tr>
 </tbody>
 </table>
+<p><strong>Deliberately not accepted</strong> (run-scoped, not function-scoped):
+<code>checkpoint</code>/<code>checkpoint_key</code>/<code>checkpoint_version</code> — a checkpoint file
+names a <em>run</em>; two <code>.map()</code> calls sharing a default file would collide
+keys and serve wrong resumes. <code>stop</code> — a token is a campaign latch.
+Pass these per call.</p>
 <h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>

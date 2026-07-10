@@ -1338,6 +1338,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../development/policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../development/devx-principles/" class="md-nav__link">
         
   
@@ -1514,6 +1542,34 @@
     
   
     v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/plans/design-spikes-pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
   
 
     
@@ -1728,6 +1784,7 @@
 <p>Pyarallel provides async-native parallel execution: a windowed engine driven by <code>asyncio.wait</code> with <code>asyncio.Semaphore</code> for concurrency control — in-flight tasks are cancelled and awaited on errors and timeouts, so nothing is left running on the loop.</p>
 <h2 id="async_parallel_map"><code>async_parallel_map</code><a class="headerlink" href="#async_parallel_map" title="Permanent link">&para;</a></h2>
 <p>Execute an async function over items concurrently.</p>
+<!-- docs-check: skip -->
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel_map</span>
 
 <span class="n">results</span> <span class="o">=</span> <span class="k">await</span> <span class="n">async_parallel_map</span><span class="p">(</span>
@@ -1848,9 +1905,10 @@
 <h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
 
+<span class="n">client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span>  <span class="c1"># ONE client — connections pooled across calls</span>
+
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
-    <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">client</span><span class="p">:</span>
-        <span class="k">return</span> <span class="p">(</span><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">))</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+    <span class="k">return</span> <span class="p">(</span><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">))</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
 
 <span class="c1"># Basic</span>
 <span class="n">results</span> <span class="o">=</span> <span class="k">await</span> <span class="n">async_parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">concurrency</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
@@ -1961,10 +2019,11 @@ generator is closed, in-flight work stops.</p>
 <h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_parallel</span>
 
+<span class="n">client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span>  <span class="c1"># ONE client, reused by every call</span>
+
 <span class="nd">@async_parallel</span><span class="p">(</span><span class="n">concurrency</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
-    <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">c</span><span class="p">:</span>
-        <span class="k">return</span> <span class="p">(</span><span class="k">await</span> <span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">))</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+    <span class="k">return</span> <span class="p">(</span><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">))</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
 
 <span class="c1"># Normal call</span>
 <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;http://example.com&quot;</span><span class="p">)</span>
@@ -1978,11 +2037,11 @@ generator is closed, in-flight work stops.</p>
 <div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AsyncScraper</span><span class="p">:</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">base_url</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">base_url</span> <span class="o">=</span> <span class="n">base_url</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">client</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span>  <span class="c1"># one client per scraper</span>
 
     <span class="nd">@async_parallel</span><span class="p">(</span><span class="n">concurrency</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
-        <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">c</span><span class="p">:</span>
-            <span class="k">return</span> <span class="p">(</span><span class="k">await</span> <span class="n">c</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">base_url</span><span class="si">}{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">(</span><span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">base_url</span><span class="si">}{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
 
 <span class="n">scraper</span> <span class="o">=</span> <span class="n">AsyncScraper</span><span class="p">(</span><span class="s2">&quot;https://api.example.com&quot;</span><span class="p">)</span>
 <span class="n">data</span> <span class="o">=</span> <span class="k">await</span> <span class="n">scraper</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;/users/1&quot;</span><span class="p">)</span>

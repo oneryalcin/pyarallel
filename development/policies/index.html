@@ -10,29 +10,31 @@
         <meta name="author" content="Mehmet Oner Yalcin">
       
       
-        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/">
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/development/policies/">
       
       
+        <link rel="prev" href="../CONTRIBUTING/">
       
-        <link rel="next" href="getting-started/installation/">
+      
+        <link rel="next" href="../devx-principles/">
       
       
         
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Pyarallel</title>
+        <title>Compatibility & Policies - Pyarallel</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,7 +53,7 @@
       
     
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#pyarallel" class="md-skip">
+        <a href="#compatibility-deprecation-policies" class="md-skip">
           Skip to content
         </a>
       
@@ -90,7 +92,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+    <a href="../.." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -110,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Home
+              Compatibility & Policies
             
           </span>
         </div>
@@ -202,7 +204,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+    <a href="../.." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -229,37 +231,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Home
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="." class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -275,70 +250,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Example
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Documentation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        License
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -404,7 +315,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/installation/" class="md-nav__link">
+      <a href="../../getting-started/installation/" class="md-nav__link">
         
   
   
@@ -432,7 +343,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/quickstart/" class="md-nav__link">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
         
   
   
@@ -460,7 +371,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting-started/comparison/" class="md-nav__link">
+      <a href="../../getting-started/comparison/" class="md-nav__link">
         
   
   
@@ -549,7 +460,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/" class="md-nav__link">
+      <a href="../../cookbook/" class="md-nav__link">
         
   
   
@@ -577,7 +488,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/llm-batch-calls/" class="md-nav__link">
+      <a href="../../cookbook/llm-batch-calls/" class="md-nav__link">
         
   
   
@@ -605,7 +516,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/embeddings/" class="md-nav__link">
+      <a href="../../cookbook/embeddings/" class="md-nav__link">
         
   
   
@@ -633,7 +544,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/dataset-enrichment/" class="md-nav__link">
+      <a href="../../cookbook/dataset-enrichment/" class="md-nav__link">
         
   
   
@@ -661,7 +572,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/web-scraping/" class="md-nav__link">
+      <a href="../../cookbook/web-scraping/" class="md-nav__link">
         
   
   
@@ -689,7 +600,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/bulk-file-download/" class="md-nav__link">
+      <a href="../../cookbook/bulk-file-download/" class="md-nav__link">
         
   
   
@@ -717,7 +628,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/github-bulk-repo-changes/" class="md-nav__link">
+      <a href="../../cookbook/github-bulk-repo-changes/" class="md-nav__link">
         
   
   
@@ -745,7 +656,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/docker-registry-cleanup/" class="md-nav__link">
+      <a href="../../cookbook/docker-registry-cleanup/" class="md-nav__link">
         
   
   
@@ -773,7 +684,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/secrets-rotation/" class="md-nav__link">
+      <a href="../../cookbook/secrets-rotation/" class="md-nav__link">
         
   
   
@@ -801,7 +712,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/streaming-etl/" class="md-nav__link">
+      <a href="../../cookbook/streaming-etl/" class="md-nav__link">
         
   
   
@@ -829,7 +740,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/ncbi-entrez-batch/" class="md-nav__link">
+      <a href="../../cookbook/ncbi-entrez-batch/" class="md-nav__link">
         
   
   
@@ -857,7 +768,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cookbook/cpu-fanout/" class="md-nav__link">
+      <a href="../../cookbook/cpu-fanout/" class="md-nav__link">
         
   
   
@@ -946,7 +857,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/advanced-features/" class="md-nav__link">
+      <a href="../../user-guide/advanced-features/" class="md-nav__link">
         
   
   
@@ -974,7 +885,7 @@
   
   
     <li class="md-nav__item">
-      <a href="user-guide/best-practices/" class="md-nav__link">
+      <a href="../../user-guide/best-practices/" class="md-nav__link">
         
   
   
@@ -1063,7 +974,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api-reference/core/" class="md-nav__link">
+      <a href="../../api-reference/core/" class="md-nav__link">
         
   
   
@@ -1091,7 +1002,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api-reference/async/" class="md-nav__link">
+      <a href="../../api-reference/async/" class="md-nav__link">
         
   
   
@@ -1119,7 +1030,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api-reference/rate-limiting/" class="md-nav__link">
+      <a href="../../api-reference/rate-limiting/" class="md-nav__link">
         
   
   
@@ -1151,8 +1062,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -1163,13 +1076,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
@@ -1190,7 +1101,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1208,7 +1119,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/CONTRIBUTING/" class="md-nav__link">
+      <a href="../CONTRIBUTING/" class="md-nav__link">
         
   
   
@@ -1233,10 +1144,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="development/policies/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1252,6 +1190,92 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deprecation-from-100" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deprecation (from 1.0.0)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#checkpoint-file-guarantees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checkpoint file guarantees
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#python-version-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python version support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-api-snapshot-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The API snapshot gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-public-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What "public" means
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1264,7 +1288,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/devx-principles/" class="md-nav__link">
+      <a href="../devx-principles/" class="md-nav__link">
         
   
   
@@ -1292,7 +1316,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/roadmap/" class="md-nav__link">
+      <a href="../roadmap/" class="md-nav__link">
         
   
   
@@ -1320,7 +1344,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/plans/v0.5.0/" class="md-nav__link">
+      <a href="../plans/v0.5.0/" class="md-nav__link">
         
   
   
@@ -1348,7 +1372,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/plans/v0.6-engine-unification/" class="md-nav__link">
+      <a href="../plans/v0.6-engine-unification/" class="md-nav__link">
         
   
   
@@ -1376,7 +1400,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/plans/v0.6-ledger-refactor/" class="md-nav__link">
+      <a href="../plans/v0.6-ledger-refactor/" class="md-nav__link">
         
   
   
@@ -1404,7 +1428,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/plans/v0.7-free-threaded-and-interpreters/" class="md-nav__link">
+      <a href="../plans/v0.7-free-threaded-and-interpreters/" class="md-nav__link">
         
   
   
@@ -1432,7 +1456,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/plans/v0.8-honest-contract/" class="md-nav__link">
+      <a href="../plans/v0.8-honest-contract/" class="md-nav__link">
         
   
   
@@ -1460,7 +1484,7 @@
   
   
     <li class="md-nav__item">
-      <a href="development/plans/design-spikes-pre-1.0/" class="md-nav__link">
+      <a href="../plans/design-spikes-pre-1.0/" class="md-nav__link">
         
   
   
@@ -1515,10 +1539,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#versioning" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Versioning
       
     </span>
   </a>
@@ -1526,10 +1550,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-example" class="md-nav__link">
+  <a href="#deprecation-from-100" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Example
+        Deprecation (from 1.0.0)
       
     </span>
   </a>
@@ -1537,10 +1561,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#checkpoint-file-guarantees" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation
+        Checkpoint file guarantees
       
     </span>
   </a>
@@ -1548,10 +1572,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
+  <a href="#python-version-support" class="md-nav__link">
     <span class="md-ellipsis">
       
-        License
+        Python version support
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-api-snapshot-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The API snapshot gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-public-means" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What "public" means
       
     </span>
   </a>
@@ -1578,52 +1624,80 @@
   
 
 
-<h1 id="pyarallel">Pyarallel<a class="headerlink" href="#pyarallel" title="Permanent link">&para;</a></h1>
-<p>The fan-out layer for rate-limited APIs. Simple, explicit parallel execution for Python.</p>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Pyarallel is for "apply one function to many inputs" workloads against services that throttle you — LLM calls, embeddings, scraping, SaaS APIs — as well as general parallel processing. It wraps Python's <code>concurrent.futures</code> and <code>asyncio</code> with the policies that workload actually needs: rate limiting, per-item retry, structured error handling, and progress callbacks. Sync and async, zero dependencies.</p>
-<p><strong>Design principles:</strong></p>
+<h1 id="compatibility-deprecation-policies">Compatibility &amp; Deprecation Policies<a class="headerlink" href="#compatibility-deprecation-policies" title="Permanent link">&para;</a></h1>
+<p>What you can rely on across pyarallel versions — stated before 1.0, so
+the freeze means something. These policies bind from <strong>1.0.0</strong> onward;
+the pre-1.0 sections describe the current reality honestly.</p>
+<h2 id="versioning">Versioning<a class="headerlink" href="#versioning" title="Permanent link">&para;</a></h2>
+<p>Pyarallel follows <a href="https://semver.org/">semantic versioning</a> from 1.0.0:</p>
 <ul>
-<li><strong>Explicit over implicit</strong> — <code>.map()</code> for parallel, normal calls stay normal</li>
-<li><strong>No magic</strong> — no type-sniffing, no global config, no singletons</li>
-<li><strong>Structured errors</strong> — all failures collected via <code>ExceptionGroup</code>, never silently lost</li>
-<li><strong>Sync + async</strong> — mirror APIs, you choose explicitly</li>
+<li><strong>Patch</strong> (<code>1.0.x</code>): bug fixes only. No API surface change — enforced
+  in CI by the <a href="#the-api-snapshot-gate">public-API snapshot gate</a>.</li>
+<li><strong>Minor</strong> (<code>1.x.0</code>): additive only. New parameters get defaults; new
+  exports don't collide; nothing existing changes meaning.</li>
+<li><strong>Major</strong> (<code>x.0.0</code>): the only place breaking changes may live, each
+  with a CHANGELOG migration note.</li>
 </ul>
-<h2 id="quick-example">Quick Example<a class="headerlink" href="#quick-example" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span>
-
-<span class="c1"># Fan out 200 API calls, rate-limited to 100/min, with progress</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
-    <span class="n">fetch_url</span><span class="p">,</span>
-    <span class="n">urls</span><span class="p">,</span>
-    <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-    <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">),</span>
-    <span class="n">on_progress</span><span class="o">=</span><span class="k">lambda</span> <span class="n">done</span><span class="p">,</span> <span class="n">total</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">done</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span>
-<span class="p">)</span>
-
-<span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>        <span class="c1"># raises ExceptionGroup if any failed</span>
-    <span class="n">process</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
-</code></pre></div>
-<p>Or with the decorator:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel</span>
-
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
-
-<span class="n">data</span> <span class="o">=</span> <span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;http://example.com&quot;</span><span class="p">)</span>        <span class="c1"># normal call, returns dict</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">([</span><span class="s2">&quot;u1&quot;</span><span class="p">,</span> <span class="s2">&quot;u2&quot;</span><span class="p">,</span> <span class="s2">&quot;u3&quot;</span><span class="p">])</span>   <span class="c1"># parallel, returns ParallelResult</span>
-</code></pre></div>
-<h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h2>
+<p><strong>Pre-1.0</strong> (now): breaking changes ship in minor versions, deliberately
+batched (v0.8 was one planned contract-breaking release) and always with
+prominent CHANGELOG migration notes. Pinning <code>pyarallel~=0.x.0</code> per
+minor is the safe spelling until 1.0.</p>
+<h2 id="deprecation-from-100">Deprecation (from 1.0.0)<a class="headerlink" href="#deprecation-from-100" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="getting-started/installation/">Installation</a></li>
-<li><a href="getting-started/quickstart/">Quick Start</a></li>
-<li><a href="user-guide/advanced-features/">Advanced Features</a></li>
-<li><a href="user-guide/best-practices/">Best Practices</a></li>
-<li><a href="api-reference/core/">API Reference</a></li>
+<li>A deprecated API emits <code>DeprecationWarning</code> for <strong>at least one minor
+  release</strong> before removal, and removal happens only in a major.</li>
+<li>The warning message names the replacement and the removal version.</li>
+<li>The CHANGELOG lists every active deprecation in each release's notes.</li>
 </ul>
-<h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
-<p>MIT — see <a href="https://github.com/oneryalcin/pyarallel/blob/main/LICENSE.md">LICENSE</a>.</p>
+<h2 id="checkpoint-file-guarantees">Checkpoint file guarantees<a class="headerlink" href="#checkpoint-file-guarantees" title="Permanent link">&para;</a></h2>
+<p>Checkpoint files are the one on-disk artifact pyarallel owns. The
+contract:</p>
+<ul>
+<li><strong>Schema stability</strong>: files are stamped with a schema version
+  (currently <code>2</code>). A pyarallel release reads every schema it documents
+  supporting and <strong>fails closed</strong> — with delete-to-start-fresh
+  instructions — on any schema it doesn't. There is no silent migration
+  and no silent adoption of unrecognized files.</li>
+<li><strong>Within a major</strong> (from 1.0.0): checkpoint files written by version
+  <code>X.a</code> are readable by <code>X.b</code> for any <code>b &gt;= a</code>. Reading newer files
+  with older code is not guaranteed (example: 0.8 readers don't enforce
+  the <code>checkpoint_version=</code> fence that 0.9 writers record).</li>
+<li><strong>Across majors</strong>: readable unless the CHANGELOG says otherwise; a
+  schema bump fails closed rather than misreading.</li>
+<li><strong>Pickle boundary</strong>: rows are pickle. That means (a) results must be
+  picklable, (b) a checkpoint is only usable by code that can import
+  the pickled types, and (c) <strong>a checkpoint file is code — never resume
+  from a file you didn't create</strong> (see the
+  <a href="../../user-guide/advanced-features/#checkpoint-resume">security note</a>).</li>
+<li><strong>Python version</strong>: pickled with the running interpreter's default
+  protocol; files move across Python versions within pickle's own
+  compatibility rules (protocol 5 reads on every supported Python).</li>
+</ul>
+<h2 id="python-version-support">Python version support<a class="headerlink" href="#python-version-support" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The floor is declared in <code>requires-python</code> (currently <strong>3.12</strong>) and
+  every supported version — including free-threaded builds and the
+  3.14+ interpreter executor — is exercised in CI per commit.</li>
+<li>A floor raise is a <strong>minor</strong> release pre-1.0 and a <strong>major</strong> from
+  1.0.0, announced one release ahead in the CHANGELOG.</li>
+<li>New Python versions are added to CI when their first beta ships;
+  support is claimed only after the full matrix is green.</li>
+</ul>
+<h2 id="the-api-snapshot-gate">The API snapshot gate<a class="headerlink" href="#the-api-snapshot-gate" title="Permanent link">&para;</a></h2>
+<p><code>tests/api_snapshot.txt</code> is a committed, human-readable rendering of the
+entire public surface — every export, signature, method, property, and
+enum member. CI compares the live API against it on every push, so an
+accidental rename, signature change, or dropped export is a <strong>red
+build</strong>, and a deliberate one is a <strong>reviewed diff</strong>. Regenerating it is
+a conscious act:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>tests/test_api_snapshot.py<span class="w"> </span>&gt;<span class="w"> </span>tests/api_snapshot.txt
+</code></pre></div>
+<h2 id="what-public-means">What "public" means<a class="headerlink" href="#what-public-means" title="Permanent link">&para;</a></h2>
+<p>The public API is exactly <code>pyarallel.__all__</code> and the documented
+parameters of those objects. Anything prefixed <code>_</code>, any module not
+re-exported from the package root, and the checkpoint file's internal
+layout (beyond the guarantees above) are implementation details and may
+change without notice.</p>
 
 
 
@@ -1679,10 +1753,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
