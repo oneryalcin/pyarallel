@@ -292,10 +292,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#see-the-claims-fail-or-pass" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        See the claims fail or pass
       
     </span>
   </a>
@@ -303,10 +303,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-example" class="md-nav__link">
+  <a href="#choose-your-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Example
+        Choose your path
       
     </span>
   </a>
@@ -314,10 +314,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#the-contract" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation
+        The contract
       
     </span>
   </a>
@@ -440,6 +440,34 @@
     
   
     Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="getting-started/choosing-an-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which API Should I Use?
   
 
     
@@ -995,6 +1023,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user-guide/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1319,6 +1403,57 @@
   
   
   
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture & History
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture & History
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
       <a href="development/plans/v0.5.0/" class="md-nav__link">
         
@@ -1487,6 +1622,14 @@
     </li>
   
 
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
     
   </ul>
 </nav>
@@ -1515,10 +1658,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#see-the-claims-fail-or-pass" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        See the claims fail or pass
       
     </span>
   </a>
@@ -1526,10 +1669,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-example" class="md-nav__link">
+  <a href="#choose-your-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Example
+        Choose your path
       
     </span>
   </a>
@@ -1537,10 +1680,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#the-contract" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Documentation
+        The contract
       
     </span>
   </a>
@@ -1579,49 +1722,67 @@
 
 
 <h1 id="pyarallel">Pyarallel<a class="headerlink" href="#pyarallel" title="Permanent link">&para;</a></h1>
-<p>The fan-out layer for rate-limited APIs. Simple, explicit parallel execution for Python.</p>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>Pyarallel is for "apply one function to many inputs" workloads against services that throttle you — LLM calls, embeddings, scraping, SaaS APIs — as well as general parallel processing. It wraps Python's <code>concurrent.futures</code> and <code>asyncio</code> with the policies that workload actually needs: rate limiting, per-item retry, structured error handling, and progress callbacks. Sync and async, zero dependencies.</p>
-<p><strong>Design principles:</strong></p>
-<ul>
-<li><strong>Explicit over implicit</strong> — <code>.map()</code> for parallel, normal calls stay normal</li>
-<li><strong>No magic</strong> — no type-sniffing, no global config, no singletons</li>
-<li><strong>Structured errors</strong> — all failures collected via <code>ExceptionGroup</code>, never silently lost</li>
-<li><strong>Sync + async</strong> — mirror APIs, you choose explicitly</li>
-</ul>
-<h2 id="quick-example">Quick Example<a class="headerlink" href="#quick-example" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span><span class="p">,</span> <span class="n">RateLimit</span>
+<p><strong>One function. Many inputs. One rate-limited service pushing back.</strong></p>
+<p>Pyarallel is the fan-out layer for API jobs that need more than a thread
+pool: shared rate limits, coordinated <code>Retry-After</code> backoff, per-item retry,
+crash-safe resume, graceful shutdown, and an honest final status. Sync and
+async, with no runtime dependencies.</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">Limiter</span><span class="p">,</span> <span class="n">RateLimit</span><span class="p">,</span> <span class="n">Retry</span><span class="p">,</span> <span class="n">parallel_map</span>
 
-<span class="c1"># Fan out 200 API calls, rate-limited to 100/min, with progress</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
-    <span class="n">fetch_url</span><span class="p">,</span>
+<span class="n">limiter</span> <span class="o">=</span> <span class="n">Limiter</span><span class="p">(</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">))</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+    <span class="n">fetch</span><span class="p">,</span>
     <span class="n">urls</span><span class="p">,</span>
-    <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
-    <span class="n">rate_limit</span><span class="o">=</span><span class="n">RateLimit</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="s2">&quot;minute&quot;</span><span class="p">),</span>
-    <span class="n">on_progress</span><span class="o">=</span><span class="k">lambda</span> <span class="n">done</span><span class="p">,</span> <span class="n">total</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">done</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span>
+    <span class="n">workers</span><span class="o">=</span><span class="mi">12</span><span class="p">,</span>
+    <span class="n">rate_limit</span><span class="o">=</span><span class="n">limiter</span><span class="p">,</span>
+    <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="o">.</span><span class="n">for_http</span><span class="p">(</span><span class="n">on</span><span class="o">=</span><span class="p">(</span><span class="n">HttpError</span><span class="p">,),</span> <span class="n">attempts</span><span class="o">=</span><span class="mi">5</span><span class="p">),</span>
+    <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;fetch.ckpt&quot;</span><span class="p">,</span>
+    <span class="n">checkpoint_version</span><span class="o">=</span><span class="s2">&quot;fetch-v2&quot;</span><span class="p">,</span>
+    <span class="n">max_errors</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>        <span class="c1"># raises ExceptionGroup if any failed</span>
-    <span class="n">process</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+<span class="n">result</span><span class="o">.</span><span class="n">raise_on_failure</span><span class="p">()</span>
+<span class="n">save_all</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
 </code></pre></div>
-<p>Or with the decorator:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel</span>
-
-<span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
-
-<span class="n">data</span> <span class="o">=</span> <span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;http://example.com&quot;</span><span class="p">)</span>        <span class="c1"># normal call, returns dict</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">([</span><span class="s2">&quot;u1&quot;</span><span class="p">,</span> <span class="s2">&quot;u2&quot;</span><span class="p">,</span> <span class="s2">&quot;u3&quot;</span><span class="p">])</span>   <span class="c1"># parallel, returns ParallelResult</span>
+<p>When one task receives <code>429 Retry-After</code>, the shared limiter pauses the
+pool instead of letting every worker rediscover the quota. If the process
+dies, rerunning the same job loads completed items from the checkpoint
+instead of paying for them twice.</p>
+<h2 id="see-the-claims-fail-or-pass">See the claims fail or pass<a class="headerlink" href="#see-the-claims-fail-or-pass" title="Permanent link">&para;</a></h2>
+<p>The repository includes a self-checking resilience demo. It starts a local
+fake API, proves that one 429 pauses the whole pool, kills a checkpointed
+child process with <code>SIGKILL</code>, and verifies that the next run performs only
+the remaining work:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>examples/resilience_demo.py
 </code></pre></div>
-<h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h2>
+<p>No credentials or external service required. The same demo runs against the
+built wheel in CI.</p>
+<h2 id="choose-your-path">Choose your path<a class="headerlink" href="#choose-your-path" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="getting-started/installation/">Installation</a></li>
-<li><a href="getting-started/quickstart/">Quick Start</a></li>
-<li><a href="user-guide/advanced-features/">Advanced Features</a></li>
-<li><a href="user-guide/best-practices/">Best Practices</a></li>
-<li><a href="api-reference/core/">API Reference</a></li>
+<li><strong>New here?</strong> Run the <a href="getting-started/quickstart/">Quick Start</a> for one
+  complete API-job pattern.</li>
+<li><strong>Choosing an API?</strong> The <a href="getting-started/choosing-an-api/">one-page decision guide</a>
+  covers collected, streaming, sync, async, decorators, and executors.</li>
+<li><strong>Building a real job?</strong> Start from the <a href="cookbook/">Cookbook</a> or the
+  runnable <a href="https://github.com/oneryalcin/pyarallel/blob/main/examples/07_production_api_job.py">production template</a>.</li>
+<li><strong>Evaluating the fit?</strong> Read the <a href="getting-started/comparison/">honest comparison</a>,
+  including when the standard library, Prefect, or Ray is a better choice.</li>
+<li><strong>Something went wrong?</strong> Go directly to <a href="user-guide/troubleshooting/">Troubleshooting</a>
+  or <a href="user-guide/testing/">Testing</a>.</li>
 </ul>
+<h2 id="the-contract">The contract<a class="headerlink" href="#the-contract" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Explicit:</strong> ordinary calls remain ordinary; <code>.map()</code> opts into fan-out.</li>
+<li><strong>Coordinated:</strong> retry and rate limiting share one view of server pressure.</li>
+<li><strong>Bounded:</strong> iterables are consumed lazily through an admission window.</li>
+<li><strong>Resumable:</strong> completed items are committed before progress is reported.</li>
+<li><strong>Honest:</strong> <code>RunStatus</code> distinguishes completion, timeout, abort, and
+  cancellation; a truncated run is never <code>.ok</code>.</li>
+</ul>
+<p>Pyarallel deliberately is not a task queue, DAG engine, or distributed
+system. It is for one common shape: apply one function to many inputs while
+an external service controls the pace.</p>
 <h2 id="license">License<a class="headerlink" href="#license" title="Permanent link">&para;</a></h2>
 <p>MIT — see <a href="https://github.com/oneryalcin/pyarallel/blob/main/LICENSE.md">LICENSE</a>.</p>
 

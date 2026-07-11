@@ -7,7 +7,9 @@ pyarallel is a zero-dependency Python library for fanning out one function over 
 
 - [Home](https://oneryalcin.github.io/pyarallel/index.md): Overview and the fan-out niche
 - [Quick Start](https://oneryalcin.github.io/pyarallel/getting-started/quickstart/index.md): Quick start
+- [Which API Should I Use?](https://oneryalcin.github.io/pyarallel/getting-started/choosing-an-api/index.md): Choose collected, streaming, sync, or async
 - [Comparison](https://oneryalcin.github.io/pyarallel/getting-started/comparison/index.md): When to use pyarallel vs alternatives
+- [Troubleshooting](https://oneryalcin.github.io/pyarallel/user-guide/troubleshooting/index.md): Diagnose common failures
 
 ## Cookbook
 
@@ -31,4 +33,6 @@ pyarallel is a zero-dependency Python library for fanning out one function over 
 - [Rate Limiting](https://oneryalcin.github.io/pyarallel/api-reference/rate-limiting/index.md)
 - [Advanced Features](https://oneryalcin.github.io/pyarallel/user-guide/advanced-features/index.md)
 - [Best Practices](https://oneryalcin.github.io/pyarallel/user-guide/best-practices/index.md)
+- [Testing](https://oneryalcin.github.io/pyarallel/user-guide/testing/index.md)
+- [Troubleshooting](https://oneryalcin.github.io/pyarallel/user-guide/troubleshooting/index.md)
 

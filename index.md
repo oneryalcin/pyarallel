@@ -1,56 +1,58 @@
 # Pyarallel
 
-The fan-out layer for rate-limited APIs. Simple, explicit parallel execution for Python.
+**One function. Many inputs. One rate-limited service pushing back.**
 
-## Overview
-
-Pyarallel is for "apply one function to many inputs" workloads against services that throttle you — LLM calls, embeddings, scraping, SaaS APIs — as well as general parallel processing. It wraps Python's `concurrent.futures` and `asyncio` with the policies that workload actually needs: rate limiting, per-item retry, structured error handling, and progress callbacks. Sync and async, zero dependencies.
-
-**Design principles:**
-
-- **Explicit over implicit** — `.map()` for parallel, normal calls stay normal
-- **No magic** — no type-sniffing, no global config, no singletons
-- **Structured errors** — all failures collected via `ExceptionGroup`, never silently lost
-- **Sync + async** — mirror APIs, you choose explicitly
-
-## Quick Example
+Pyarallel is the fan-out layer for API jobs that need more than a thread pool: shared rate limits, coordinated `Retry-After` backoff, per-item retry, crash-safe resume, graceful shutdown, and an honest final status. Sync and async, with no runtime dependencies.
 
 ```
-from pyarallel import parallel_map, RateLimit
+from pyarallel import Limiter, RateLimit, Retry, parallel_map
 
-# Fan out 200 API calls, rate-limited to 100/min, with progress
-results = parallel_map(
-    fetch_url,
+limiter = Limiter(RateLimit(100, "minute"))
+
+result = parallel_map(
+    fetch,
     urls,
-    workers=10,
-    rate_limit=RateLimit(100, "minute"),
-    on_progress=lambda done, total: print(f"{done}/{total}"),
+    workers=12,
+    rate_limit=limiter,
+    retry=Retry.for_http(on=(HttpError,), attempts=5),
+    checkpoint="fetch.ckpt",
+    checkpoint_version="fetch-v2",
+    max_errors=20,
 )
 
-for item in results:        # raises ExceptionGroup if any failed
-    process(item)
+result.raise_on_failure()
+save_all(result.values())
 ```
 
-Or with the decorator:
+When one task receives `429 Retry-After`, the shared limiter pauses the pool instead of letting every worker rediscover the quota. If the process dies, rerunning the same job loads completed items from the checkpoint instead of paying for them twice.
+
+## See the claims fail or pass
+
+The repository includes a self-checking resilience demo. It starts a local fake API, proves that one 429 pauses the whole pool, kills a checkpointed child process with `SIGKILL`, and verifies that the next run performs only the remaining work:
 
 ```
-from pyarallel import parallel
-
-@parallel(workers=4)
-def fetch(url):
-    return requests.get(url).json()
-
-data = fetch("http://example.com")        # normal call, returns dict
-results = fetch.map(["u1", "u2", "u3"])   # parallel, returns ParallelResult
+python examples/resilience_demo.py
 ```
 
-## Documentation
+No credentials or external service required. The same demo runs against the built wheel in CI.
 
-- [Installation](https://oneryalcin.github.io/pyarallel/getting-started/installation/index.md)
-- [Quick Start](https://oneryalcin.github.io/pyarallel/getting-started/quickstart/index.md)
-- [Advanced Features](https://oneryalcin.github.io/pyarallel/user-guide/advanced-features/index.md)
-- [Best Practices](https://oneryalcin.github.io/pyarallel/user-guide/best-practices/index.md)
-- [API Reference](https://oneryalcin.github.io/pyarallel/api-reference/core/index.md)
+## Choose your path
+
+- **New here?** Run the [Quick Start](https://oneryalcin.github.io/pyarallel/getting-started/quickstart/index.md) for one complete API-job pattern.
+- **Choosing an API?** The [one-page decision guide](https://oneryalcin.github.io/pyarallel/getting-started/choosing-an-api/index.md) covers collected, streaming, sync, async, decorators, and executors.
+- **Building a real job?** Start from the [Cookbook](https://oneryalcin.github.io/pyarallel/cookbook/index.md) or the runnable [production template](https://github.com/oneryalcin/pyarallel/blob/main/examples/07_production_api_job.py).
+- **Evaluating the fit?** Read the [honest comparison](https://oneryalcin.github.io/pyarallel/getting-started/comparison/index.md), including when the standard library, Prefect, or Ray is a better choice.
+- **Something went wrong?** Go directly to [Troubleshooting](https://oneryalcin.github.io/pyarallel/user-guide/troubleshooting/index.md) or [Testing](https://oneryalcin.github.io/pyarallel/user-guide/testing/index.md).
+
+## The contract
+
+- **Explicit:** ordinary calls remain ordinary; `.map()` opts into fan-out.
+- **Coordinated:** retry and rate limiting share one view of server pressure.
+- **Bounded:** iterables are consumed lazily through an admission window.
+- **Resumable:** completed items are committed before progress is reported.
+- **Honest:** `RunStatus` distinguishes completion, timeout, abort, and cancellation; a truncated run is never `.ok`.
+
+Pyarallel deliberately is not a task queue, DAG engine, or distributed system. It is for one common shape: apply one function to many inputs while an external service controls the pace.
 
 ## License
 

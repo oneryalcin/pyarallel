@@ -1,6 +1,6 @@
 # Cookbook
 
-Complete, copy-pasteable recipes for real workloads — not toy examples. Each one shows the specific combination of policies (rate limiting, retry with server-driven backoff, checkpoint/resume, early abort) that makes pyarallel the right tool, not just "a parallel loop."
+Adaptable, end-to-end patterns for real workloads — not isolated API snippets. Each one shows the specific combination of policies (rate limiting, retry with server-driven backoff, checkpoint/resume, early abort) that makes pyarallel the right tool, not just "a parallel loop."
 
 The through-line for most of these: they're jobs where **repeating work is expensive or dangerous**, or where **the rate budget is a shared external resource** — exactly where a hand-rolled semaphore + retry silently does the wrong thing.
 

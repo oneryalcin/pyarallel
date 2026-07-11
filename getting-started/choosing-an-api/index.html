@@ -10,13 +10,13 @@
         <meta name="author" content="Mehmet Oner Yalcin">
       
       
-        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/getting-started/installation/">
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/getting-started/choosing-an-api/">
       
       
-        <link rel="prev" href="../..">
+        <link rel="prev" href="../quickstart/">
       
       
-        <link rel="next" href="../quickstart/">
+        <link rel="next" href="../comparison/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Installation - Pyarallel</title>
+        <title>Which API Should I Use? - Pyarallel</title>
       
     
     
@@ -76,7 +76,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installation" class="md-skip">
+        <a href="#which-api-should-i-use" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Installation
+              Which API Should I Use?
             
           </span>
         </div>
@@ -312,37 +312,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Installation
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
         
   
   
@@ -358,70 +331,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Requirements
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#install" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-install" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Development Install
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#verify" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Verify
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -459,10 +368,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../choosing-an-api/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which API Should I Use?
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -478,6 +414,70 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#collected-vs-streaming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collected vs streaming
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#functions-vs-the-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Functions vs the decorator
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#which-executor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which executor?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-you-dont-need-pyarallel-at-all" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When you don't need pyarallel at all
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1660,10 +1660,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
+  <a href="#collected-vs-streaming" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Requirements
+        Collected vs streaming
       
     </span>
   </a>
@@ -1671,10 +1671,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#install" class="md-nav__link">
+  <a href="#functions-vs-the-decorator" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Install
+        Functions vs the decorator
       
     </span>
   </a>
@@ -1682,10 +1682,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#development-install" class="md-nav__link">
+  <a href="#which-executor" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Development Install
+        Which executor?
       
     </span>
   </a>
@@ -1693,10 +1693,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#verify" class="md-nav__link">
+  <a href="#when-you-dont-need-pyarallel-at-all" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Verify
+        When you don't need pyarallel at all
       
     </span>
   </a>
@@ -1723,28 +1723,145 @@
   
 
 
-<h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
-<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Python 3.12 or higher</li>
-</ul>
-<h2 id="install">Install<a class="headerlink" href="#install" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>pyarallel
+<h1 id="which-api-should-i-use">Which API Should I Use?<a class="headerlink" href="#which-api-should-i-use" title="Permanent link">&para;</a></h1>
+<p>Pyarallel's surface is small — one decision tree covers all of it.</p>
+<div class="highlight"><pre><span></span><code>Is your function async (async def)?
+│
+├─ NO (sync) ──► Do you need results incrementally / constant memory?
+│               ├─ NO  ──► parallel_map(fn, items)          ← start here
+│               ├─ YES ──► parallel_iter(fn, items)
+│               └─ items are argument TUPLES?
+│                          parallel_starmap(fn, pairs)
+│
+└─ YES ───────► Do you need results incrementally / constant memory?
+                ├─ NO  ──► async_parallel_map(fn, items)
+                ├─ YES ──► async_parallel_iter(fn, items)
+                └─ items are argument TUPLES?
+                           async_parallel_starmap(fn, pairs)
 </code></pre></div>
-<h2 id="development-install">Development Install<a class="headerlink" href="#development-install" title="Permanent link">&para;</a></h2>
-<p>The dev toolchain is a <a href="https://peps.python.org/pep-0735/">dependency group</a>
-(not a <code>[dev]</code> extra), managed with <a href="https://docs.astral.sh/uv/">uv</a>:</p>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/oneryalcin/pyarallel.git
-<span class="nb">cd</span><span class="w"> </span>pyarallel
-uv<span class="w"> </span>sync<span class="w"> </span>--group<span class="w"> </span>dev<span class="w">     </span><span class="c1"># editable install + test/lint/type/docs toolchain</span>
-uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w">        </span><span class="c1"># should be all green</span>
-</code></pre></div>
-<h2 id="verify">Verify<a class="headerlink" href="#verify" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">parallel_map</span>
+<p>One caveat on the starmap branch: the starmaps cover the common
+"unpack these tuples" case but don't take <code>checkpoint=</code>, <code>max_errors=</code>,
+or <code>stop=</code>. If you need those, wrap the call into a single-argument
+function and use <code>parallel_map</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">pair</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="n">name</span><span class="p">,</span> <span class="n">count</span> <span class="o">=</span> <span class="n">pair</span>
+    <span class="k">return</span> <span class="n">upload</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span>
 
-<span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">workers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">results</span><span class="p">))</span>  <span class="c1"># [2, 4, 6]</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">pairs</span><span class="p">,</span> <span class="n">checkpoint</span><span class="o">=</span><span class="s2">&quot;run.ckpt&quot;</span><span class="p">)</span>
 </code></pre></div>
+<h2 id="collected-vs-streaming">Collected vs streaming<a class="headerlink" href="#collected-vs-streaming" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Collected</th>
+<th>Streaming</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sync function</td>
+<td><code>parallel_map</code></td>
+<td><code>parallel_iter</code></td>
+</tr>
+<tr>
+<td>Async function</td>
+<td><code>async_parallel_map</code></td>
+<td><code>async_parallel_iter</code></td>
+</tr>
+<tr>
+<td>Returns</td>
+<td><code>ParallelResult</code> at the end</td>
+<td><code>ItemResult</code>s as they finish</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>holds all results</td>
+<td>constant (windowed)</td>
+</tr>
+<tr>
+<td>Checkpoint/resume</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr>
+<td>Wall-clock <code>timeout=</code></td>
+<td>yes</td>
+<td>no (use <code>task_timeout=</code> in async)</td>
+</tr>
+</tbody>
+</table>
+<p>Rule of thumb: <strong>collect</strong> when the job fits in memory and you want
+<code>RunStatus</code>, checkpointing, and one honest verdict at the end.
+<strong>Stream</strong> when results should be written out as they arrive, inputs
+are huge or unsized, or you want to react to failures mid-run.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Collected: one verdict at the end</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+    <span class="n">save_all</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+
+<span class="c1"># Streaming: constant memory, act per item</span>
+<span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">parallel_iter</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+        <span class="n">sink</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+</code></pre></div>
+<h2 id="functions-vs-the-decorator">Functions vs the decorator<a class="headerlink" href="#functions-vs-the-decorator" title="Permanent link">&para;</a></h2>
+<p>Same engine, different ergonomics. Use the <strong>functions</strong> when you're
+parallelizing someone else's callable at a call site. Use the
+<strong>decorator</strong> when you own the function and want its parallel defaults
+declared once, next to its definition:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">retry</span><span class="o">=</span><span class="n">Retry</span><span class="p">(</span><span class="n">attempts</span><span class="o">=</span><span class="mi">3</span><span class="p">))</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span><span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="o">...</span>
+
+<span class="n">fetch</span><span class="p">(</span><span class="s2">&quot;https://api.example.com/1&quot;</span><span class="p">)</span>   <span class="c1"># normal call — unchanged</span>
+<span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span>                      <span class="c1"># parallel, with the defaults above</span>
+<span class="n">fetch</span><span class="o">.</span><span class="n">stream</span><span class="p">(</span><span class="n">urls</span><span class="p">)</span>                   <span class="c1"># streaming, same defaults</span>
+<span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>           <span class="c1"># any call can override</span>
+</code></pre></div>
+<p><code>@async_parallel</code> is the same idea for <code>async def</code> functions.</p>
+<h2 id="which-executor">Which executor?<a class="headerlink" href="#which-executor" title="Permanent link">&para;</a></h2>
+<p>Only sync calls take <code>executor=</code>; async concurrency is tasks on your
+event loop, no pool involved.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Use for</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"thread"</code> (default)</td>
+<td>I/O: HTTP, DBs, files</td>
+<td>Right for ~90% of uses. On free-threaded Python (3.13t/3.14t) threads also parallelize CPU work</td>
+</tr>
+<tr>
+<td><code>"process"</code></td>
+<td>CPU-bound work</td>
+<td>Function + items must pickle, module-scope functions only; ~70ms+ startup per worker</td>
+</tr>
+<tr>
+<td><code>"interpreter"</code></td>
+<td>CPU-bound, Python 3.14+</td>
+<td>One OS process, GIL-free parallelism; ~50ms startup per worker on a standard build (~100ms free-threaded; machine-dependent); same module-scope constraint</td>
+</tr>
+</tbody>
+</table>
+<p>Numbers and methodology: <a href="https://github.com/oneryalcin/pyarallel/tree/main/benchmarks"><code>benchmarks/</code></a>.</p>
+<h2 id="when-you-dont-need-pyarallel-at-all">When you don't need pyarallel at all<a class="headerlink" href="#when-you-dont-need-pyarallel-at-all" title="Permanent link">&para;</a></h2>
+<p>No rate limit, no retry, no resume, no partial-failure story — just "run
+this 20 times concurrently"? The standard library is enough:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPoolExecutor</span>
+
+<span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">pool</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">))</span>
+</code></pre></div>
+<p>Pyarallel earns its place when the service pushes back — quotas, 429s,
+flaky calls, jobs long enough to crash. The
+<a href="../comparison/">comparison page</a> draws the full map, including when you
+want Prefect, Ray, or Celery instead.</p>
 
 
 

@@ -371,6 +371,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../getting-started/choosing-an-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which API Should I Use?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../getting-started/comparison/" class="md-nav__link">
         
   
@@ -906,6 +934,62 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1329,6 +1413,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#post-10-candidates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-1.0 candidates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#distribution" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1358,6 +1453,57 @@
   
 
               
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture & History
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture & History
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -1533,6 +1679,14 @@
     </li>
   
 
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
     
   </ul>
 </nav>
@@ -1620,6 +1774,17 @@
     <span class="md-ellipsis">
       
         v1.0 — Freeze
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#post-10-candidates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-1.0 candidates
       
     </span>
   </a>
@@ -1832,6 +1997,16 @@ can proceed in parallel.</p>
   r/Python) published — distribution is a 1.0 criterion, not an
   afterthought.</li>
 </ul>
+<h2 id="post-10-candidates">Post-1.0 candidates<a class="headerlink" href="#post-10-candidates" title="Permanent link">&para;</a></h2>
+<p>Tracked in one place —
+<a href="https://github.com/oneryalcin/pyarallel/issues/32">issue #32</a> — so 1.0
+ships lean. All are additive (none would require a breaking change,
+which is why none block the freeze): <code>on_result=</code> completion callback,
+stable item identity (<code>item_key=</code>), read-only checkpoint inspection,
+weighted/composite quotas (see the
+<a href="../plans/design-spikes-pre-1.0/">design spike record</a>), and a reusable
+execution session. Selection happens on real user feedback, not
+speculation.</p>
 <h2 id="distribution">Distribution<a class="headerlink" href="#distribution" title="Permanent link">&para;</a></h2>
 <p>Recipes (Cookbook) and the comparison page shipped with 0.7. Remaining:
 <strong>one good write-up</strong> demonstrating server-driven backoff + resume
