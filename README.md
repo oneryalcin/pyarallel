@@ -8,6 +8,10 @@ Fanning out over a service that throttles you — LLM calls, embeddings, scrapin
 
 **Zero dependencies. Python 3.12+** — free-threaded 3.13t/3.14t tested, sub-interpreter executor on 3.14.
 
+```bash
+pip install pyarallel
+```
+
 ## Before / After
 
 Fetch 10,000 URLs with rate limiting and error handling.
@@ -19,7 +23,9 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def fetch(url):
-    return requests.get(url, timeout=10).json()
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+    return response.json()
 
 urls = ["https://api.example.com/users/1", "https://api.example.com/users/2", ...]
 
@@ -42,13 +48,18 @@ with ThreadPoolExecutor(max_workers=10) as pool:
 **pyarallel:**
 
 ```python
-from pyarallel import parallel_map, RateLimit, Retry
+from pyarallel import Limiter, RateLimit, Retry, parallel_map
+
+limiter = Limiter(RateLimit(100, "minute"))
 
 result = parallel_map(
     fetch, urls,
     workers=10,
-    rate_limit=RateLimit(100, "minute"),
-    retry=Retry(attempts=3, on=(ConnectionError, TimeoutError)),
+    rate_limit=limiter,
+    retry=Retry.for_http(on=(requests.HTTPError,), attempts=4),
+    checkpoint="fetch.ckpt",
+    checkpoint_version="fetch-v1",
+    max_errors=20,
 )
 
 for idx, val in result.successes():
@@ -61,38 +72,45 @@ Same thing, async:
 
 ```python
 import httpx
-from pyarallel import async_parallel_map, RateLimit, Retry
+from pyarallel import Limiter, RateLimit, Retry, async_parallel_map
 
-client = httpx.AsyncClient()  # ONE client: pooled connections across all calls
+limiter = Limiter(RateLimit(100, "minute"))
 
-async def fetch_async(url):
-    return (await client.get(url, timeout=10)).json()
+async with httpx.AsyncClient(timeout=10) as client:
+    async def fetch_async(url):
+        response = await client.get(url)
+        response.raise_for_status()
+        return response.json()
 
-result = await async_parallel_map(
-    fetch_async, urls,
-    concurrency=10,
-    rate_limit=RateLimit(100, "minute"),
-    retry=Retry(attempts=3, on=(ConnectionError, TimeoutError)),
-)
-await client.aclose()
+    result = await async_parallel_map(
+        fetch_async, urls,
+        concurrency=10,
+        rate_limit=limiter,
+        retry=Retry.for_http(on=(httpx.HTTPStatusError,)),
+        checkpoint="fetch.ckpt",
+        checkpoint_version="fetch-v1",
+        max_errors=20,
+    )
 # Same result model — result.ok, result.successes(), result.failures()
 ```
 
-## Install
-
-```bash
-pip install pyarallel
-```
-
 ## What You Get
+
+**Respect the service**
 
 - **Rate limiting** — token bucket with burst, per-second/minute/hour: `rate_limit=RateLimit(100, "minute", burst=20)`
 - **Shared quota** — one `Limiter` instance across calls and functions when the budget belongs to an API key: `rate_limit=Limiter(RateLimit(100, "minute"))`
 - **Retry with backoff** — per-item, exponential, jitter, exception filtering: `retry=Retry(attempts=3, on=(ConnectionError,))`
 - **Server-driven backoff** — `retry=Retry.for_http(on=(httpx.HTTPStatusError,))`: 429/503 + `Retry-After` (numeric *and* HTTP-date form) prewired, no client import; the wait also pauses the shared limiter so one throttled task slows the whole pool. Custom policies via `retry_if=`/`wait_from=`
+
+**Finish expensive jobs**
+
 - **Checkpoint/resume** — `checkpoint="run.ckpt"`: a crash at item 40,000 resumes instead of restarting from zero; `checkpoint_key=lambda u: u.id` keys rows by identity so evolving inputs keep completed work
 - **Early abort** — `max_errors=10`: a dead API costs tens of calls, not thousands; unrun items are marked `Aborted`, partial results returned
 - **Cooperative stop** — `stop=StopToken()`: SIGTERM/notebook-stop lands the plane — admission ceases, checkpoint rows kept, `RunStatus.CANCELLED` reported
+
+**Control execution and outcomes**
+
 - **One windowed engine** — every API (collected and streaming, sync and async) admits work through a bounded in-flight window: lazy input, generators never materialized, no batch barriers, a straggler never stalls the items behind it
 - **Streaming** — `parallel_iter` / `async_parallel_iter`: `ordered=True` for input-order yields, per-item `attempts`/`duration`
 - **Async sources** — async cursors and paginated generators feed `async_parallel_*` directly, with backpressure to the producer — no draining into a list first
@@ -100,87 +118,35 @@ pip install pyarallel
 - **Timeouts** — total wall-clock on sync *and* async (`timeout=30.0`), per-task in async (`task_timeout=5.0`)
 - **Debug mode** — `sequential=True` runs inline: no pool, real stack traces, working breakpoints
 - **Progress callbacks** — `on_progress=lambda done, total: print(f"{done}/{total}")` on collected and streaming APIs
+
+**Choose the runtime and interface**
+
 - **Process executor** — CPU-bound work: `executor="process"`, with `worker_init=` and `max_tasks_per_worker=`
 - **Interpreter executor** (Python 3.14+) — `executor="interpreter"`: true CPU parallelism for pure-Python work without process overhead (PEP 734)
 - **Contextvars propagation** — correlation IDs survive into thread workers
 - **Decorator API** — `@parallel` / `@async_parallel` with `.map()`, `.starmap()`, `.stream()` — typed options via `Unpack[TypedDict]`, and single-arg named functions bind their item type (`fetch.map([1])` is a type error when `fetch` takes `str` — in mypy *and* pyright)
 
-## Quick Start
-
-### Sync
-
-```python
-import requests
-from pyarallel import parallel_map, RateLimit, Retry
-
-def fetch(url):
-    return requests.get(url, timeout=10).json()
-
-# Fan out over a list, get ordered results
-result = parallel_map(fetch, urls, workers=10)
-
-# Rate-limited API calls with retry
-def call_api(user_id):
-    return requests.get(f"https://api.example.com/users/{user_id}").json()
-
-result = parallel_map(
-    call_api, user_ids,
-    workers=10,
-    rate_limit=RateLimit(100, "minute"),
-    retry=Retry(attempts=3, backoff=1.0, on=(ConnectionError, TimeoutError)),
-)
-
-# CPU-bound with processes
-from PIL import Image
-
-def resize_image(path):
-    img = Image.open(path)
-    img.thumbnail((800, 600))
-    img.save(path.replace(".png", "_thumb.png"))
-
-result = parallel_map(resize_image, paths, executor="process")
-```
-
-### Async
-
-```python
-import httpx
-from pyarallel import async_parallel_map
-
-client = httpx.AsyncClient()  # ONE client: pooled connections across all calls
-
-async def fetch_async(url):
-    return (await client.get(url, timeout=10)).json()
-
-result = await async_parallel_map(
-    fetch_async, urls, concurrency=20, task_timeout=5.0,
-)
-await client.aclose()
-```
+## Other API Shapes
 
 ### Decorator
 
 Adds `.map()`, `.starmap()`, `.stream()` without changing the function:
 
 ```python
-from pyarallel import parallel, async_parallel, RateLimit
+from pyarallel import RateLimit, parallel
 
 @parallel(workers=8, rate_limit=RateLimit(100, "minute"))
 def fetch(url):
-    return requests.get(url).json()
+    response = requests.get(url, timeout=10)
+    response.raise_for_status()
+    return response.json()
 
 fetch("http://example.com")          # normal call — returns dict
 fetch.map(urls)                      # parallel — returns ParallelResult
 fetch.stream(urls, window_size=500)   # streaming — yields ItemResult
-
-client = httpx.AsyncClient()  # ONE client, reused by every call
-
-@async_parallel(concurrency=10)
-async def fetch_async(url):
-    return (await client.get(url)).json()
-
-await fetch_async.map(urls)          # async parallel
 ```
+
+`@async_parallel` mirrors the same interface for `async def` functions.
 
 ### Streaming — Constant Memory
 
@@ -257,9 +223,12 @@ The demo asserts its own claims and exits non-zero if any fail.
 
 ## Documentation
 
-[Full docs](https://oneryalcin.github.io/pyarallel/) — API reference, advanced features, best practices.
-
-Deciding whether pyarallel fits? [Comparison vs tenacity+ThreadPoolExecutor, aiometer, mpire, joblib](https://oneryalcin.github.io/pyarallel/getting-started/comparison/) — including when *not* to use it. Then the [Cookbook](https://oneryalcin.github.io/pyarallel/cookbook/): batch LLM calls, embeddings with resume, polite scraping, bulk GitHub/registry ops, NCBI fetches, secrets rotation.
+- [Quick Start](https://oneryalcin.github.io/pyarallel/getting-started/quickstart/) — one safe API job, then the policies you are likely to change
+- [Which API Should I Use?](https://oneryalcin.github.io/pyarallel/getting-started/choosing-an-api/) — collected vs streaming, sync vs async, functions vs decorators
+- [Production API Job](examples/07_production_api_job.py) — runnable template with shared client, retry, resume, graceful stop, and explicit status handling
+- [Cookbook](https://oneryalcin.github.io/pyarallel/cookbook/) — LLM calls, embeddings, scraping, bulk operations, ETL, and CPU fan-out
+- [Testing](https://oneryalcin.github.io/pyarallel/user-guide/testing/) and [Troubleshooting](https://oneryalcin.github.io/pyarallel/user-guide/troubleshooting/) — deterministic tests and symptom-first diagnosis
+- [Comparison](https://oneryalcin.github.io/pyarallel/getting-started/comparison/) — alternatives and when *not* to use pyarallel
 
 ## License
 
