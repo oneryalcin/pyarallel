@@ -243,7 +243,9 @@ def main() -> None:
 
     # A real job uses a stable path — that's the whole point of resume.
     # (A fresh temp dir here would make "rerun to resume" a lie.)
-    ckpt = os.path.join(tempfile.gettempdir(), "pyarallel-example-07.ckpt")
+    ckpt = os.environ.get("DEMO_CKPT") or os.path.join(
+        tempfile.gettempdir(), "pyarallel-example-07.ckpt"
+    )
     fresh_run = not os.path.exists(ckpt)
     if not fresh_run:
         print(f"  found {ckpt} — resuming a previously interrupted run\n")
@@ -255,6 +257,10 @@ def main() -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+    # The server's receipt: on a resumed run this is exactly the items
+    # the checkpoint did NOT already have — paid-for calls not repeated.
+    print(f"  server served {api.ok} OK calls this run")
 
     if result.status is not RunStatus.COMPLETED:
         sys.exit(code)  # interrupted/aborted: keep the checkpoint for resume

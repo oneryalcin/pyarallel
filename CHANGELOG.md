@@ -7,7 +7,12 @@
   one runnable, zero-credential file: shared client + `Limiter`,
   `Retry.for_http`, checkpoint with stable key and version, `max_errors`,
   SIGTERM/SIGINT → `StopToken`, and explicit `RunStatus` handling of
-  partial results. Self-asserting; CI runs it against the built wheel.
+  partial results. Self-asserting; CI runs it against the built wheel,
+  and a subprocess integration test protects the interrupt/resume
+  contract the clean run can't see: a real SIGINT must exit `130` with
+  the checkpoint intact, and the rerun must hit the server only for the
+  remainder (both defects existed in the first draft — caught by
+  adversarial review, now regression-tested).
 - Docs: **three new pages** — "Which API Should I Use?" (one decision
   tree for the whole surface), a testing guide (deterministic tests
   without sleeps or real HTTP; every `RunStatus` manufactured cheaply),
