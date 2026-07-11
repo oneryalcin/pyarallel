@@ -52,12 +52,13 @@ nav:
     - Compatibility & Policies: development/policies.md
     - DevX Principles: development/devx-principles.md
     - Roadmap: development/roadmap.md
-    - v0.5.0 Plan: development/plans/v0.5.0.md
-    - v0.6 Engine Unification Plan: development/plans/v0.6-engine-unification.md
-    - v0.6 Ledger Refactor Plan: development/plans/v0.6-ledger-refactor.md
-    - v0.7 Free-Threaded & Interpreters Plan: development/plans/v0.7-free-threaded-and-interpreters.md
-    - v0.8 Honest Contract Plan: development/plans/v0.8-honest-contract.md
-    - Pre-1.0 Design Spike Records: development/plans/design-spikes-pre-1.0.md
+    - Architecture & History:
+      - v0.5.0 Plan: development/plans/v0.5.0.md
+      - v0.6 Engine Unification Plan: development/plans/v0.6-engine-unification.md
+      - v0.6 Ledger Refactor Plan: development/plans/v0.6-ledger-refactor.md
+      - v0.7 Free-Threaded & Interpreters Plan: development/plans/v0.7-free-threaded-and-interpreters.md
+      - v0.8 Honest Contract Plan: development/plans/v0.8-honest-contract.md
+      - Pre-1.0 Design Spike Records: development/plans/design-spikes-pre-1.0.md
 
 plugins:
   - search
@@ -77,7 +78,9 @@ plugins:
         Getting Started:
           - index.md: Overview and the fan-out niche
           - getting-started/quickstart.md: Quick start
+          - getting-started/choosing-an-api.md: Choose collected, streaming, sync, or async
           - getting-started/comparison.md: When to use pyarallel vs alternatives
+          - user-guide/troubleshooting.md: Diagnose common failures
         Cookbook:
           - cookbook/*.md
         Reference:

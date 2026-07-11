@@ -1,5 +1,9 @@
 # Quick Start
 
+This page builds one safe API job, then shows the few choices you are most
+likely to change. For the complete surface, use
+[Which API Should I Use?](choosing-an-api.md).
+
 ## The Function: `parallel_map`
 
 The simplest way to parallelize work:
@@ -9,7 +13,9 @@ from pyarallel import parallel_map
 
 def fetch_url(url):
     import requests
-    return requests.get(url).json()
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    return response.json()
 
 urls = ["https://api.example.com/1", "https://api.example.com/2"]
 results = parallel_map(fetch_url, urls, workers=4)
@@ -36,7 +42,9 @@ from pyarallel import parallel
 
 @parallel(workers=4)
 def fetch(url):
-    return requests.get(url).json()
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    return response.json()
 
 # Normal call — returns dict
 data = fetch("http://example.com")
@@ -53,60 +61,11 @@ the async twin `@async_parallel` follows the same pattern — see the
 [API reference](../api-reference/core.md#parallel) for both. Plain
 `parallel_map(scraper.fetch, urls)` with a bound method also just works.
 
-## CPU-Bound Work
+## Add the production policies
 
-Use `executor="process"` for CPU-intensive tasks:
-
-```python
-def crunch(data):
-    return heavy_computation(data)
-
-results = parallel_map(crunch, datasets, workers=4, executor="process")
-```
-
-!!! note
-    Functions must be picklable for process execution — use module-level functions, not lambdas.
-
-On Python 3.14+, `executor="interpreter"` runs pure-Python CPU-bound
-work in sub-interpreters — process rules, one OS process, cheap workers.
-numpy/pandas fail there (`ImportError` — their C code doesn't support
-subinterpreters yet); keep `executor="process"` for those. See
-[Best Practices](../user-guide/best-practices.md#interpreters-executorinterpreter-python-314).
-
-## Rate Limiting
-
-Control execution rate for API calls:
-
-```python
-from pyarallel import RateLimit
-
-# 100 operations per minute
-results = parallel_map(call_api, ids, workers=4,
-                       rate_limit=RateLimit(100, "minute"))
-
-# Shorthand: 10 per second
-results = parallel_map(call_api, ids, workers=4, rate_limit=10)
-```
-
-## Retry
-
-Built-in per-item retry with exponential backoff — no tenacity needed:
-
-```python
-from pyarallel import Retry
-
-# Retry flaky network calls up to 3 times with exponential backoff
-results = parallel_map(fetch, urls, workers=10, retry=Retry(attempts=3, backoff=1.0))
-
-# Only retry network errors, fail immediately on bad input
-results = parallel_map(fetch, urls, workers=10,
-                       retry=Retry(on=(ConnectionError, TimeoutError)))
-```
-
-## Shared Quota and 429s
-
-When several calls spend one API key's budget, share a `Limiter` — and let
-`Retry-After` drive the backoff:
+When several calls spend one API key's budget, share a `Limiter`.
+`Retry.for_http()` understands both forms of `Retry-After`; a throttled
+response pauses that shared limiter, so the whole pool slows down together:
 
 ```python
 from pyarallel import Limiter, RateLimit, Retry
@@ -115,38 +74,20 @@ limiter = Limiter(RateLimit(100, "minute"))
 
 result = parallel_map(
     call_api, ids,
-    rate_limit=limiter,   # same instance across calls = one budget
-    retry=Retry(attempts=4, wait_from=lambda e: getattr(e, "retry_after", None)),
+    workers=10,
+    rate_limit=limiter,
+    retry=Retry.for_http(on=(HttpError,), attempts=4),
+    checkpoint="api-job.ckpt",
+    checkpoint_version="request-shape-v1",
+    max_errors=20,
 )
 ```
 
-See [Advanced Features](../user-guide/advanced-features.md#shared-rate-limits-and-burst).
-
-## Resumable Runs
-
-Long job? One argument makes it crash-safe:
-
-```python
-result = parallel_map(embed, chunks, checkpoint="run.ckpt")
-# rerun the same line after a crash — completed items load from disk
-```
-
-See [Checkpoint / Resume](../user-guide/advanced-features.md#checkpoint-resume).
-
-## The Admission Window
-
-Memory is bounded by default: at most `2 × workers` items are submitted
-but unresolved at any moment, and input — generators included — is
-consumed lazily, one window ahead. `window_size` overrides the window
-when you want more lookahead:
-
-```python
-# Up to 500 items in flight instead of the default 2 x workers
-results = parallel_map(process, huge_list, workers=8, window_size=500)
-```
-
-There are no chunks and no barriers — a slow item never stalls the
-items behind it.
+Rerun the same call after a crash: completed items load from the checkpoint.
+Bump `checkpoint_version` when the request, model, prompt, or output contract
+changes. See [Shared Rate Limits](../user-guide/advanced-features.md#shared-rate-limits-and-burst)
+and [Checkpoint / Resume](../user-guide/advanced-features.md#checkpoint-resume)
+for the precise contracts.
 
 ## Error Handling
 
@@ -171,26 +112,35 @@ else:
     result.raise_on_failure()  # ExceptionGroup
 ```
 
-## Async
+## Async uses the same policies
 
 Mirror API for async functions:
 
 ```python
-from pyarallel import async_parallel_map
+from pyarallel import Retry, async_parallel_map
 
-client = httpx.AsyncClient()  # ONE client — connections pooled across calls
+async with httpx.AsyncClient(timeout=30) as client:
+    async def fetch(url):
+        response = await client.get(url)
+        response.raise_for_status()
+        return response.json()
 
-async def fetch(url):
-    return (await client.get(url)).json()
-
-results = await async_parallel_map(fetch, urls, concurrency=10)
-await client.aclose()
+    results = await async_parallel_map(
+        fetch,
+        urls,
+        concurrency=10,
+        retry=Retry.for_http(on=(httpx.HTTPStatusError,)),
+    )
 ```
+
+Create one client outside the item function so calls reuse its connection
+pool. The context manager closes it even if the run raises.
 
 ## Next Steps
 
 - [Which API Should I Use?](choosing-an-api.md) — one decision tree for the whole surface
-- [Advanced Features](../user-guide/advanced-features.md) — timeouts, progress, methods
-- [Best Practices](../user-guide/best-practices.md) — choosing executors, error patterns
+- [Production API Job](https://github.com/oneryalcin/pyarallel/blob/main/examples/07_production_api_job.py) — runnable end-to-end template
+- [Advanced Features](../user-guide/advanced-features.md) — resume, stop, timeouts, admission, methods
+- [Best Practices](../user-guide/best-practices.md) — executors and operational patterns
 - [Testing](../user-guide/testing.md) — deterministic tests without sleeps or real HTTP
 - [API Reference](../api-reference/core.md) — full parameter docs

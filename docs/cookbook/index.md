@@ -1,11 +1,11 @@
 ---
 title: Cookbook
-description: Copy-pasteable pyarallel recipes for real workloads — batch LLM calls, embeddings, scraping, bulk GitHub/registry operations, scientific-API fetches, secrets rotation, and CPU fan-out.
+description: Adaptable pyarallel recipes for real workloads — batch LLM calls, embeddings, scraping, bulk GitHub/registry operations, scientific-API fetches, secrets rotation, and CPU fan-out.
 ---
 
 # Cookbook
 
-Complete, copy-pasteable recipes for real workloads — not toy examples.
+Adaptable, end-to-end patterns for real workloads — not isolated API snippets.
 Each one shows the specific combination of policies (rate limiting,
 retry with server-driven backoff, checkpoint/resume, early abort) that
 makes pyarallel the right tool, not just "a parallel loop."
