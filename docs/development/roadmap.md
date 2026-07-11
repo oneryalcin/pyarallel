@@ -176,6 +176,18 @@ Criteria, not features. No headline feature ships in 1.0.
   r/Python) published — distribution is a 1.0 criterion, not an
   afterthought.
 
+## Post-1.0 candidates
+
+Tracked in one place —
+[issue #32](https://github.com/oneryalcin/pyarallel/issues/32) — so 1.0
+ships lean. All are additive (none would require a breaking change,
+which is why none block the freeze): `on_result=` completion callback,
+stable item identity (`item_key=`), read-only checkpoint inspection,
+weighted/composite quotas (see the
+[design spike record](plans/design-spikes-pre-1.0.md)), and a reusable
+execution session. Selection happens on real user feedback, not
+speculation.
+
 ## Distribution
 
 Recipes (Cookbook) and the comparison page shipped with 0.7. Remaining:

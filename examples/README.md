@@ -70,6 +70,32 @@ flag.
 python examples/06_resilient_api_jobs.py
 ```
 
+### 07_production_api_job.py
+
+**The golden template** — the shape to copy for a real production API job,
+runnable against a built-in local fake API (zero credentials): one reusable
+HTTP client, `Retry.for_http`, a shared `Limiter`, checkpoint with a stable
+`checkpoint_key` and `checkpoint_version`, `max_errors` early abort,
+SIGTERM/SIGINT → `StopToken` graceful shutdown, and explicit `RunStatus`
+handling of partial results. Self-asserting; runs in CI against the built
+wheel.
+
+```bash
+python examples/07_production_api_job.py
+```
+
+### resilience_demo.py
+
+The headline claims, proven on your laptop in ~10 seconds: a real 429 with
+`Retry-After` pauses the *whole* pool (the server measures the silence), a
+client-side `RateLimit` prevents throttling entirely, and a checkpointed run
+that gets SIGKILLED mid-flight resumes without repeating paid-for calls.
+Self-asserting; runs in CI against the built wheel.
+
+```bash
+python examples/resilience_demo.py
+```
+
 ## Quick Reference
 
 ### Basic Pattern
