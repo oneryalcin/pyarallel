@@ -299,7 +299,9 @@ class TestWidenedDecoratorDefaults:
         assert [item.value for item in seen] == [2, 4]
 
         seen.clear()
-        assert [item.value for item in work.stream([1, 2])] == [2, 4]
+        # Streaming is completion-ordered by default; this assertion is about
+        # on_result being dropped, not incidental thread scheduling.
+        assert sorted(item.value for item in work.stream([1, 2])) == [2, 4]
         assert seen == []
 
     def test_checkpoint_rejected_as_decorator_default(self):
