@@ -1,6 +1,6 @@
-# What Happens When Your 50,000-Item API Job Dies at 42,317?
+# What Happens When Your 50,000-Item API Job Dies?
 
-*A public embedding pipeline, two injected failures, and the runtime hiding around every “simple” parallel API loop.*
+*A public embedding pipeline, two injected failures, and the job-level runtime a thread pool does not provide.*
 
 You have 50,000 document chunks to embed.
 
@@ -16,7 +16,7 @@ Yet somebody has to.
 
 ## This workload shape is real
 
-OpenAI’s open-source [Knowledge Retrieval starter](https://github.com/openai/openai-knowledge-retrieval) contains a current embedding pipeline with exactly this shape. Its [`embed_texts_concurrent()` implementation](https://github.com/openai/openai-knowledge-retrieval/blob/f62c5dd49955d2bc793e0a55989863dca61f1ead/ingestion/pipeline.py#L113) does several sensible things:
+At the revision examined for this case study, OpenAI’s open-source [Knowledge Retrieval starter](https://github.com/openai/openai-knowledge-retrieval) contains an embedding pipeline with exactly this shape. Its [`embed_texts_concurrent()` implementation](https://github.com/openai/openai-knowledge-retrieval/blob/f62c5dd49955d2bc793e0a55989863dca61f1ead/ingestion/pipeline.py#L113) does several sensible things:
 
 - divides texts into batches;
 - chooses a configurable worker count;
@@ -28,6 +28,8 @@ OpenAI’s open-source [Knowledge Retrieval starter](https://github.com/openai/o
 - reconstructs the original order afterward.
 
 This is not bad code. It is competent application code growing a small execution runtime because the workload requires one.
+
+This is a case study, not an upstream dependency proposal: at the pinned revision, the starter supports [Python 3.10+](https://github.com/openai/openai-knowledge-retrieval/blob/f62c5dd49955d2bc793e0a55989863dca61f1ead/pyproject.toml#L7), while pyarallel requires [Python 3.12+](https://github.com/oneryalcin/pyarallel/blob/main/pyproject.toml#L6).
 
 The orchestration is roughly this:
 
@@ -53,7 +55,9 @@ with ThreadPoolExecutor(max_workers=workers) as pool:
 embeddings = restore_input_order(completed)
 ```
 
-That abbreviated version already needs batching, retry state, sleeping, futures, completion tracking, and order restoration. Production pressure usually adds more: a rate limiter, a failure threshold, graceful termination, result bookkeeping, and some way to resume a job after the laptop, pod, or VM disappears.
+That abbreviated version already needs batching, retry state, sleeping, futures, completion tracking, and order restoration.
+
+Production pressure usually adds more: a rate limiter, a failure threshold, graceful termination, result bookkeeping, and some way to resume a job after the laptop, pod, or VM disappears.
 
 The code around the API call becomes larger than the API call.
 
@@ -102,7 +106,7 @@ These are failure-injection experiments, not claims that the referenced OpenAI p
 
 ## Give the job one owner
 
-Here is the same embedding shape using [pyarallel](https://github.com/oneryalcin/pyarallel), a zero-dependency fan-out layer for rate-limited API jobs:
+Here is the same embedding shape using [pyarallel](https://github.com/oneryalcin/pyarallel), a zero-dependency fan-out layer for rate-limited API jobs. Assume `texts` contains the loaded corpus; the linked production template covers signals and resource lifecycle end to end.
 
 ```python
 from dataclasses import dataclass
@@ -171,58 +175,59 @@ The API call is still ordinary client code. The difference is that the policies 
 
 ### What each line buys
 
-`Limiter(...)` is the shared admission gate. Every initial call and every retry passes through the same budget. When `Retry.for_http()` reads a valid `Retry-After`, it moves that limiter’s next-admission floor, so one throttled response slows the pool rather than only the unlucky worker.
-
-`checkpoint="embeddings.ckpt"` commits each completed batch to SQLite. The result is persisted before progress is reported. After a hard kill, rerunning the same call loads completed batches and executes the remainder.
-
-`checkpoint_key=lambda batch: batch.offset` gives each batch a stable identity. The checkpoint also fingerprints the payload, so changed text under the same offset is recomputed rather than silently reused.
-
-`checkpoint_version=(MODEL, BATCH_SIZE, DATASET_FINGERPRINT)` covers meaning that function inspection cannot see. Change the model, batch shape, or dataset and the old checkpoint fails closed instead of mixing incompatible vectors into a plausible-looking result.
-
-`max_errors=10` stops admission when the service is dead or credentials are broken. With a bounded in-flight window, the damage is approximately the failure threshold plus already-admitted work—not the entire remaining dataset.
-
-`RunStatus` separates `COMPLETED`, `TIMED_OUT`, `ABORTED`, and `CANCELLED`. `result.ok` means the run completed and every item succeeded. Asking a truncated result for all values raises rather than returning a partial list with the shape of a complete one.
-
-That last rule exists because pyarallel once got it wrong.
-
-## Centralizing infrastructure does not make it infallible
-
-An earlier pyarallel release defined `.ok` as “every recorded item succeeded.” On a timed-out run over a generator, every item that had executed could succeed while thousands of unseen inputs were never admitted. `.ok` could still be true.
-
-The bug was not theoretical. The contradictory state was representable in the API and survived several releases. Before 1.0, the result contract was redesigned so completion status and item success cannot be conflated.
-
-That history is not evidence that shared infrastructure is magically correct. It is the argument for making the infrastructure shared: the contract becomes visible, adversarially testable, and fixable once instead of being rediscovered inside every ingestion script.
-
-The same review found validators that accepted `NaN`, a cancellation path that busy-spun at roughly 1.9 million limiter checks per second, and documentation examples that created one HTTP client per item. Centralizing the runtime created a surface that could be attacked deliberately.
+- **One admission gate.** `Limiter(...)` owns the shared budget. Every initial call and retry passes through it. A valid `Retry-After` moves the limiter’s next-admission floor, so one throttled response slows the pool rather than only the unlucky worker.
+- **Durable receipts.** `checkpoint="embeddings.ckpt"` commits each completed batch to SQLite before progress is reported. After a hard kill, the next run loads completed batches and executes the remainder.
+- **Stable identity.** `checkpoint_key=lambda batch: batch.offset` identifies each batch. The checkpoint also fingerprints its payload, so changed text under the same offset is recomputed rather than silently reused.
+- **Semantic invalidation.** `checkpoint_version=(MODEL, BATCH_SIZE, DATASET_FINGERPRINT)` covers meaning that function inspection cannot see. Change the model, batch shape, or dataset and the old checkpoint fails closed.
+- **Bounded failure.** `max_errors=10` stops admission when the service is dead or credentials are broken. Damage is approximately the failure threshold plus already-admitted work—not the entire remaining dataset.
+- **Honest completion.** `RunStatus` separates `COMPLETED`, `TIMED_OUT`, `ABORTED`, and `CANCELLED`. Asking a truncated result for all values raises rather than returning a partial list with the shape of a complete one.
 
 ## Run the failure injection yourself
 
 The pyarallel repository carries the quota and crash experiments as one self-checking script:
 
 ```bash
-pip install pyarallel
 git clone https://github.com/oneryalcin/pyarallel
 cd pyarallel
+python -m pip install .
 python examples/resilience_demo.py
 ```
 
 It uses a local standard-library HTTP server—no credentials and no paid API calls.
 
-Act 1 runs an eight-worker pool into a hard quota. The server records at least one real 429 and measures the subsequent quiet period. The test fails if the pool does not honor the server delay or if throttling turns into a request storm.
+A fresh run produced this abridged output. Timings and the exact kill boundary vary:
 
-Act 2 runs below the same quota and requires zero 429s.
+```text
+ACT 1 — the server throttles; one 429 pauses the WHOLE pool
+  items completed : 80/80
+  429s drawn      : 1
+  server silence  : 1.0s
 
-Act 3 starts a checkpointed child process, kills it with real `SIGKILL`, reruns the identical command, and checks the server receipt. Completed calls must come from SQLite; only work in flight at the kill boundary may repeat.
+ACT 2 — client-side RateLimit
+  items completed : 40/40
+  server said 429 : 0 times
 
-The script exits non-zero when a claim fails and runs in CI against the built wheel. The point is not the theatrical output. It is that the server and checkpoint provide receipts independent of the executor reporting success.
+ACT 3 — SIGKILL, then rerun
+  run 1: killed at item 48; server had served 48 calls
+  run 2: server served only the remaining 72 calls
+         48 paid-for calls loaded from the checkpoint
+```
+
+The decisive receipts come from outside the executor: the server measured the quiet period after `Retry-After`, and its request counter showed that completed calls were not repeated after restart. Only calls in flight at the kill boundary may replay—at most one per worker.
+
+The script exits non-zero when a claim fails and runs in CI against the built wheel.
+
+## Centralizing infrastructure does not make it infallible
+
+Pyarallel once defined `.ok` as “every recorded item succeeded.” A timed-out generator could therefore report `.ok=True` even though unseen inputs were never admitted. Centralizing the job layer did not make it infallible; it made that contradiction visible enough to regression-test and fix once.
 
 ## What this does not solve
 
-Pyarallel is deliberately single-machine and single-stage. If step B consumes step A across a cluster, use a workflow or distributed execution system such as Prefect or Ray. If you need a durable queue with independent workers, use Celery or another task queue. If you only need to call a function twenty times with no quota, retry, resume, or partial-failure contract, `ThreadPoolExecutor.map()` is already enough.
+Pyarallel is deliberately single-machine and single-stage. If step B consumes step A across a cluster, use a workflow or distributed execution system such as Prefect or Ray.
+
+If you need a durable queue with independent workers, use Celery or another task queue. If you only need to call a function twenty times with no quota, retry, resume, or partial-failure contract, `ThreadPoolExecutor.map()` is already enough.
 
 There is another honest limitation in the embedding example: API providers may enforce several budgets at once—requests per minute, tokens per minute, and model-specific limits. The example’s `RateLimit` controls request admission; batching controls token volume indirectly. Pyarallel does not yet expose weighted composite quotas, so workloads requiring exact token-weighted admission still need provider-specific accounting.
-
-And this is a case study, not a proposed drop-in pull request to OpenAI’s starter. That project currently supports Python 3.10+, while pyarallel requires Python 3.12+. Adding the dependency upstream would change its compatibility contract. The public code is useful here because it demonstrates the workload honestly, not because every project should adopt another package.
 
 ## The real abstraction
 
@@ -244,7 +249,6 @@ One function. Many inputs. One service pushing back.
 
 ```bash
 pip install pyarallel
-python examples/resilience_demo.py
 ```
 
-Further reading: [documentation](https://oneryalcin.github.io/pyarallel/) · [comparison and non-goals](https://oneryalcin.github.io/pyarallel/getting-started/comparison/) · [production API-job template](https://github.com/oneryalcin/pyarallel/blob/main/examples/07_production_api_job.py)
+Further reading: [demo instructions](#run-the-failure-injection-yourself) · [documentation](https://oneryalcin.github.io/pyarallel/) · [comparison and non-goals](https://oneryalcin.github.io/pyarallel/getting-started/comparison/) · [production API-job template](https://github.com/oneryalcin/pyarallel/blob/main/examples/07_production_api_job.py)
