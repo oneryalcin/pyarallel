@@ -94,6 +94,20 @@ def _item_result(idx: int, outcome: _Outcome) -> ItemResult[Any]:
     )
 
 
+def _stored_item_result(
+    idx: int, entry: Any, attempts: int, duration: float
+) -> ItemResult[Any]:
+    """Build an ``ItemResult`` from one collected-result slot."""
+    if isinstance(entry, _Failure):
+        return ItemResult(
+            idx,
+            error=entry.exception,
+            attempts=attempts,
+            duration=duration,
+        )
+    return ItemResult(idx, value=entry, attempts=attempts, duration=duration)
+
+
 @dataclass(init=False, frozen=True, slots=True)
 class ItemResult[R]:
     """Single streaming result item.
@@ -306,14 +320,7 @@ class ParallelResult[R]:
         out: list[ItemResult[R]] = []
         for i, e in enumerate(self._entries):
             attempts, duration = self._meta[i] if self._meta is not None else (1, 0.0)
-            if isinstance(e, _Failure):
-                out.append(
-                    ItemResult(
-                        i, error=e.exception, attempts=attempts, duration=duration
-                    )
-                )
-            else:
-                out.append(ItemResult(i, value=e, attempts=attempts, duration=duration))
+            out.append(_stored_item_result(i, e, attempts, duration))
         return out
 
     def raise_on_failure(self) -> None:

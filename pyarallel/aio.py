@@ -47,6 +47,7 @@ from .result import (
     _Failure,
     _item_result,
     _Outcome,
+    _stored_item_result,
 )
 from .stop import StopToken
 
@@ -103,6 +104,7 @@ class AsyncMapOptions(TypedDict, total=False):
     timeout: float | None
     task_timeout: float | None
     on_progress: Callable[[int, int], None] | None
+    on_result: Callable[[ItemResult[Any]], None] | None
     window_size: int | None
     retry: Retry | None
     checkpoint: str | Path | None
@@ -120,6 +122,7 @@ class AsyncStarmapOptions(TypedDict, total=False):
     timeout: float | None
     task_timeout: float | None
     on_progress: Callable[[int, int], None] | None
+    on_result: Callable[[ItemResult[Any]], None] | None
     window_size: int | None
     retry: Retry | None
 
@@ -197,6 +200,7 @@ async def async_parallel_map[T, R](
     timeout: float | None = None,
     task_timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    on_result: Callable[[ItemResult[R]], None] | None = None,
     window_size: int | None = None,
     retry: Retry | None = None,
     checkpoint: str | Path | None = None,
@@ -233,6 +237,11 @@ async def async_parallel_map[T, R](
             completions) — it grows as the run progresses, so a
             percentage over it is meaningless; pass a sized input for a
             real total.
+        on_result: Synchronous ``callback(item_result)`` after each completed
+            item, on the event-loop thread and in completion order. Receives
+            success/failure metadata; checkpoint hits report ``attempts=0``.
+            Exceptions propagate like ``on_progress``. Use
+            ``async_parallel_iter`` when the callback itself must be awaited.
         window_size: The admission window — the maximum number of tasks
             created but not yet resolved (default ``2 × concurrency``).
             It is a memory/lookahead bound, not a chunk size: there are
@@ -286,6 +295,7 @@ async def async_parallel_map[T, R](
         timeout=timeout,
         task_timeout=task_timeout,
         on_progress=on_progress,
+        on_result=on_result,
         window_size=window_size,
         retry=retry,
         checkpoint=checkpoint,
@@ -305,6 +315,7 @@ async def _async_collected_map(
     timeout: float | None,
     task_timeout: float | None,
     on_progress: Callable[[int, int], None] | None,
+    on_result: Callable[[ItemResult[Any]], None] | None,
     window_size: int | None,
     retry: Retry | None,
     checkpoint: str | Path | None,
@@ -329,9 +340,12 @@ async def _async_collected_map(
     results: list[Any] = []
     # Per-index (attempts, duration), grown in lockstep with results.
     # Default (0, 0.0) = "nothing ran this run" (cache hit / truncation
-    # placeholder); _absorb overwrites with the task's real receipt.
+    # placeholder); completion consumption overwrites with the task's receipt.
     meta: list[tuple[int, float]] = []
     in_flight: dict[asyncio.Task[_Outcome], int] = {}
+    completions: asyncio.Queue[
+        tuple[asyncio.Task[Any] | None, int, _Outcome | None, BaseException | None]
+    ] = asyncio.Queue()
     completed = 0
     failures = 0
     halt = _RunStop()
@@ -364,17 +378,91 @@ async def _async_collected_map(
         unregister = stop._register(_wake_driver)
         stop_task = asyncio.create_task(stop_event.wait())
 
-    async def _run(item: Any) -> _Outcome:
-        async with semaphore:
-            if limiter:
-                await limiter.wait_async()
-            return await _async_execute_outcome(
-                fn, item, retry, task_timeout=task_timeout, limiter=limiter
-            )
+    async def _run(item: Any, idx: int) -> _Outcome:
+        """Run one item and enqueue its completion before returning.
+
+        ``asyncio.wait`` returns an unordered set. Enqueuing here, on the
+        event-loop thread at the exact end of each task, gives callbacks one
+        FIFO shared by live work and checkpoint hits while keeping callback
+        execution itself on the driver.
+        """
+        task = asyncio.current_task()
+        assert task is not None
+        try:
+            async with semaphore:
+                if limiter:
+                    await limiter.wait_async()
+                outcome = await _async_execute_outcome(
+                    fn, item, retry, task_timeout=task_timeout, limiter=limiter
+                )
+        except BaseException as exc:
+            completions.put_nowait((task, idx, None, exc))
+            raise
+        completions.put_nowait((task, idx, outcome, None))
+        return outcome
 
     def _report() -> None:
         if on_progress:
             on_progress(completed, _progress_total(total, results))
+
+    def _report_result(idx: int) -> None:
+        if on_result:
+            attempts, duration = meta[idx]
+            on_result(_stored_item_result(idx, results[idx], attempts, duration))
+
+    def _consume_completion(
+        event: tuple[
+            asyncio.Task[Any] | None,
+            int,
+            _Outcome | None,
+            BaseException | None,
+        ],
+    ) -> None:
+        nonlocal completed, failures
+        task, idx, outcome, infrastructure_error = event
+        if task is None:  # checkpoint hit
+            completed += 1
+            _report_result(idx)
+            _report()
+            return
+
+        in_flight.pop(task, None)
+        error: Exception | None
+        if infrastructure_error is not None:
+            # Mark an infrastructure exception retrieved; task failures from
+            # the user function already travel inside _Outcome and never raise.
+            task.exception()
+            if not isinstance(infrastructure_error, Exception):
+                raise infrastructure_error
+            error = infrastructure_error
+            meta[idx] = (1, 0.0)
+        else:
+            assert outcome is not None
+            error = outcome.error
+            meta[idx] = (outcome.attempts, outcome.duration)
+        if error is not None:
+            results[idx] = _Failure(error)
+            failures += 1
+            if max_errors is not None and failures >= max_errors:
+                halt.stop(RunStatus.ABORTED)
+        else:
+            assert outcome is not None
+            results[idx] = outcome.value
+            if store is not None:
+                store.put(idx, results[idx])
+        completed += 1
+        _report_result(idx)
+        _report()
+
+    def _drain_completions() -> int:
+        drained = 0
+        while True:
+            try:
+                event = completions.get_nowait()
+            except asyncio.QueueEmpty:
+                return drained
+            _consume_completion(event)
+            drained += 1
 
     async def _submit_next() -> bool:
         nonlocal completed
@@ -424,38 +512,14 @@ async def _async_collected_map(
                 cached = store.lookup(idx, item)
                 if cached is not None:
                     results[idx] = cached[0]
-                    completed += 1
-                    _report()
+                    completions.put_nowait((None, idx, None, None))
+                    _drain_completions()
+                    if halt.stopped:
+                        return False
                     continue  # cached — keep looking for work to admit
-            in_flight[asyncio.create_task(_run(item))] = idx
+            task = asyncio.create_task(_run(item, idx))
+            in_flight[task] = idx
             return True
-
-    def _absorb(task: asyncio.Task[_Outcome], idx: int) -> None:
-        nonlocal completed, failures
-        error: Exception | None
-        try:
-            outcome = task.result()
-        except Exception as exc:
-            error = exc  # infrastructure failure — task errors ride the outcome
-            # No _Outcome (task crashed at infra level): one dispatch,
-            # duration unmeasured. Never 0 — the item did run.
-            meta[idx] = (1, 0.0)
-        else:
-            error = outcome.error
-            meta[idx] = (outcome.attempts, outcome.duration)
-        if error is not None:
-            results[idx] = _Failure(error)
-            failures += 1
-            if max_errors is not None and failures >= max_errors:
-                halt.stop(RunStatus.ABORTED)
-        else:
-            results[idx] = outcome.value
-            # Outside the except: a checkpoint write failure raises
-            # CheckpointError instead of mislabeling a success as a failure.
-            if store is not None:
-                store.put(idx, results[idx])
-        completed += 1
-        _report()
 
     async def _drive() -> None:
         # Same lap as the sync driver (see core.py's DRIVER LOOP map):
@@ -470,22 +534,35 @@ async def _async_collected_map(
                 pass
             if halt.stopped or not in_flight:
                 break
-            waiting: set[asyncio.Task[Any]] = set(in_flight)
-            if stop_task is not None:
-                waiting.add(stop_task)
-            done, _pending = await asyncio.wait(
-                waiting, return_when=asyncio.FIRST_COMPLETED
-            )
-            # Absorb real completions before honoring the stop — so a
-            # salvaged Nth failure CAN name the status ABORTED when it
-            # arrives in the same wake as the stop (deep review F4:
-            # accepted nondeterminism, first classification wins; sync
-            # has the same first-writer rule with deterministic order).
-            stopped_now = stop_task is not None and stop_task in done
-            if stop_task is not None:
-                done.discard(stop_task)
-            for task in done:
-                _absorb(task, in_flight.pop(task))
+            if stop_task is None:
+                _consume_completion(await completions.get())
+                _drain_completions()
+                continue
+
+            next_completion = asyncio.create_task(completions.get())
+            try:
+                done, _pending = await asyncio.wait(
+                    {next_completion, stop_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+            except asyncio.CancelledError:
+                # A deadline can cancel the driver after Queue.get() has
+                # removed an event but before this frame consumes it. Restore
+                # ownership so timeout aftermath can salvage that completion.
+                if next_completion.done() and not next_completion.cancelled():
+                    completions.put_nowait(next_completion.result())
+                raise
+            finally:
+                if not next_completion.done():
+                    next_completion.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await next_completion
+            # Completion wins a simultaneous wake, preserving the existing
+            # first-classification rule for max_errors versus StopToken.
+            stopped_now = stop_task in done
+            if next_completion in done:
+                _consume_completion(next_completion.result())
+                _drain_completions()
             if stopped_now:
                 halt.stop(RunStatus.CANCELLED)
             if halt.stopped:
@@ -516,11 +593,9 @@ async def _async_collected_map(
 
         if halt.timed_out:
             assert timeout is not None
-            # Salvage completions that raced the deadline, drop the rest.
-            # A salvaged Nth failure calls stop(ABORTED) — a no-op: the
-            # run already stopped on the deadline, first writer wins.
-            for task in [t for t in in_flight if t.done()]:
-                _absorb(task, in_flight.pop(task))
+            # Tasks enqueue before they return, so this FIFO contains every
+            # completion available to salvage without unordered task scans.
+            _drain_completions()
             _mark_timeout_indices(results, in_flight.values(), timeout)
             if total is not None:
                 for idx in range(len(results), total):
@@ -528,8 +603,7 @@ async def _async_collected_map(
                     meta.append((0, 0.0))
         elif halt.aborted:
             # Salvage completions that raced the stop, cancel the rest.
-            for task in [t for t in in_flight if t.done()]:
-                _absorb(task, in_flight.pop(task))
+            _drain_completions()
             reason = f"aborted after {failures} failures (max_errors={max_errors})"
             for idx in in_flight.values():
                 if results[idx] is _PENDING:
@@ -547,8 +621,7 @@ async def _async_collected_map(
             # where running threads finish in the background). The
             # cancellations happen in the finally below; here every
             # unresolved slot is marked.
-            for task in [t for t in in_flight if t.done()]:
-                _absorb(task, in_flight.pop(task))
+            _drain_completions()
             reason = "cancelled by StopToken"
             for idx in in_flight.values():
                 if results[idx] is _PENDING:
@@ -584,6 +657,7 @@ async def async_parallel_starmap[R](
     timeout: float | None = None,
     task_timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    on_result: Callable[[ItemResult[R]], None] | None = None,
     window_size: int | None = None,
     retry: Retry | None = None,
 ) -> ParallelResult[R]:
@@ -600,6 +674,7 @@ async def async_parallel_starmap[R](
         timeout=timeout,
         task_timeout=task_timeout,
         on_progress=on_progress,
+        on_result=on_result,
         window_size=window_size,
         retry=retry,
     )

@@ -181,7 +181,8 @@ Criteria, not features. No headline feature ships in 1.0.
 Tracked in one place —
 [issue #32](https://github.com/oneryalcin/pyarallel/issues/32) — so 1.0
 ships lean. All are additive (none would require a breaking change,
-which is why none block the freeze): `on_result=` completion callback,
+which is why none block the freeze). `on_result=` was selected from this
+list and is implemented in Unreleased; the remaining candidates are
 stable item identity (`item_key=`), read-only checkpoint inspection,
 weighted/composite quotas (see the
 [design spike record](plans/design-spikes-pre-1.0.md)), and a reusable

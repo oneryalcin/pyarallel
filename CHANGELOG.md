@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- New: collected APIs accept `on_result=` — a live callback receiving each
+  success or failure as an `ItemResult` on the driver thread, in completion
+  order. Retry metadata is preserved, checkpoint hits report `attempts=0`,
+  callback exceptions propagate like `on_progress`, and async callers that
+  need awaited handling remain on `async_parallel_iter`.
 - New: **production golden template**
   (`examples/07_production_api_job.py`) — every recommended pattern in
   one runnable, zero-credential file: shared client + `Limiter`,

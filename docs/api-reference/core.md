@@ -17,6 +17,7 @@ results = parallel_map(
     rate_limit=None,                 # RateLimit spec, shared Limiter, or ops/second
     timeout=None,                    # Total timeout in seconds
     on_progress=None,                # callback(completed, total)
+    on_result=None,                  # callback(ItemResult) in completion order
     window_size=None,                # Admission window: max unresolved items
     retry=None,                      # Retry(attempts=3, backoff=1.0)
     checkpoint=None,                 # Path to a resume file (SQLite)
@@ -41,6 +42,7 @@ results = parallel_map(
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting (float = ops/second). Pass a shared `Limiter` to draw from one budget across calls |
 | `timeout` | `float \| None` | `None` | Total wall-clock timeout in seconds. Sets `result.timed_out` on expiry; the source is never drained after a stop |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback `(completed, total)`. For unsized iterables, `total` is items seen so far |
+| `on_result` | `Callable[[ItemResult[R]], None] \| None` | `None` | Live per-item callback on the driver thread, in completion order. Receives successes and failures with retry metadata; checkpoint hits have `attempts=0`. Exceptions propagate like `on_progress`. Use `async_parallel_iter` for awaited callback work |
 | `window_size` | `int \| None` | `None` | Admission window: max items submitted but unresolved (default `2 × workers`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun. **Contains pickle: treat the file like code** — never resume from a file you didn't create ([details](../user-guide/advanced-features.md#checkpoint-resume)) |
@@ -81,12 +83,49 @@ results = parallel_map(embed, chunks, checkpoint="embeddings.ckpt")
 results = parallel_map(fetch, urls, workers=10, max_errors=10)
 ```
 
+### Handle Results as They Complete
+
+Use `on_result=` when each result should be logged, measured, or handed to a
+fast synchronous sink without waiting for the complete `ParallelResult`:
+
+```python
+from pyarallel import ItemResult, parallel_map
+
+
+def divide(value: int) -> float:
+    return 100 / value
+
+
+def record(item: ItemResult[float]) -> None:
+    if item.ok:
+        print(
+            f"item {item.index}: {item.value} "
+            f"({item.attempts} attempt(s), {item.duration:.3f}s)"
+        )
+    else:
+        print(f"item {item.index} failed: {item.error}")
+
+
+result = parallel_map(divide, [5, 0, 4], workers=3, on_result=record)
+```
+
+The callback receives both successes and failures in completion order. A
+checkpoint hit is reported too, with `attempts=0` and `duration=0.0` because
+no work ran for that item during the resumed call.
+
+!!! warning "Keep result callbacks fast"
+    `on_result` runs inline on the driver thread. A slow or blocking callback
+    delays completion processing and can hold up admission of more work. Hand
+    off expensive persistence or network I/O to another queue, or consume
+    `parallel_iter` when result handling is the main workload. For async code,
+    use `async_parallel_iter` when handling must be awaited.
+
 ### Debug Mode with `sequential=True`
 
 `sequential=True` runs every item inline in the calling thread: no pool,
 no futures — real stack traces, working breakpoints, deterministic input
 order. It honors `rate_limit`, `retry`, `checkpoint`, `on_progress`, and
-`max_errors`; `timeout` is checked between items only (an in-flight item
+`on_result`, and `max_errors`; `timeout` is checked between items only (an in-flight item
 cannot be interrupted). `workers` is ignored rather than rejected, so a
 single flag can flip production code into debug mode:
 
@@ -224,7 +263,7 @@ Decorator that adds `.map()` for parallel execution. The decorated function **ke
 ```python
 @parallel(workers=4, executor="thread", rate_limit=None,
           retry=None, timeout=None, window_size=None,
-          max_errors=None, on_progress=None)
+          max_errors=None, on_progress=None, on_result=None)
 def fn(item): ...
 ```
 
@@ -245,6 +284,7 @@ even `None` — overrides).
 | `window_size` | `int \| None` | `None` | Default admission window |
 | `max_errors` | `int \| None` | `None` | Default early-abort threshold |
 | `on_progress` | `Callable \| None` | `None` | Default progress callback |
+| `on_result` | `Callable[[ItemResult], None] \| None` | `None` | Default live result callback for `.map()`/`.starmap()` — ignored by `.stream()`, which already yields each `ItemResult` |
 
 **Deliberately not accepted** (run-scoped, not function-scoped):
 `checkpoint`/`checkpoint_key`/`checkpoint_version` — a checkpoint file
@@ -268,6 +308,7 @@ results = fetch.map(urls, workers=16)           # override workers
 results = fetch.map(urls, rate_limit=100)       # override rate limit
 results = fetch.map(urls, timeout=30.0)         # add timeout
 results = fetch.map(urls, on_progress=callback) # add progress
+results = fetch.map(urls, on_result=save_result) # handle each completion
 
 # Bare decorator (uses all defaults)
 @parallel
@@ -307,7 +348,7 @@ from pyarallel import parallel_starmap
 results = parallel_starmap(fn, [(arg1, arg2), (arg3, arg4), ...])
 ```
 
-Takes the same options as `parallel_map` (workers, executor, rate_limit, timeout, window_size, retry).
+Takes the same applicable options as `parallel_map`, including `on_result=`.
 
 ### Examples
 
@@ -358,7 +399,9 @@ for item in parallel_iter(fn, items, workers=4):
 
 ### Parameters
 
-Same as `parallel_map` except no `timeout` or `on_progress` (results stream as they complete).
+Same execution controls as `parallel_map`, except no total `timeout`,
+checkpointing, `stop`, or `on_result` — the iterator already yields each
+`ItemResult` as work completes. `on_progress` remains available.
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|

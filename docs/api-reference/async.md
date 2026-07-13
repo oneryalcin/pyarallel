@@ -19,6 +19,7 @@ results = await async_parallel_map(
     timeout=None,                    # Total wall-clock timeout (mirror of sync)
     task_timeout=None,               # Per-task timeout in seconds
     on_progress=None,                # callback(completed, total)
+    on_result=None,                  # sync callback(ItemResult) in completion order
     window_size=None,                # Admission window: max unresolved items
     retry=None,                      # Retry(attempts=3, backoff=1.0)
     checkpoint=None,                 # Path to a resume file (SQLite)
@@ -40,11 +41,19 @@ results = await async_parallel_map(
 | `timeout` | `float \| None` | `None` | **Total** wall-clock timeout — mirror of the sync `timeout`. Unfinished tasks are cancelled, `result.timed_out` is set; sized slots are marked `TimeoutError`, unsized inputs return a shorter result (the source is never drained) |
 | `task_timeout` | `float \| None` | `None` | **Per-task** timeout in seconds |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback. For unsized iterables, `total` is items seen so far |
+| `on_result` | `Callable[[ItemResult[R]], None] \| None` | `None` | Synchronous per-item callback on the event-loop thread, in completion order. Receives successes and failures with retry metadata; checkpoint hits have `attempts=0`. Exceptions propagate like `on_progress`; use `async_parallel_iter` when handling must be awaited |
 | `window_size` | `int \| None` | `None` | Admission window: max tasks created but unresolved (default `2 × concurrency`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
 | `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — see the [sync docs](core.md#checkpoint-resume) |
 | `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Windowed admission makes the abort cheap; unrun items are marked `Aborted`, `result.aborted` is set — see the [sync docs](core.md#early-abort-with-max_errors) |
+
+!!! warning "Keep result callbacks fast"
+    `on_result` is synchronous and runs inline on the event-loop thread. A
+    slow callback delays completion processing; blocking I/O blocks the whole
+    event loop. Keep it brief, hand work to a queue, or use
+    `async_parallel_iter` when result handling must be awaited. See the
+    [complete callback example](core.md#handle-results-as-they-complete).
 
 ### Why `concurrency` instead of `workers`?
 
@@ -177,7 +186,7 @@ async for item in fetch.stream(urls):
 Decorator that adds `.map()` for async parallel execution.
 
 ```python
-@async_parallel(concurrency=4, rate_limit=None)
+@async_parallel(concurrency=4, rate_limit=None, on_result=None)
 async def fn(item): ...
 ```
 
@@ -187,6 +196,7 @@ async def fn(item): ...
 |---|---|---|---|
 | `concurrency` | `int` | `4` | Default concurrency for `.map()` |
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Default rate limiting |
+| `on_result` | `Callable[[ItemResult], None] \| None` | `None` | Default synchronous live-result callback for `.map()`/`.starmap()` — ignored by `.stream()`, which already yields each result |
 
 ### Usage
 
