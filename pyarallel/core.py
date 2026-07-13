@@ -19,7 +19,9 @@ import contextvars
 import functools
 import os
 import pickle
+import queue
 import sys
+import threading
 import time
 from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import (
@@ -60,6 +62,7 @@ from .result import (
     _Failure,
     _item_result,
     _Outcome,
+    _stored_item_result,
 )
 from .stop import StopToken
 
@@ -78,6 +81,7 @@ class SyncMapOptions(TypedDict, total=False):
     rate_limit: Limiter | RateLimit | float | None
     timeout: float | None
     on_progress: Callable[[int, int], None] | None
+    on_result: Callable[[ItemResult[Any]], None] | None
     window_size: int | None
     retry: Retry | None
     checkpoint: str | Path | None
@@ -98,6 +102,7 @@ class SyncStarmapOptions(TypedDict, total=False):
     rate_limit: Limiter | RateLimit | float | None
     timeout: float | None
     on_progress: Callable[[int, int], None] | None
+    on_result: Callable[[ItemResult[Any]], None] | None
     window_size: int | None
     retry: Retry | None
     sequential: bool | None
@@ -403,6 +408,7 @@ def parallel_map[T, R](
     rate_limit: Limiter | RateLimit | float | None = None,
     timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    on_result: Callable[[ItemResult[R]], None] | None = None,
     window_size: int | None = None,
     retry: Retry | None = None,
     checkpoint: str | Path | None = None,
@@ -447,6 +453,12 @@ def parallel_map[T, R](
             completions) — it grows as the run progresses, so a
             percentage over it is meaningless; pass a sized input for a
             real total.
+        on_result: ``callback(item_result)`` fired for each completed item
+            on the driver thread, in completion order. The callback receives
+            successes and failures with attempts/duration metadata; checkpoint
+            hits report ``attempts=0``. Exceptions propagate like
+            ``on_progress``. For awaited callback work, use
+            ``async_parallel_iter`` instead.
         window_size: The admission window — the maximum number of items
             submitted but not yet resolved (default ``2 × workers``).
             It is a memory/lookahead bound, not a chunk size: there are
@@ -530,6 +542,7 @@ def parallel_map[T, R](
             rate_limit=rate_limit,
             timeout=timeout,
             on_progress=on_progress,
+            on_result=on_result,
             retry=retry,
             checkpoint=checkpoint,
             checkpoint_key=checkpoint_key,
@@ -547,6 +560,7 @@ def parallel_map[T, R](
         rate_limit=rate_limit,
         timeout=timeout,
         on_progress=on_progress,
+        on_result=on_result,
         window_size=window_size,
         retry=retry,
         checkpoint=checkpoint,
@@ -568,6 +582,7 @@ def _collected_map(
     rate_limit: Limiter | RateLimit | float | None,
     timeout: float | None,
     on_progress: Callable[[int, int], None] | None,
+    on_result: Callable[[ItemResult[Any]], None] | None,
     window_size: int | None,
     retry: Retry | None,
     checkpoint: str | Path | None,
@@ -585,10 +600,9 @@ def _collected_map(
     moment, and the source is never touched after a stop. The window
     is also what makes ``max_errors`` cheap: a dead API costs the
     abort-trigger point plus one window, not thousands of upfront
-    submissions. Keeping the window small is deliberate —
-    ``wait()`` re-registers waiters across the in-flight set per
-    wake, so admission bounded by workers is what keeps the driver
-    loop O(n) (benchmarked in the v0.6 plan).
+    submissions. Keeping the window small is deliberate: it bounds
+    admission and the completion FIFO while preserving the O(n) driver
+    behavior benchmarked in the v0.6 plan.
     """
     bucket = _as_limiter(rate_limit)
     task_fn = _build_task_fn(fn, executor, retry, bucket)
@@ -606,6 +620,17 @@ def _collected_map(
     # worker's real receipt.
     meta: list[tuple[int, float]] = []
     in_flight: dict[Future[_Outcome], int] = {}
+    # (future, index, outcome, infrastructure_error). Thread workers enqueue
+    # from inside the submitted callable, before their Future becomes done;
+    # process/interpreter workers enqueue from the Future callback. That makes
+    # a live completion visible before a later checkpoint hit even when the
+    # source observes Future.result() immediately.
+    completions: queue.Queue[
+        tuple[Future[_Outcome] | None, int, _Outcome | None, BaseException | None]
+    ] = queue.Queue()
+    future_by_idx: dict[int, Future[_Outcome]] = {}
+    publication = threading.Condition()
+    published: set[Future[_Outcome]] = set()
     completed = 0
     failures = 0
     halt = _RunStop()
@@ -621,6 +646,49 @@ def _collected_map(
     def _report() -> None:
         if on_progress:
             on_progress(completed, _progress_total(total, results))
+
+    def _report_result(idx: int) -> None:
+        if on_result:
+            attempts, duration = meta[idx]
+            on_result(_stored_item_result(idx, results[idx], attempts, duration))
+
+    def _consume_completion(
+        event: tuple[
+            Future[_Outcome] | None,
+            int,
+            _Outcome | None,
+            BaseException | None,
+        ],
+    ) -> None:
+        nonlocal completed
+        future, idx, outcome, infrastructure_error = event
+        if future is None and outcome is None and infrastructure_error is None:
+            # Checkpoint hit.
+            completed += 1
+            _report_result(idx)
+            _report()
+            return
+        if future is None:
+            # Thread workers publish their outcome before returning, so the
+            # Future may not be done yet. Remove it by index and absorb the
+            # already-published payload directly.
+            submitted = future_by_idx.pop(idx)
+            in_flight.pop(submitted, None)
+            _absorb_payload(outcome, infrastructure_error, idx)
+            return
+        future_by_idx.pop(idx, None)
+        in_flight.pop(future, None)
+        _absorb(future, idx)
+
+    def _drain_completions() -> int:
+        drained = 0
+        while True:
+            try:
+                event = completions.get_nowait()
+            except queue.Empty:
+                return drained
+            _consume_completion(event)
+            drained += 1
 
     def _submit_next() -> bool:
         nonlocal completed
@@ -646,8 +714,22 @@ def _collected_map(
                 cached = store.lookup(idx, item)
                 if cached is not None:
                     results[idx] = cached[0]
-                    completed += 1
-                    _report()
+                    if executor != "thread":
+                        # A process/interpreter Future becomes done before its
+                        # callbacks run. If the source observed result() in
+                        # that gap, wait for the executor callback to publish
+                        # every already-done live result before this cache hit.
+                        with publication:
+                            while any(
+                                future.done() and future not in published
+                                for future in in_flight
+                            ):
+                                publication.wait()
+                    # Cache hits join the same FIFO as live completions.
+                    completions.put((None, idx, None, None))
+                    _drain_completions()
+                    if halt.stopped:
+                        return False
                     continue  # cached — keep looking for work to admit
             if bucket is not None and stop is None:
                 # No token: one bounded wait. The limiter predicts —
@@ -689,20 +771,49 @@ def _collected_map(
                         halt.stop(RunStatus.TIMED_OUT)
                         return False
                     time.sleep(slice_budget)  # > 0: deadline gate above
-            in_flight[_submit_task(pool, executor, task_fn, item)] = idx
+            if executor == "thread":
+
+                def _run_and_enqueue(value: Any, item_idx: int = idx) -> _Outcome:
+                    try:
+                        outcome = task_fn(value)
+                    except BaseException as exc:
+                        completions.put((None, item_idx, None, exc))
+                        raise
+                    completions.put((None, item_idx, outcome, None))
+                    return outcome
+
+                future = _submit_task(pool, executor, _run_and_enqueue, item)
+            else:
+                future = _submit_task(pool, executor, task_fn, item)
+            in_flight[future] = idx
+            future_by_idx[idx] = future
+
+            def _enqueue_done(done: Future[_Outcome], item_idx: int = idx) -> None:
+                completions.put((done, item_idx, None, None))
+                with publication:
+                    published.add(done)
+                    publication.notify_all()
+
+            if executor != "thread":
+                future.add_done_callback(_enqueue_done)
             return True
 
-    def _absorb(future: Future[_Outcome], idx: int) -> None:
+    def _absorb_payload(
+        outcome: _Outcome | None,
+        infrastructure_error: BaseException | None,
+        idx: int,
+    ) -> None:
         nonlocal completed, failures
         error: Exception | None
-        try:
-            outcome = future.result()
-        except Exception as exc:
-            error = exc  # infrastructure failure — task errors ride the outcome
+        if infrastructure_error is not None:
+            if not isinstance(infrastructure_error, Exception):
+                raise infrastructure_error
+            error = infrastructure_error
             # No _Outcome came back (pool/worker died): one dispatch,
             # duration unmeasured. Never 0 — the item did run.
             meta[idx] = (1, 0.0)
         else:
+            assert outcome is not None
             error = outcome.error
             meta[idx] = (outcome.attempts, outcome.duration)
         if error is not None:
@@ -711,13 +822,23 @@ def _collected_map(
             if max_errors is not None and failures >= max_errors:
                 halt.stop(RunStatus.ABORTED)
         else:
+            assert outcome is not None
             results[idx] = outcome.value
             # Outside the except: a checkpoint write failure raises
             # CheckpointError instead of mislabeling a success as a failure.
             if store is not None:
                 store.put(idx, results[idx])
         completed += 1
+        _report_result(idx)
         _report()
+
+    def _absorb(future: Future[_Outcome], idx: int) -> None:
+        try:
+            outcome = future.result()
+        except Exception as exc:
+            _absorb_payload(None, exc, idx)
+        else:
+            _absorb_payload(outcome, None, idx)
 
     # The mid-fill absorb sweep exists so a dead API stops admission
     # mid-fill (max_errors) and so progress stays timely while a rate
@@ -758,9 +879,7 @@ def _collected_map(
                 if not _submit_next():
                     break
                 if sweep_mid_fill:
-                    done_now, _pending_now = wait(in_flight, timeout=0)
-                    for future in done_now:
-                        _absorb(future, in_flight.pop(future))
+                    _drain_completions()
             # A mid-fill abort must stop here — falling through to the
             # blocking wait would delay the abort by a task completion
             # (or repackage it as a timeout if the deadline fires first).
@@ -771,6 +890,15 @@ def _collected_map(
             # The completion wait is sliced when a StopToken is present
             # (~100ms cancel latency); without one it blocks exactly as
             # before, bounded only by the deadline.
+            event: (
+                tuple[
+                    Future[_Outcome] | None,
+                    int,
+                    _Outcome | None,
+                    BaseException | None,
+                ]
+                | None
+            ) = None
             while True:
                 wait_timeout: float | None = None
                 if deadline is not None:
@@ -779,10 +907,11 @@ def _collected_map(
                     wait_timeout = (
                         0.1 if wait_timeout is None else min(wait_timeout, 0.1)
                     )
-                done, _pending = wait(
-                    in_flight, timeout=wait_timeout, return_when=FIRST_COMPLETED
-                )
-                if done:
+                try:
+                    event = completions.get(timeout=wait_timeout)
+                except queue.Empty:
+                    event = None
+                if event is not None:
                     break
                 if stop is not None and stop.stopped:
                     halt.stop(RunStatus.CANCELLED)
@@ -792,8 +921,9 @@ def _collected_map(
                     break
             if halt.stopped:
                 break
-            for future in done:
-                _absorb(future, in_flight.pop(future))
+            assert event is not None
+            _consume_completion(event)
+            _drain_completions()
             if halt.stopped:
                 break
 
@@ -803,6 +933,7 @@ def _collected_map(
         # unsized inputs yield a shorter result — documented.
         if halt.timed_out:
             assert timeout is not None
+            _drain_completions()
             for future in in_flight:
                 future.cancel()
             _mark_timeout_indices(results, in_flight.values(), timeout)
@@ -812,10 +943,8 @@ def _collected_map(
                     meta.append((0, 0.0))
         elif halt.aborted:
             # Salvage completions that raced the stop, drop the rest.
-            done, pending = wait(in_flight, timeout=0)
-            for future in done:
-                _absorb(future, in_flight.pop(future))
-            for future in pending:
+            _drain_completions()
+            for future in in_flight:
                 future.cancel()
             reason = f"aborted after {failures} failures (max_errors={max_errors})"
             for idx in in_flight.values():
@@ -831,10 +960,8 @@ def _collected_map(
             # threads cannot be killed — they finish in the background
             # (their slots still read Cancelled: the RESULT was not
             # delivered to this run).
-            done, pending = wait(in_flight, timeout=0)
-            for future in done:
-                _absorb(future, in_flight.pop(future))
-            for future in pending:
+            _drain_completions()
+            for future in in_flight:
                 future.cancel()
             reason = "cancelled by StopToken"
             for idx in in_flight.values():
@@ -866,6 +993,7 @@ def _sequential_collected_map(
     rate_limit: Limiter | RateLimit | float | None,
     timeout: float | None,
     on_progress: Callable[[int, int], None] | None,
+    on_result: Callable[[ItemResult[Any]], None] | None,
     retry: Retry | None,
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
@@ -918,6 +1046,8 @@ def _sequential_collected_map(
                 if cached is not None:
                     results[idx] = cached[0]
                     completed += 1
+                    if on_result:
+                        on_result(_stored_item_result(idx, results[idx], 0, 0.0))
                     if on_progress:
                         on_progress(completed, _progress_total(total, results))
                     continue
@@ -977,6 +1107,12 @@ def _sequential_collected_map(
                 if store is not None:
                     store.put(idx, results[idx])
             completed += 1
+            if on_result:
+                on_result(
+                    _stored_item_result(
+                        idx, results[idx], outcome.attempts, outcome.duration
+                    )
+                )
             if on_progress:
                 on_progress(completed, _progress_total(total, results))
             if max_errors is not None and failures >= max_errors:
@@ -1054,6 +1190,7 @@ def parallel_starmap[R](
     rate_limit: Limiter | RateLimit | float | None = None,
     timeout: float | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    on_result: Callable[[ItemResult[R]], None] | None = None,
     window_size: int | None = None,
     retry: Retry | None = None,
     sequential: bool = False,
@@ -1088,6 +1225,7 @@ def parallel_starmap[R](
                 rate_limit=rate_limit,
                 timeout=timeout,
                 on_progress=on_progress,
+                on_result=on_result,
                 window_size=window_size,
                 retry=retry,
                 sequential=sequential,
@@ -1107,6 +1245,7 @@ def parallel_starmap[R](
         rate_limit=rate_limit,
         timeout=timeout,
         on_progress=on_progress,
+        on_result=on_result,
         window_size=window_size,
         retry=retry,
         sequential=sequential,

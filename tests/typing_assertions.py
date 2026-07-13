@@ -175,6 +175,9 @@ def check_decorator_option_keys() -> None:
     admit None in their types."""
     limiter = Limiter(RateLimit(10))
 
+    def collect_str(item: ItemResult[str]) -> None:
+        assert_type(item, ItemResult[str])
+
     assert_type(
         triple.map(
             [1],
@@ -183,6 +186,7 @@ def check_decorator_option_keys() -> None:
             rate_limit=limiter,
             timeout=30.0,
             on_progress=lambda done, total: None,
+            on_result=collect_str,
             window_size=100,
             retry=Retry(attempts=2),
             checkpoint="run.ckpt",
@@ -211,12 +215,16 @@ def check_decorator_option_keys() -> None:
 
 
 async def check_async_decorator_option_keys() -> None:
+    def collect_bytes(item: ItemResult[bytes]) -> None:
+        assert_type(item, ItemResult[bytes])
+
     assert_type(
         await fetch_many.map(
             ["u"],
             concurrency=8,
             timeout=60.0,
             task_timeout=5.0,
+            on_result=collect_bytes,
             retry=Retry(attempts=2),
             checkpoint="run.ckpt",
             checkpoint_key=lambda item: str(item),
@@ -244,3 +252,18 @@ def check_policy_arguments() -> None:
             wait_from=lambda exc: getattr(exc, "retry_after", None),
         ),
     )
+
+
+def _consume_string_result(item: ItemResult[str]) -> None:
+    item.value.upper() if item.value is not None else None
+
+
+@parallel(on_result=_consume_string_result)  # type: ignore[arg-type]
+def _decorated_int_result(value: int) -> int:
+    """The decorator callback type must match the function result type."""
+    return value
+
+
+@async_parallel(on_result=_consume_string_result)  # type: ignore[arg-type]
+async def _async_decorated_int_result(value: int) -> int:
+    return value

@@ -118,6 +118,7 @@ async with httpx.AsyncClient(timeout=10) as client:
 - **Timeouts** — total wall-clock on sync *and* async (`timeout=30.0`), per-task in async (`task_timeout=5.0`)
 - **Debug mode** — `sequential=True` runs inline: no pool, real stack traces, working breakpoints
 - **Progress callbacks** — `on_progress=lambda done, total: print(f"{done}/{total}")` on collected and streaming APIs
+- **Live result callbacks** — `on_result=` receives each `ItemResult` on the driver thread as collected-map work completes, including failures, retry metadata, and checkpoint hits
 
 **Choose the runtime and interface**
 

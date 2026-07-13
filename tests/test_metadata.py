@@ -7,14 +7,17 @@ bounds are asserted (sleep guarantees them); upper bounds are avoided
 """
 
 import asyncio
+import threading
 import time
 
 from pyarallel import (
     ItemResult,
     ParallelResult,
     Retry,
+    StopToken,
     async_parallel_iter,
     async_parallel_map,
+    async_parallel_starmap,
     parallel_iter,
     parallel_map,
     parallel_starmap,
@@ -295,6 +298,453 @@ class TestCollectedMetadata:
         assert item.ok
         assert item.attempts == 2
         assert item.duration >= 0.04
+
+
+class TestOnResult:
+    """Live collected-result callbacks expose the same ItemResult receipts."""
+
+    def test_completion_order_and_driver_thread(self):
+        gates = [threading.Event() for _ in range(3)]
+        started = threading.Barrier(4)
+        callback_seen = [threading.Event() for _ in range(3)]
+        callback_items = []
+        driver_thread = threading.get_ident()
+
+        def work(index):
+            started.wait()
+            gates[index].wait(timeout=5)
+            return index * 10
+
+        def release_in_order():
+            started.wait()
+            for index in (2, 0, 1):
+                gates[index].set()
+                assert callback_seen[index].wait(timeout=5)
+
+        def record(item):
+            callback_items.append((threading.get_ident(), item))
+            callback_seen[item.index].set()
+
+        controller = threading.Thread(target=release_in_order)
+        controller.start()
+        result = parallel_map(
+            work,
+            range(3),
+            workers=3,
+            on_result=record,
+        )
+        controller.join(timeout=5)
+
+        assert result.ok
+        assert not controller.is_alive()
+        assert [item.index for _, item in callback_items] == [2, 0, 1]
+        assert [item.value for _, item in callback_items] == [20, 0, 10]
+        assert all(thread_id == driver_thread for thread_id, _ in callback_items)
+        assert all(item.attempts == 1 for _, item in callback_items)
+
+    def test_failure_and_callback_exception_semantics(self):
+        seen = []
+
+        def fail(_item):
+            raise ValueError("task failed")
+
+        parallel_map(fail, [1], workers=1, on_result=seen.append)
+        assert len(seen) == 1
+        assert not seen[0].ok
+        assert isinstance(seen[0].error, ValueError)
+
+        def reject(_item):
+            raise RuntimeError("callback failed")
+
+        import pytest
+
+        with pytest.raises(RuntimeError, match="callback failed"):
+            parallel_map(lambda x: x, [1], workers=1, on_result=reject)
+
+    def test_thread_fatal_exception_wakes_driver_and_propagates(self):
+        import pytest
+
+        class Fatal(BaseException):
+            pass
+
+        def fail(_item):
+            raise Fatal("fatal")
+
+        with pytest.raises(Fatal, match="fatal"):
+            parallel_map(fail, [1], workers=1)
+
+    def test_checkpoint_hits_report_zero_attempts(self, tmp_path):
+        checkpoint = tmp_path / "on-result.db"
+        parallel_map(lambda x: x * 2, [1, 2], checkpoint=checkpoint)
+
+        seen = []
+        result = parallel_map(
+            lambda x: x * 2,
+            [1, 2],
+            checkpoint=checkpoint,
+            on_result=seen.append,
+        )
+
+        assert result.ok
+        assert [item.value for item in seen] == [2, 4]
+        assert all(item.attempts == 0 and item.duration == 0.0 for item in seen)
+
+    def test_mixed_live_and_cached_results_keep_completion_order(
+        self, tmp_path, monkeypatch
+    ):
+        from pyarallel import core
+
+        checkpoint = tmp_path / "mixed-on-result.db"
+
+        def work(x):
+            return x * 2
+
+        parallel_map(work, [1], checkpoint=checkpoint, checkpoint_key=int)
+
+        submitted = []
+        original_submit = core._submit_task
+
+        def capture_submit(*args, **kwargs):
+            future = original_submit(*args, **kwargs)
+            submitted.append(future)
+            return future
+
+        monkeypatch.setattr(core, "_submit_task", capture_submit)
+
+        def source():
+            yield 0
+            submitted[0].result(timeout=5)  # done, but not yet absorbed
+            yield 1  # checkpoint hit must not jump ahead of item 0
+
+        seen = []
+        result = parallel_map(
+            work,
+            source(),
+            workers=1,
+            checkpoint=checkpoint,
+            checkpoint_key=int,
+            on_result=seen.append,
+        )
+
+        assert result.ok
+        assert [(item.index, item.attempts) for item in seen] == [(0, 1), (1, 0)]
+
+    def test_callback_can_stop_the_run(self):
+        stop = StopToken()
+        seen = []
+
+        def inspect(item):
+            seen.append(item)
+            stop.stop()
+
+        result = parallel_map(
+            lambda x: x,
+            [1, 2, 3],
+            sequential=True,
+            stop=stop,
+            on_result=inspect,
+        )
+
+        assert result.status.value == "cancelled"
+        assert [item.value for item in seen] == [1]
+
+    def test_concurrent_callback_can_stop_before_more_admission(self):
+        stop = StopToken()
+        seen = []
+
+        def inspect(item):
+            seen.append(item)
+            stop.stop()
+
+        result = parallel_map(
+            lambda x: x,
+            [1, 2, 3],
+            workers=1,
+            window_size=1,
+            stop=stop,
+            on_result=inspect,
+        )
+
+        assert result.status.value == "cancelled"
+        assert [item.value for item in seen] == [1]
+
+    def test_process_callback_stays_on_driver_thread(self):
+        seen = []
+        driver_thread = threading.get_ident()
+
+        result = parallel_map(
+            _double_for_process,
+            [1, 2],
+            workers=2,
+            executor="process",
+            on_result=lambda item: seen.append((threading.get_ident(), item)),
+        )
+
+        assert result.ok
+        assert sorted(item.value for _, item in seen) == [2, 4]
+        assert all(thread_id == driver_thread for thread_id, _ in seen)
+
+    def test_process_completion_publishes_before_later_cache_hit(
+        self, tmp_path, monkeypatch
+    ):
+        from pyarallel import core
+
+        checkpoint = tmp_path / "process-mixed-on-result.db"
+        parallel_map(
+            _double_for_process,
+            [1],
+            workers=1,
+            executor="process",
+            checkpoint=checkpoint,
+            checkpoint_key=int,
+        )
+
+        submitted = []
+        original_submit = core._submit_task
+
+        def capture_submit(*args, **kwargs):
+            future = original_submit(*args, **kwargs)
+            # Future.set_result() wakes result() waiters before callbacks.
+            # Delay our publication callback to make that gap deterministic.
+            future.add_done_callback(lambda _done: time.sleep(0.1))
+            submitted.append(future)
+            return future
+
+        monkeypatch.setattr(core, "_submit_task", capture_submit)
+
+        def source():
+            yield 0
+            submitted[0].result(timeout=5)
+            yield 1
+
+        seen = []
+        result = parallel_map(
+            _double_for_process,
+            source(),
+            workers=1,
+            executor="process",
+            checkpoint=checkpoint,
+            checkpoint_key=int,
+            on_result=seen.append,
+        )
+
+        assert result.ok
+        assert [(item.index, item.attempts) for item in seen] == [(0, 1), (1, 0)]
+
+    def test_starmap_forwards_on_result(self):
+        seen = []
+        result = parallel_starmap(
+            lambda a, b: a + b,
+            [(1, 2), (3, 4)],
+            workers=1,
+            on_result=seen.append,
+        )
+        assert result.ok
+        assert [item.value for item in seen] == [3, 7]
+
+    async def test_async_callback_runs_on_event_loop_thread(self):
+        seen = []
+        driver_thread = threading.get_ident()
+
+        async def work(index):
+            await asyncio.sleep(0)
+            return index + 1
+
+        result = await async_parallel_map(
+            work,
+            [1, 2],
+            concurrency=2,
+            on_result=lambda item: seen.append((threading.get_ident(), item)),
+        )
+
+        assert result.ok
+        assert sorted(item.value for _, item in seen) == [2, 3]
+        assert all(thread_id == driver_thread for thread_id, _ in seen)
+
+    async def test_async_fatal_exception_wakes_driver_and_propagates(self):
+        import pytest
+
+        class Fatal(BaseException):
+            pass
+
+        async def fail(_item):
+            raise Fatal("fatal")
+
+        with pytest.raises(Fatal, match="fatal"):
+            await async_parallel_map(fail, [1], concurrency=1)
+
+    async def test_async_starmap_forwards_on_result(self):
+        seen = []
+
+        async def add(a, b):
+            return a + b
+
+        result = await async_parallel_starmap(
+            add,
+            [(1, 2), (3, 4)],
+            concurrency=1,
+            on_result=seen.append,
+        )
+        assert result.ok
+        assert [item.value for item in seen] == [3, 7]
+
+    async def test_async_mixed_live_and_cached_completion_order(
+        self, tmp_path, monkeypatch
+    ):
+        from pyarallel import aio
+
+        checkpoint = tmp_path / "async-mixed-on-result.db"
+
+        async def work(x):
+            return x * 2
+
+        await async_parallel_map(work, [1], checkpoint=checkpoint, checkpoint_key=int)
+
+        submitted = []
+        original_create_task = asyncio.create_task
+
+        def capture_task(coro):
+            task = original_create_task(coro)
+            if getattr(getattr(coro, "cr_code", None), "co_name", None) == "_run":
+                submitted.append(task)
+            return task
+
+        monkeypatch.setattr(aio.asyncio, "create_task", capture_task)
+
+        async def source():
+            yield 0
+            while not submitted:
+                await asyncio.sleep(0)
+            await submitted[0]  # done, but not yet absorbed
+            yield 1  # checkpoint hit must not jump ahead of item 0
+
+        seen = []
+        result = await async_parallel_map(
+            work,
+            source(),
+            concurrency=1,
+            checkpoint=checkpoint,
+            checkpoint_key=int,
+            on_result=seen.append,
+        )
+
+        assert result.ok
+        assert [(item.index, item.attempts) for item in seen] == [(0, 1), (1, 0)]
+
+    async def test_async_cached_completion_does_not_drain_source_after_abort(
+        self, tmp_path, monkeypatch
+    ):
+        from pyarallel import aio
+
+        checkpoint = tmp_path / "async-cached-abort.db"
+
+        async def work(x):
+            if x == 0:
+                raise ValueError("boom")
+            return x
+
+        await async_parallel_map(work, [1], checkpoint=checkpoint, checkpoint_key=int)
+
+        submitted = []
+        original_create_task = asyncio.create_task
+
+        def capture_task(coro):
+            task = original_create_task(coro)
+            if getattr(getattr(coro, "cr_code", None), "co_name", None) == "_run":
+                submitted.append(task)
+            return task
+
+        monkeypatch.setattr(aio.asyncio, "create_task", capture_task)
+        pulled = []
+
+        async def source():
+            pulled.append(0)
+            yield 0
+            while not submitted:
+                await asyncio.sleep(0)
+            await submitted[0]
+            pulled.append(1)
+            yield 1
+            pulled.append(2)
+            yield 2
+
+        result = await async_parallel_map(
+            work,
+            source(),
+            concurrency=1,
+            checkpoint=checkpoint,
+            checkpoint_key=int,
+            max_errors=1,
+        )
+
+        assert result.status.value == "aborted"
+        assert pulled == [0, 1]
+
+    async def test_async_timeout_restores_completion_owned_by_wait_helper(
+        self, monkeypatch
+    ):
+        from pyarallel import aio
+
+        original_wait = asyncio.wait
+
+        async def delay_after_completion_get(fs, **kwargs):
+            done, pending = await original_wait(fs, **kwargs)
+            completion_get = next(
+                (
+                    task
+                    for task in fs
+                    if "Queue.get" in getattr(task.get_coro(), "__qualname__", "")
+                ),
+                None,
+            )
+            if completion_get is not None and completion_get in done:
+                # The helper owns the event now; let the total deadline cancel
+                # the driver before it can consume next_completion.result().
+                await asyncio.sleep(1)
+            return done, pending
+
+        monkeypatch.setattr(aio.asyncio, "wait", delay_after_completion_get)
+        seen = []
+
+        async def work(value):
+            return value
+
+        result = await async_parallel_map(
+            work,
+            [1],
+            concurrency=1,
+            stop=StopToken(),
+            timeout=0.02,
+            on_result=seen.append,
+        )
+
+        assert result.status.value == "timed_out"
+        assert result.ok_values() == [1]
+        assert [item.value for item in seen] == [1]
+
+    async def test_async_concurrent_callback_can_stop_before_more_admission(self):
+        stop = StopToken()
+        seen = []
+
+        async def work(x):
+            await asyncio.sleep(0)
+            return x
+
+        def inspect(item):
+            seen.append(item)
+            stop.stop()
+
+        result = await async_parallel_map(
+            work,
+            [1, 2, 3],
+            concurrency=1,
+            window_size=1,
+            stop=stop,
+            on_result=inspect,
+        )
+
+        assert result.status.value == "cancelled"
+        assert [item.value for item in seen] == [1]
 
 
 class TestItemResultDefaults:

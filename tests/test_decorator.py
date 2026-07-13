@@ -286,6 +286,22 @@ class TestWidenedDecoratorDefaults:
         work.map([1, 2, 3])
         assert seen == [1, 2, 3]
 
+    def test_on_result_as_default_is_collected_only(self):
+        from pyarallel import parallel
+
+        seen = []
+
+        @parallel(workers=1, on_result=seen.append)
+        def work(x):
+            return x * 2
+
+        work.map([1, 2])
+        assert [item.value for item in seen] == [2, 4]
+
+        seen.clear()
+        assert [item.value for item in work.stream([1, 2])] == [2, 4]
+        assert seen == []
+
     def test_checkpoint_rejected_as_decorator_default(self):
         """A checkpoint file names a run, not a function — two .map()
         calls sharing one default file would collide keys and serve
@@ -315,9 +331,12 @@ class TestWidenedDecoratorDefaults:
         from pyarallel import Retry, async_parallel
 
         calls = {"n": 0}
+        seen = []
 
         @async_parallel(
-            concurrency=1, retry=Retry(attempts=3, backoff=0.0, jitter=False)
+            concurrency=1,
+            retry=Retry(attempts=3, backoff=0.0, jitter=False),
+            on_result=seen.append,
         )
         async def flaky(x):
             calls["n"] += 1
@@ -328,6 +347,8 @@ class TestWidenedDecoratorDefaults:
         r = await flaky.map([1])
         assert r.ok
         assert calls["n"] == 2
+        assert len(seen) == 1
+        assert seen[0].value == 1 and seen[0].attempts == 2
 
     async def test_async_task_timeout_as_default(self):
         import asyncio

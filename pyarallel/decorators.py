@@ -87,7 +87,7 @@ def _merge_opts(
 
 
 # Decorator defaults an engine surface doesn't accept (see _merge_opts).
-_STREAM_DROP = ("timeout",)
+_STREAM_DROP = ("timeout", "on_result")
 _STARMAP_DROP = ("max_errors",)
 
 
@@ -151,6 +151,7 @@ class _ParallelFunc[**P, R]:
         window_size: int | None = None,
         max_errors: int | None = None,
         on_progress: Callable[[int, int], None] | None = None,
+        on_result: Callable[[ItemResult[R]], None] | None = None,
     ) -> None:
         self.__wrapped__: Callable[P, R] = fn
         self._defaults: dict[str, Any] = {"executor": executor}
@@ -165,6 +166,7 @@ class _ParallelFunc[**P, R]:
             "window_size": window_size,
             "max_errors": max_errors,
             "on_progress": on_progress,
+            "on_result": on_result,
         }
         self._defaults.update({k: v for k, v in optional.items() if v is not None})
         functools.update_wrapper(self, fn)
@@ -255,10 +257,40 @@ class _ParallelDecorator:
         return _UnaryParallelFunc(fn, **self._kw)
 
 
+class _ResultParallelDecorator[R]:
+    """Configured decorator whose callback fixes the function result type."""
+
+    __slots__ = ("_kw",)
+
+    def __init__(self, kw: dict[str, Any]) -> None:
+        self._kw = kw
+
+    @overload
+    def __call__[T](self, fn: Callable[[T], R]) -> _UnaryParallelFunc[T, R]: ...
+    @overload
+    def __call__[**P](self, fn: Callable[P, R]) -> _ParallelFunc[P, R]: ...
+    def __call__(self, fn: Callable[..., R]) -> Any:
+        return _UnaryParallelFunc(fn, **self._kw)
+
+
 @overload
 def parallel[T, R](fn: Callable[[T], R]) -> _UnaryParallelFunc[T, R]: ...
 @overload
 def parallel[**P, R](fn: Callable[P, R]) -> _ParallelFunc[P, R]: ...
+@overload
+def parallel[R](
+    fn: None = None,
+    *,
+    workers: int | None = None,
+    executor: ExecutorType = "thread",
+    rate_limit: Limiter | RateLimit | float | None = None,
+    retry: Retry | None = None,
+    timeout: float | None = None,
+    window_size: int | None = None,
+    max_errors: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
+    on_result: Callable[[ItemResult[R]], None],
+) -> _ResultParallelDecorator[R]: ...
 @overload
 def parallel(
     fn: None = None,
@@ -271,6 +303,7 @@ def parallel(
     window_size: int | None = None,
     max_errors: int | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    on_result: None = None,
 ) -> _ParallelDecorator: ...
 def parallel(
     fn: Callable[..., Any] | None = None,
@@ -283,6 +316,7 @@ def parallel(
     window_size: int | None = None,
     max_errors: int | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    on_result: Callable[[ItemResult[Any]], None] | None = None,
 ) -> Any:
     """Decorator: adds ``.map()`` for parallel execution.
 
@@ -319,9 +353,12 @@ def parallel(
         "window_size": window_size,
         "max_errors": max_errors,
         "on_progress": on_progress,
+        "on_result": on_result,
     }
     if fn is not None:
         return _UnaryParallelFunc(fn, **kw)
+    if on_result is not None:
+        return _ResultParallelDecorator(kw)
     return _ParallelDecorator(kw)
 
 
@@ -387,6 +424,7 @@ class _AsyncParallelFunc[**P, R]:
         window_size: int | None = None,
         max_errors: int | None = None,
         on_progress: Callable[[int, int], None] | None = None,
+        on_result: Callable[[ItemResult[R]], None] | None = None,
     ) -> None:
         self.__wrapped__: Callable[P, Awaitable[R]] = fn
         self._defaults: dict[str, Any] = {"concurrency": concurrency}
@@ -398,6 +436,7 @@ class _AsyncParallelFunc[**P, R]:
             "window_size": window_size,
             "max_errors": max_errors,
             "on_progress": on_progress,
+            "on_result": on_result,
         }
         self._defaults.update({k: v for k, v in optional.items() if v is not None})
         functools.update_wrapper(self, fn)
@@ -493,6 +532,26 @@ class _AsyncParallelDecorator:
         return _UnaryAsyncParallelFunc(fn, **self._kw)
 
 
+class _ResultAsyncParallelDecorator[R]:
+    """Async configured decorator with a callback-bound result type."""
+
+    __slots__ = ("_kw",)
+
+    def __init__(self, kw: dict[str, Any]) -> None:
+        self._kw = kw
+
+    @overload
+    def __call__[T](
+        self, fn: Callable[[T], Awaitable[R]]
+    ) -> _UnaryAsyncParallelFunc[T, R]: ...
+    @overload
+    def __call__[**P](
+        self, fn: Callable[P, Awaitable[R]]
+    ) -> _AsyncParallelFunc[P, R]: ...
+    def __call__(self, fn: Callable[..., Awaitable[R]]) -> Any:
+        return _UnaryAsyncParallelFunc(fn, **self._kw)
+
+
 @overload
 def async_parallel[T, R](
     fn: Callable[[T], Awaitable[R]],
@@ -501,6 +560,20 @@ def async_parallel[T, R](
 def async_parallel[**P, R](
     fn: Callable[P, Awaitable[R]],
 ) -> _AsyncParallelFunc[P, R]: ...
+@overload
+def async_parallel[R](
+    fn: None = None,
+    *,
+    concurrency: int = 4,
+    rate_limit: Limiter | RateLimit | float | None = None,
+    retry: Retry | None = None,
+    timeout: float | None = None,
+    task_timeout: float | None = None,
+    window_size: int | None = None,
+    max_errors: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
+    on_result: Callable[[ItemResult[R]], None],
+) -> _ResultAsyncParallelDecorator[R]: ...
 @overload
 def async_parallel(
     fn: None = None,
@@ -513,6 +586,7 @@ def async_parallel(
     window_size: int | None = None,
     max_errors: int | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    on_result: None = None,
 ) -> _AsyncParallelDecorator: ...
 def async_parallel(
     fn: Callable[..., Any] | None = None,
@@ -525,6 +599,7 @@ def async_parallel(
     window_size: int | None = None,
     max_errors: int | None = None,
     on_progress: Callable[[int, int], None] | None = None,
+    on_result: Callable[[ItemResult[Any]], None] | None = None,
 ) -> Any:
     """Decorator: adds ``.map()`` for async parallel execution.
 
@@ -547,7 +622,10 @@ def async_parallel(
         "window_size": window_size,
         "max_errors": max_errors,
         "on_progress": on_progress,
+        "on_result": on_result,
     }
     if fn is not None:
         return _UnaryAsyncParallelFunc(fn, **kw)
+    if on_result is not None:
+        return _ResultAsyncParallelDecorator(kw)
     return _AsyncParallelDecorator(kw)
