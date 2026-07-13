@@ -172,9 +172,10 @@ Criteria, not features. No headline feature ships in 1.0.
   documented.
 - Release artifacts and docs generated from the same tag; API/typing
   snapshots enforced in CI.
-- The comparison page, cookbook, and one good write-up (blog / Show HN /
-  r/Python) published — distribution is a 1.0 criterion, not an
-  afterthought.
+- The comparison page, cookbook, and one good write-up are published.
+  [What Happens When Your 50,000-Item API Job Dies?](https://oneryalcin.hashnode.dev/what-happens-when-your-50-000-item-api-job-dies)
+  demonstrates the server-driven-backoff and crash/resume case against a
+  real public workload. The publication criterion is complete.
 
 ## Post-1.0 candidates
 
@@ -191,11 +192,12 @@ speculation.
 
 ## Distribution
 
-Recipes (Cookbook) and the comparison page shipped with 0.7. Remaining:
-**one good write-up** demonstrating server-driven backoff + resume
-(and/or the free-threading angle), submitted to the channels where this
-niche looks for tools. Without it the engineering work is unfalsifiable
-effort.
+Recipes (Cookbook) and the comparison page shipped with 0.7. The required
+write-up is now published:
+[What Happens When Your 50,000-Item API Job Dies?](https://oneryalcin.hashnode.dev/what-happens-when-your-50-000-item-api-job-dies),
+a concrete server-driven-backoff and crash/resume case study. The 1.0
+distribution criterion is complete; further promotion is ongoing product
+work, not a release blocker.
 
 ---
 
