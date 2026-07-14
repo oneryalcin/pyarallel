@@ -7,10 +7,11 @@ engine, O(n) driver" — used to rest on throwaway scripts that ran once on
 one machine. This directory replaces them with **one runnable harness** so
 the claims are falsifiable on *your* machine.
 
-`bench.py` is stdlib + pyarallel only. `_workloads.py` holds the two target
+`bench.py` is stdlib + pyarallel only. `_workloads.py` holds the target
 functions (they must live in a real importable module, not the script's
 `__main__`, or the `process`/`interpreter` executors can't re-import them in
-a worker). Nothing here is imported by the package or the test suite.
+a worker). Nothing here is imported by the production package; deterministic
+harness tests import these modules directly.
 
 ## Running it
 
@@ -22,23 +23,30 @@ The harness prints its machine context — including `sys._is_gil_enabled()`
 uv run --with . python benchmarks/bench.py
 
 # Standard build with the interpreter executor (needs 3.14+, GIL on):
-uv run --no-project --python cpython-3.14.6-macos-aarch64-none \
+PYTHONPATH="$PWD" uv run --no-project \
+    --python cpython-3.14.6-macos-aarch64-none \
     --with . python benchmarks/bench.py
 
 # Free-threaded build (GIL off): uv manages 3.13t / 3.14t for you.
-uv run --no-project --python 3.14t --with . python benchmarks/bench.py
+PYTHONPATH="$PWD" uv run --no-project --python 3.14t \
+    --with . python benchmarks/bench.py
 
 # Fast pass (fewer items/reps — ratios are weaker, see below):
 uv run --with . python benchmarks/bench.py --quick
 
 # Machine-readable:
 uv run --with . python benchmarks/bench.py --json
+
+# Add non-gating one-worker, one-item, and no-op session diagnostics:
+uv run --with . python benchmarks/bench.py --diagnostic
 ```
 
-**On free-threaded builds — what actually worked here:** `uv run --python
-3.14t ...` Just Works — uv downloads and manages the free-threaded build; no
-manual install needed. If it isn't cached yet, `uv python install 3.14t`
-first. `3.13t` works the same way. Watch out: on a box that has *both* 3.14
+**On free-threaded builds — what actually worked here:** the `3.14t` command
+above lets uv download and manage the free-threaded build; no manual install is
+needed. The `PYTHONPATH` prefix is required for the isolated 3.14 interpreter
+benchmark targets. If the build isn't cached yet, run `uv python install 3.14t`
+first. `3.13t` works the same way and does not need the prefix because it has no
+interpreter executor. Watch out: on a box that has *both* 3.14
 variants installed, a bare `--python 3.14` may resolve to the free-threaded
 one — don't guess, read the `GIL:` line the harness prints. To force the
 GIL-on build, pass the full `cpython-3.14.6-...` specifier (or a Homebrew
@@ -55,6 +63,38 @@ churn it).
 | **cpu-scaling** | `parallel_map` of a pure-Python CPU spin: `thread` workers=1 vs 4, plus `process`/`interpreter` at 4. | `thread_scaling` → "1.0× under the GIL, **2.4×** on free-threaded"; `thread/interpreter` on a GIL build → "**3.4×**, interpreters get true CPU parallelism on standard builds". |
 | **engine-overhead** | Per-item wall time of `parallel_map` and `parallel_iter` over a no-op vs a plain loop, at two sizes a decade apart. | "one windowed engine, **O(n)** driver" — flat per-item cost across a 10× size range is the linearity evidence. |
 | **worker-startup** | Time to first result on a *cold* pool (workers=1) per executor. | Interpreter cold-start beats process fork/spawn on GIL builds (~50 ms vs ~72 ms recorded; machine-dependent). |
+| **execution-session** | Repeated small maps through fresh Pyarallel pools, fresh stdlib pools, and one reused stdlib pool. | Decides whether worker reuse is stable and material enough to earn a separate lifecycle/API design. It does not benchmark a public session API. |
+
+## Reading the execution-session result
+
+The session spike measures three deliberately separate strategies:
+
+- `pyarallel_fresh` is today's public `parallel_map()` cost.
+- `stdlib_fresh` creates and closes an equivalent stdlib executor for every
+  map.
+- `stdlib_reused` sends every map through one stdlib executor and closes it at
+  the end.
+
+`stdlib_fresh / stdlib_reused` is the raw worker-reuse opportunity.
+`pyarallel_fresh - stdlib_fresh` is reported separately as current integration
+cost. **`stdlib_reused` is an optimistic lower bound, not a promised Pyarallel
+speedup:** it does not include rate limiting, retries, checkpoints, callbacks,
+streaming ownership, cancellation, or concurrent-call isolation.
+
+The default pass uses seven samples per strategy and reports every sample under
+`execution_session.cells.*.strategies.*.samples_ns` in JSON. A cell is noisy
+when either stdlib lane has `MAD / median > 0.10`. Run the default 3.12/3.13
+pass exactly twice: both runs must be clean and agree before the candidate can
+advance; any noisy run means `defer-noisy`. Do not take a third run to find a
+preferred answer. `--quick` runs only `P1`, `P3`, and `T10` with three samples
+and always returns `smoke-only`.
+
+On a standard GIL-enabled 3.14 build the harness also records interpreter
+mirrors (`IP*`/`IPI*`). CPython subinterpreters initialize isolated import paths
+at process startup, so launch the 3.14 command with `PYTHONPATH="$PWD"` as shown
+above. The harness fails fast when it is absent instead of producing per-item
+import failures. Interpreter cells are contextual; the process cells own the
+product verdict.
 
 ### Why the item count matters (and why `--quick` under-reports)
 
