@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- New: `checkpoint_info(path)` inspects an existing checkpoint without loading
+  pickled result values. The frozen `CheckpointInfo` reports schema and semantic
+  versions, task signature, persisted row count, and primary-file size. It opens
+  SQLite read-only and preserves crash-left WAL visibility; `completed` is a row
+  count, not total progress, and inspection does not validate against a live
+  function.
 - New: `item_key=` adds a `str`/`int`/`bytes` application identity to
   `ItemResult.key` across sync and async map, starmap, streaming, callbacks,
   and collected `.item_results()`. `index` remains the ordering contract and

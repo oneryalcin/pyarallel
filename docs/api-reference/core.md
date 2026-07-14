@@ -298,6 +298,48 @@ Constraints, stated honestly:
 Available on `parallel_map`, `async_parallel_map`, and `.map()` — not on
 starmap or the streaming APIs.
 
+### Inspect an Existing Checkpoint
+
+`checkpoint_info(path)` reads operational metadata without loading any pickled
+result value:
+
+```python
+from pyarallel import checkpoint_info
+
+
+EXPECTED_VERSION = ("classify-v3", "gpt-5")
+info = checkpoint_info("classify.ckpt")
+
+if info.checkpoint_version != EXPECTED_VERSION:
+    raise RuntimeError("checkpoint belongs to a different campaign")
+
+print(f"{info.completed} persisted rows in {info.size_bytes} bytes")
+```
+
+It returns a frozen `CheckpointInfo` with these fields:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `path` | `Path` | The supplied checkpoint location |
+| `schema_version` | `str` | Pyarallel's stored checkpoint schema version |
+| `checkpoint_version` | `str \| int \| bytes \| tuple \| None` | Decoded semantic token supplied when the run was created |
+| `task_signature` | `str` | Stored mapped-function identity |
+| `completed` | `int` | Number of result rows persisted in the inspected SQLite snapshot |
+| `size_bytes` | `int` | Primary database file size observed before SQLite opens it; excludes WAL/SHM sidecars |
+
+The reader validates the version-2 table shapes, reads metadata and the row
+count in one SQLite snapshot, and never selects `results.value`. Missing files
+raise `FileNotFoundError`; malformed, foreign, or unsupported files raise
+`CheckpointError`.
+
+!!! warning "Inspection is not resume validation or total progress"
+    `checkpoint_info()` reports what the file contains. It does not compare the
+    stored signature or version with a live callable, does not know the original
+    input total, and cannot prove that results reached an external sink. Treat
+    `completed` as persisted rows, not a percentage or successful-run status.
+    SQLite may create or update `-wal`/`-shm` sidecars while reading a WAL-mode
+    database, even though the database is opened logically read-only.
+
 ### Notes on Progress and Unsized Iterables
 
 When `items` has a known length, `on_progress(done, total)` reports the final

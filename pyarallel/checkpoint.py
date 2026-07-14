@@ -32,6 +32,7 @@ and are safely recomputed.
 
 from __future__ import annotations
 
+import ast
 import base64
 import functools
 import hashlib
@@ -42,8 +43,9 @@ import sqlite3
 import stat
 import types
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 
 def _create_secure(path: str | Path) -> None:
@@ -93,6 +95,23 @@ class CheckpointError(RuntimeError):
     persisted (the checkpoint contract would silently break, so the run
     stops loudly instead).
     """
+
+
+@dataclass(frozen=True, slots=True)
+class CheckpointInfo:
+    """Read-only metadata about one existing checkpoint file.
+
+    ``completed`` is the number of persisted result rows, not total progress.
+    ``size_bytes`` covers only the primary SQLite file at the initial path
+    validation; WAL and shared-memory sidecars are excluded.
+    """
+
+    path: Path
+    schema_version: str
+    checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None
+    task_signature: str
+    completed: int
+    size_bytes: int
 
 
 def _code_digest(code: Any) -> bytes:
@@ -461,6 +480,160 @@ def _encode_version(token: Any) -> str | None:
             "containers can change between runs."
         )
     return repr(token)
+
+
+_CHECKPOINT_TABLES: dict[str, tuple[tuple[Any, ...], ...]] = {
+    "meta": (
+        (0, "key", "TEXT", 0, None, 1),
+        (1, "value", "TEXT", 1, None, 0),
+    ),
+    "results": (
+        (0, "key", "TEXT", 0, None, 1),
+        (1, "fingerprint", "BLOB", 1, None, 0),
+        (2, "value", "BLOB", 1, None, 0),
+    ),
+}
+
+
+def _inspection_error(path: Path, detail: str) -> CheckpointError:
+    return CheckpointError(
+        f"Checkpoint {str(path)!r} {detail}. Delete the file to start fresh "
+        "or choose a different checkpoint path."
+    )
+
+
+def _validate_inspection_schema(conn: sqlite3.Connection, path: Path) -> None:
+    objects = conn.execute(
+        "SELECT type, name FROM sqlite_master"
+        " WHERE name IN ('meta', 'results') ORDER BY name"
+    ).fetchall()
+    if objects != [("table", "meta"), ("table", "results")]:
+        raise _inspection_error(path, "does not contain the required checkpoint tables")
+
+    for table, expected in _CHECKPOINT_TABLES.items():
+        actual = conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+        if actual != list(expected):
+            raise _inspection_error(path, f"has an unsupported {table!r} table shape")
+
+
+def _decode_version(
+    value: str, path: Path
+) -> str | int | bytes | tuple[str | int | bytes, ...]:
+    try:
+        decoded = ast.literal_eval(value)
+        if _encode_version(decoded) != value:
+            raise ValueError("checkpoint version is not canonically encoded")
+    except (CheckpointError, SyntaxError, TypeError, ValueError, RecursionError) as exc:
+        raise _inspection_error(
+            path, "has malformed checkpoint-version metadata"
+        ) from exc
+    return cast(str | int | bytes | tuple[str | int | bytes, ...], decoded)
+
+
+def _valid_task_signature(value: str) -> bool:
+    prefix, separator, digest = value.rpartition(":")
+    return bool(
+        prefix
+        and separator
+        and len(digest) == 16
+        and all(character in "0123456789abcdef" for character in digest)
+    )
+
+
+def checkpoint_info(path: str | Path) -> CheckpointInfo:
+    """Inspect an existing checkpoint without loading stored result values.
+
+    The database is opened in SQLite read-only/query-only mode. Reading a WAL
+    checkpoint may still cause SQLite to create or update ``-wal``/``-shm``
+    sidecars. The returned row count and metadata share one read transaction;
+    the primary-file size is the earlier filesystem observation.
+    """
+    supplied_path = Path(path)
+    try:
+        receipt = os.lstat(supplied_path)
+    except FileNotFoundError:
+        raise
+    except OSError as exc:
+        raise _inspection_error(supplied_path, "could not be inspected") from exc
+
+    if not stat.S_ISREG(receipt.st_mode):
+        raise _inspection_error(
+            supplied_path,
+            "is not a regular file (symlink, directory, or special file)",
+        )
+
+    conn: sqlite3.Connection | None = None
+    primary_error: BaseException | None = None
+    try:
+        uri = f"{supplied_path.absolute().as_uri()}?mode=ro&cache=private"
+        conn = sqlite3.connect(uri, uri=True)
+        conn.execute("PRAGMA query_only=ON")
+        conn.execute("BEGIN")
+        _validate_inspection_schema(conn, supplied_path)
+
+        rows = conn.execute(
+            "SELECT key, value FROM meta"
+            " WHERE key IN ('schema_version', 'task_signature',"
+            " 'checkpoint_version')"
+        ).fetchall()
+        metadata: dict[str, str] = {}
+        for key, value in rows:
+            if not isinstance(key, str) or not isinstance(value, str):
+                raise _inspection_error(
+                    supplied_path, "has malformed non-text metadata"
+                )
+            metadata[key] = value
+        schema_version = metadata.get("schema_version")
+        task_signature = metadata.get("task_signature")
+        if schema_version != _SCHEMA_VERSION:
+            raise _inspection_error(
+                supplied_path,
+                "uses an unsupported or missing schema version "
+                f"(found {schema_version!r}, need {_SCHEMA_VERSION!r})",
+            )
+        if task_signature is None or not _valid_task_signature(task_signature):
+            raise _inspection_error(
+                supplied_path, "has missing or malformed task-signature metadata"
+            )
+
+        encoded_version = metadata.get("checkpoint_version")
+        checkpoint_version = (
+            None
+            if encoded_version is None
+            else _decode_version(encoded_version, supplied_path)
+        )
+        count_row = conn.execute("SELECT COUNT(*) FROM results").fetchone()
+        if count_row is None or not isinstance(count_row[0], int) or count_row[0] < 0:
+            raise _inspection_error(supplied_path, "has an invalid result-row count")
+
+        return CheckpointInfo(
+            path=supplied_path,
+            schema_version=schema_version,
+            checkpoint_version=checkpoint_version,
+            task_signature=task_signature,
+            completed=count_row[0],
+            size_bytes=receipt.st_size,
+        )
+    except CheckpointError as exc:
+        primary_error = exc
+        raise
+    except (OSError, sqlite3.Error) as exc:
+        primary_error = exc
+        raise _inspection_error(
+            supplied_path, "is not a usable checkpoint database"
+        ) from exc
+    except BaseException as exc:
+        primary_error = exc
+        raise
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except sqlite3.Error as exc:
+                if primary_error is None:
+                    raise _inspection_error(
+                        supplied_path, "could not close its inspection connection"
+                    ) from exc
 
 
 def _open_checkpoint(
