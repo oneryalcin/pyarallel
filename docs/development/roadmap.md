@@ -24,7 +24,7 @@ The best direction toward 1.0 is not more kinds of parallelism — it is being
 **the most trustworthy single-machine runtime for expensive, rate-limited
 fan-out jobs**.
 
-## Current (0.10.0 on PyPI)
+## Current (0.11.0 on PyPI)
 
 - `parallel_map()` / `parallel_starmap()` / `parallel_iter()` and async
   mirrors; `@parallel` / `@async_parallel` decorators with `.map()` /
@@ -165,6 +165,16 @@ can proceed in parallel.
   `tests/api_snapshot.txt` renders the whole exported surface;
   accidental changes are a red build, deliberate ones a reviewed diff.
 
+## v0.11 — Observable, resumable production jobs *(shipped in 0.11.0)*
+
+The delta after `v0.10.0` is now packaged as `0.11.0`: live result
+callbacks, stable application identities for every result path, read-only
+checkpoint inspection, and a runnable production API-job template. The
+release also promotes the executable documentation gates, API snapshot, and
+benchmark lab as maintained delivery infrastructure. The reusable-session
+benchmark and lifecycle design remain evidence and design artifacts only;
+they are explicitly deferred from this release.
+
 ## v1.0 — Freeze
 
 Criteria, not features. No headline feature ships in 1.0.
@@ -190,7 +200,7 @@ ships lean. All are additive (none would require a breaking change,
 which is why none block the freeze). `on_result=`, stable item identity
 (`item_key=` / `ItemResult.key`), and read-only checkpoint inspection
 (`checkpoint_info()`) were selected from this list and are implemented in
-Unreleased. A reusable execution session is selected for a
+0.11.0. A reusable execution session was selected for a
 [benchmark spike](plans/reusable-execution-session-benchmark.md). The
 2026-07-14 campaign produced two clean, matching CPython 3.12 runs: repeated
 small process maps saved roughly 110-114 ms per additional call, while the
@@ -198,8 +208,11 @@ thread control stayed near zero. The combined verdict is `advance-to-design`.
 A standard GIL-enabled 3.14 context run was also clean, with all process and
 interpreter cells valid. The raw record is in
 [`benchmarks/RESULTS.md`](https://github.com/oneryalcin/pyarallel/blob/main/benchmarks/RESULTS.md#reusable-execution-session-spike--2026-07-14).
-This earns a separate, reviewed lifecycle/API plan; it does not approve a
-public session implementation or `0.11.0` work.
+The resulting [reviewed lifecycle/API design](plans/reusable-execution-session-lifecycle.md)
+selects a sync-only `ParallelSession` with one active collected call, fixed
+worker configuration, clean-run-only reuse, and terminal retirement after
+truncation or infrastructure failure. Streaming and implementation remain
+demand-gated; this does not approve a public session API or `0.11.0` work.
 Weighted/composite quotas (see the
 [design spike record](plans/design-spikes-pre-1.0.md)) remain deferred until
 real user demand appears. Selection happens on evidence and feedback, not

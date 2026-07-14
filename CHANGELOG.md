@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 — 2026-07-14 — observable, resumable production jobs
 
 - New: `checkpoint_info(path)` inspects an existing checkpoint without loading
   pickled result values. The frozen `CheckpointInfo` reports schema and semantic
