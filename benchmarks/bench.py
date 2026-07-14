@@ -39,30 +39,45 @@ from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing
 import os
 import platform
 import statistics
 import sys
 import time
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Generator
+from typing import Any, Literal, cast
 
-# _workloads is the sibling module in this directory; running the file as a
-# script puts benchmarks/ on sys.path[0], so it imports cleanly. The lab
-# installs pyarallel as a normal dependency; nothing here is imported by the
-# package or the test suite.
-from _workloads import noop, spin
+_BENCH_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if not __package__:
+    # Direct script execution puts benchmarks/ rather than the repository root
+    # on sys.path. Add the root so the same package imports work in scripts/tests.
+    sys.path.insert(0, _BENCH_ROOT)
 
-from pyarallel import parallel_iter, parallel_map
+from benchmarks._session_bench import run_execution_session  # noqa: E402
+from benchmarks._workloads import noop, spin  # noqa: E402
+from pyarallel import parallel_iter, parallel_map  # noqa: E402
 
 # ~5 ms per item on an Apple M-series core; see _workloads.spin.
 SPIN_N = 140_000
 
-InterpreterMaybe = tuple[str, ...]
+ExecutorName = Literal["thread", "process", "interpreter"]
+InterpreterMaybe = tuple[ExecutorName, ...]
+
+
+def _require_interpreter_import_path() -> None:
+    """Fail fast when 3.14 subinterpreters cannot import checkout targets."""
+    if sys.version_info >= (3, 14) and _BENCH_ROOT not in os.environ.get(
+        "PYTHONPATH", ""
+    ).split(os.pathsep):
+        raise RuntimeError(
+            "Python 3.14 interpreter benchmarks require the repository root in "
+            'PYTHONPATH at process startup; run with PYTHONPATH="$PWD"'
+        )
 
 
 def _executors() -> InterpreterMaybe:
-    base = ("thread", "process")
+    base: InterpreterMaybe = ("thread", "process")
     if sys.version_info >= (3, 14):
         return (*base, "interpreter")
     return base
@@ -88,6 +103,9 @@ def machine_context() -> dict[str, Any]:
         "python_impl": platform.python_implementation(),
         "gil_enabled": (gil() if gil is not None else None),
         "cpu_count": os.cpu_count(),
+        "multiprocessing_start_method": (
+            multiprocessing.get_context().get_start_method()
+        ),
     }
 
 
@@ -95,7 +113,7 @@ def bench_cpu_scaling(reps: int, items: int) -> dict[str, Any]:
     """CPU parallelism: does adding workers actually speed CPU-bound work up?"""
     data = [SPIN_N] * items
 
-    def run(workers: int, executor: str) -> Callable[[], Any]:
+    def run(workers: int, executor: ExecutorName) -> Callable[[], Any]:
         return lambda: parallel_map(spin, data, workers=workers, executor=executor)
 
     thread_1 = _median_ms(run(1, "thread"), reps)
@@ -130,11 +148,19 @@ def bench_engine_overhead(reps: int, items: int) -> dict[str, Any]:
     per_size: list[dict[str, Any]] = []
     for n in sizes:
         data = list(range(n))
-        loop_ms = _median_ms(lambda d=data: [noop(x) for x in d], reps)
-        map_ms = _median_ms(lambda d=data: parallel_map(noop, d, workers=4), reps)
-        iter_ms = _median_ms(
-            lambda d=data: [r for r in parallel_iter(noop, d, workers=4)], reps
-        )
+
+        def run_loop(values: list[int] = data) -> list[int]:
+            return [noop(x) for x in values]
+
+        def run_map(values: list[int] = data) -> Any:
+            return parallel_map(noop, values, workers=4)
+
+        def run_iter(values: list[int] = data) -> list[Any]:
+            return [result for result in parallel_iter(noop, values, workers=4)]
+
+        loop_ms = _median_ms(run_loop, reps)
+        map_ms = _median_ms(run_map, reps)
+        iter_ms = _median_ms(run_iter, reps)
         per = 1000.0 / n  # ms -> us/item
         per_size.append(
             {
@@ -158,7 +184,10 @@ def bench_worker_startup(reps: int) -> dict[str, Any]:
             start = time.perf_counter()
             # A fresh call each time = a fresh (cold) pool. Pull one result so
             # we time pool spin-up + one worker + one task round-trip.
-            gen = parallel_iter(noop, range(64), workers=1, executor=ex)
+            gen = cast(
+                Generator[Any, None, None],
+                parallel_iter(noop, range(64), workers=1, executor=ex),
+            )
             next(iter(gen))
             gen.close()
             samples.append((time.perf_counter() - start) * 1000.0)
@@ -166,7 +195,8 @@ def bench_worker_startup(reps: int) -> dict[str, Any]:
     return out
 
 
-def run_all(quick: bool) -> dict[str, Any]:
+def run_all(quick: bool, diagnostic: bool = False) -> dict[str, Any]:
+    _require_interpreter_import_path()
     reps = 3 if quick else 5
     # 300 items is where the interpreter-vs-thread ratio on a GIL build
     # amortizes the ~50 ms cold pool and reaches the documented ~3.4x; --quick
@@ -183,6 +213,7 @@ def run_all(quick: bool) -> dict[str, Any]:
         "cpu_scaling": bench_cpu_scaling(reps, cpu_items),
         "engine_overhead": bench_engine_overhead(reps, overhead_items),
         "worker_startup": bench_worker_startup(reps),
+        "execution_session": run_execution_session(quick=quick, diagnostic=diagnostic),
     }
 
 
@@ -244,6 +275,34 @@ def print_human(report: dict[str, Any]) -> None:
         if key in ws:
             note = "  (claim: beats process fork/spawn)" if ex == "interpreter" else ""
             print(f"  {ex:<12}   {ws[key]:>9.2f} ms{note}")
+    print()
+
+    session = report["execution_session"]
+    config = session["config"]
+    calibration = session["calibration"]
+    print(
+        "[execution-session]  "
+        f"cells={len(config['cell_ids'])} "
+        f"timed={config['timed_strategy_samples']} "
+        f"warmups={config['warmup_strategy_samples']}"
+    )
+    print(
+        f"  calibration      spin={calibration['spin_ms']:.2f} ms "
+        f"initializer={calibration['initializer_ms']:.2f} ms"
+    )
+    for cell_id in config["cell_ids"]:
+        cell = session["cells"][cell_id]
+        if not cell["valid"]:
+            print(f"  {cell_id:<8} INVALID  {cell['reason']}")
+            continue
+        fresh = cell["strategies"]["stdlib_fresh"]["median_ms"]
+        reused = cell["strategies"]["stdlib_reused"]["median_ms"]
+        ratio = fresh / reused
+        print(
+            f"  {cell_id:<8} fresh={fresh:>9.2f} ms "
+            f"reused={reused:>9.2f} ms  {ratio:.2f}x"
+        )
+    print(f"  verdict          {session['verdict']}")
 
 
 def main() -> None:
@@ -258,9 +317,14 @@ def main() -> None:
         action="store_true",
         help="fast pass, fewer items/reps (ratios are weaker)",
     )
+    parser.add_argument(
+        "--diagnostic",
+        action="store_true",
+        help="add non-gating one-worker, one-item, and no-op session cells",
+    )
     args = parser.parse_args()
 
-    report = run_all(quick=args.quick)
+    report = run_all(quick=args.quick, diagnostic=args.diagnostic)
     if args.json:
         print(json.dumps(report, indent=2))
     else:

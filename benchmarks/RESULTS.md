@@ -121,3 +121,93 @@ machine as above, `--quick`:
 Per-item overhead is flat across the range (9.11 → 8.97 µs/item):
 the O(n)-driver claim holds as *measured linearity*, not extrapolation.
 The single-size numbers in the runs above remain valid as recorded.
+
+## Reusable execution-session spike — 2026-07-14
+
+This spike asks whether repeated small maps save enough wall time when one
+executor is reused to justify a separate public lifecycle design. It does not
+benchmark a Pyarallel session implementation. `stdlib_reused` is an optimistic
+lower bound; the product verdict is owned by the precommitted noise and control
+rules in the [reviewed plan](../docs/development/plans/reusable-execution-session-benchmark.md).
+
+Machine: macOS 26.4.1, Apple Silicon, 10 cores, `spawn`. Each strategy has one
+untimed warmup and seven timed samples. The JSON artifacts match the checked-in
+serializer and contain every raw nanosecond sample, derived metric, threshold,
+calibration sample, and per-worker initializer duration:
+
+- [CPython 3.12.8 run 1](results/2026-07-14-reusable-session-cpython312-run1.json)
+- [CPython 3.12.8 run 2](results/2026-07-14-reusable-session-cpython312-run2.json)
+- [CPython 3.14.6 standard, GIL enabled](results/2026-07-14-reusable-session-cpython314.json)
+
+Only the post-fix official runs are recorded. During harness development,
+failed contract probes exposed two invalid assumptions—subinterpreter callable
+globals do not preserve initializer state, and initializer evidence must not
+share a directory with worker rendezvous markers. The final harness persists
+initializer proof before task publication and isolates the two marker
+namespaces; invalid development runs did not enter the classifier.
+
+### Official run 1 — CPython 3.12.8
+
+Calibration: 4.881 ms task spin, 98.692 ms initializer. Verdict:
+**advance-to-design**.
+
+| Cell | Pyarallel fresh ms | stdlib fresh ms | stdlib reused ms | Reuse | Saved / extra call ms | Integration delta ms | Fresh MAD/median | Reused MAD/median |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| P1 | 124.283 | 122.349 | 123.889 | 0.988× | — | 1.934 | 0.0077 | 0.0063 |
+| P3 | 373.017 | 366.980 | 145.381 | 2.524× | 110.800 | 6.038 | 0.0033 | 0.0031 |
+| P10 | 1259.491 | 1238.074 | 225.895 | 5.481× | 112.464 | 21.417 | 0.0069 | 0.0076 |
+| P64 | 2002.332 | 1969.804 | 960.917 | 2.050× | 112.099 | 32.528 | 0.0036 | 0.0069 |
+| T10 | 414.410 | 408.951 | 405.063 | 1.010× | 0.432 | 5.459 | 0.0081 | 0.0045 |
+| PI3 | 664.909 | 666.653 | 221.321 | 3.012× | 222.666 | -1.744 | 0.0099 | 0.0169 |
+| PI10 | 2178.385 | 2154.349 | 228.833 | 9.415× | 213.946 | 24.035 | 0.0031 | 0.0146 |
+
+### Official run 2 — CPython 3.12.8
+
+Calibration: 4.862 ms task spin, 99.573 ms initializer. Verdict:
+**advance-to-design**.
+
+| Cell | Pyarallel fresh ms | stdlib fresh ms | stdlib reused ms | Reuse | Saved / extra call ms | Integration delta ms | Fresh MAD/median | Reused MAD/median |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| P1 | 124.963 | 124.632 | 124.772 | 0.999× | — | 0.331 | 0.0078 | 0.0174 |
+| P3 | 370.832 | 373.257 | 145.259 | 2.570× | 113.999 | -2.425 | 0.0043 | 0.0053 |
+| P10 | 1244.824 | 1234.264 | 225.709 | 5.468× | 112.062 | 10.560 | 0.0070 | 0.0120 |
+| P64 | 1985.217 | 1980.777 | 963.581 | 2.056× | 113.022 | 4.440 | 0.0111 | 0.0146 |
+| T10 | 399.697 | 404.449 | 397.647 | 1.017× | 0.756 | -4.751 | 0.0113 | 0.0059 |
+| PI3 | 650.663 | 650.564 | 219.167 | 2.968× | 215.698 | 0.100 | 0.0048 | 0.0072 |
+| PI10 | 2186.544 | 2182.728 | 227.954 | 9.575× | 217.197 | 3.816 | 0.0082 | 0.0045 |
+
+### Context run — CPython 3.14.6, GIL enabled
+
+Calibration: 5.044 ms task spin, 101.616 ms initializer. All 13 process and
+interpreter cells were valid and clean. The process-owned classifier was
+**advance-to-design**; interpreter mirrors remain contextual.
+
+| Cell | Pyarallel fresh ms | stdlib fresh ms | stdlib reused ms | Reuse | Saved / extra call ms | Integration delta ms | Fresh MAD/median | Reused MAD/median |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| P1 | 139.964 | 139.904 | 138.532 | 1.010× | — | 0.059 | 0.0207 | 0.0097 |
+| P3 | 414.317 | 415.796 | 160.006 | 2.599× | 127.895 | -1.479 | 0.0036 | 0.0065 |
+| P10 | 1374.668 | 1379.342 | 244.308 | 5.646× | 126.115 | -4.674 | 0.0111 | 0.0172 |
+| P64 | 2200.324 | 2193.426 | 1006.642 | 2.179× | 131.865 | 6.898 | 0.0068 | 0.0053 |
+| T10 | 415.573 | 415.457 | 412.154 | 1.008× | 0.367 | 0.116 | 0.0047 | 0.0084 |
+| PI3 | 698.857 | 691.788 | 235.300 | 2.940× | 228.244 | 7.069 | 0.0006 | 0.0077 |
+| PI10 | 2324.232 | 2332.204 | 243.564 | 9.575× | 232.071 | -7.972 | 0.0034 | 0.0198 |
+| IP1 | 80.681 | 45.612 | 46.220 | 0.987× | — | 35.069 | 0.0042 | 0.0047 |
+| IP3 | 245.508 | 137.944 | 69.289 | 1.991× | 34.328 | 107.564 | 0.0076 | 0.0119 |
+| IP10 | 811.826 | 461.312 | 148.587 | 3.105× | 34.747 | 350.513 | 0.0033 | 0.0023 |
+| IP64 | 1559.080 | 1193.296 | 879.193 | 1.357× | 34.900 | 365.784 | 0.0050 | 0.0053 |
+| IPI3 | 524.728 | 422.835 | 144.519 | 2.926× | 139.158 | 101.892 | 0.0020 | 0.0051 |
+| IPI10 | 1787.204 | 1410.182 | 152.228 | 9.264× | 139.773 | 377.022 | 0.0017 | 0.0185 |
+
+### Decision: advance to a separate lifecycle/API design
+
+Both authoritative 3.12 runs were clean and independently passed every ordinary
+process gate. Reusing the stdlib process pool saved roughly 110–114 ms per
+additional small map in `P3`, `P10`, and `P64`, while the thread control stayed
+near 1.0× and below 1 ms saved per extra call. The combined verdict is therefore
+**`advance-to-design`**.
+
+This does not approve `ParallelPool`, a public session API, implementation work,
+or `0.11.0`. It earns a separately planned and reviewed lifecycle design for
+ownership, shutdown, failure recovery, cancellation, concurrent calls, and
+state isolation. The full Pyarallel-to-reused gap is not labelled reuse savings;
+integration deltas remain separate in the tables and raw artifacts.

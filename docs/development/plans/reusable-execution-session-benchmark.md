@@ -115,7 +115,9 @@ subinterpreter re-import see the same value.
 Every task returns a receipt containing its ordinary value, `(pid, thread_id)`
 worker identity, initialized-state flag, and worker-local initializer duration
 when present. The initializer measures its own `perf_counter_ns()` interval and
-stores it in worker-local module state.
+persists it under the run-scoped temporary directory before tasks are published.
+The task reads that evidence by worker identity; callable globals are not assumed
+to persist across CPython subinterpreter calls.
 
 To prove equivalent four-worker ownership without warming the measured pool,
 each call receives a unique pre-created rendezvous directory. Its first tasks
@@ -174,8 +176,9 @@ Controls must pass before product gates:
   `invalid-harness`; the low-startup control says the harness is measuring
   something besides pool reuse.
 - Every required cell must have `MAD / median <= 0.10` for both stdlib
-  strategies. Rerun the full default pass once when this fails. A second noisy
-  pass yields outcome 3 (`defer-noisy`), not a hand-picked winner.
+  strategies. Run the full default pass exactly twice. If either pass is noisy,
+  the two-clean-pass requirement is unmet and the combined outcome is
+  `defer-noisy`, not a hand-picked winner.
 - Two clean default passes must produce the same classifier outcome. Any
   disagreement, including values straddling a threshold without tripping the
   noise rule, yields outcome 3 (`defer-unstable`). Do not take a third run as a
@@ -192,8 +195,15 @@ predicates:
 
 If any ordinary predicate fails, outcome 2 (`initializer-specific`) requires
 both `PI3` and `PI10` to have speedup >= 2.00 and saved/extra call >= 50 ms,
-with exactly four worker identities per call and every reported initializer
-duration inside the accepted 75-150 ms calibration band. Otherwise the result
+with exactly four worker identities per call and every receipt confirming that
+the initializer ran with a positive measured duration. Initializers persist
+that proof to the run-scoped temporary directory before tasks are published;
+receipts read it back by `(pid, thread_id)`. This works across processes and
+subinterpreters without assuming that callable globals are shared. The once-per-run
+initializer calibration must remain inside the accepted 75-150 ms band;
+per-worker elapsed durations are published as diagnostics but are not compared
+to that band because four concurrent CPU-bound initializers can be stretched by
+scheduler contention without changing the calibrated work. Otherwise the result
 is outcome 3 (`defer`). These Boolean rules are implemented in a pure function
 and pinned with boundary-value tests, including equality, just-below thresholds,
 zero/negative medians, calls=1, missing cells, invalid controls, and noise.
@@ -206,7 +216,7 @@ reuse savings. Interpreter mirrors and free-threaded runs are context only.
 ## Files and Implementation Steps
 
 1. Extend `benchmarks/_workloads.py` with importable calibrated spin,
-   initializer, receipt task, and worker-local state. Keep it dependency-free
+   initializer, receipt task, and persisted run-scoped evidence. Keep it dependency-free
    and safe under process spawn/interpreter import
    (`benchmarks/_workloads.py:1-31`).
 2. Add `benchmarks/_session_bench.py` as the importable deterministic seam:
@@ -215,7 +225,11 @@ reuse savings. Interpreter mirrors and free-threaded runs are context only.
    workloads with package-relative imports. `benchmarks/bench.py` retains its
    script entry point and uses a dual import (`from benchmarks...` when imported,
    sibling import when executed directly) so both `python benchmarks/bench.py`
-   and `import benchmarks._session_bench` work.
+   and `import benchmarks._session_bench` work. Require the repository root in
+   `PYTHONPATH` at process startup for standard 3.14 interpreter runs; CPython
+   subinterpreters initialize an isolated `sys.path` and do not inherit a
+   main-interpreter-only `sys.path.insert()` or a late environment mutation.
+   Fail fast with the exact launch instruction when this capability is absent.
 3. Extend `benchmarks/bench.py` with calibration, strategy execution,
    correctness/worker-receipt checks, JSON fields, and a concise human
    `execution-session` table. Preserve all existing JSON keys and output
@@ -238,7 +252,7 @@ reuse savings. Interpreter mirrors and free-threaded runs are context only.
 
 - Every strategy returns the same ordered values for every call.
 - Every call reports exactly four distinct worker identities in gate cells; the
-  initializer task also reports true initialized state and a positive in-band
+  initializer task also reports true initialized state and a positive
   worker-local initializer duration for every receipt.
 - Strategy-owned pools close even when result validation raises.
 - The run-scoped rendezvous temporary directory is removed on success and every

@@ -191,8 +191,15 @@ which is why none block the freeze). `on_result=`, stable item identity
 (`item_key=` / `ItemResult.key`), and read-only checkpoint inspection
 (`checkpoint_info()`) were selected from this list and are implemented in
 Unreleased. A reusable execution session is selected for a
-[benchmark spike](plans/reusable-execution-session-benchmark.md) only; no
-public API is approved until measured savings earn the abstraction.
+[benchmark spike](plans/reusable-execution-session-benchmark.md). The
+2026-07-14 campaign produced two clean, matching CPython 3.12 runs: repeated
+small process maps saved roughly 110-114 ms per additional call, while the
+thread control stayed near zero. The combined verdict is `advance-to-design`.
+A standard GIL-enabled 3.14 context run was also clean, with all process and
+interpreter cells valid. The raw record is in
+[`benchmarks/RESULTS.md`](https://github.com/oneryalcin/pyarallel/blob/main/benchmarks/RESULTS.md#reusable-execution-session-spike--2026-07-14).
+This earns a separate, reviewed lifecycle/API plan; it does not approve a
+public session implementation or `0.11.0` work.
 Weighted/composite quotas (see the
 [design spike record](plans/design-spikes-pre-1.0.md)) remain deferred until
 real user demand appears. Selection happens on evidence and feedback, not
