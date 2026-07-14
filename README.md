@@ -119,6 +119,7 @@ async with httpx.AsyncClient(timeout=10) as client:
 - **Debug mode** — `sequential=True` runs inline: no pool, real stack traces, working breakpoints
 - **Progress callbacks** — `on_progress=lambda done, total: print(f"{done}/{total}")` on collected and streaming APIs
 - **Live result callbacks** — `on_result=` receives each `ItemResult` on the driver thread as collected-map work completes, including failures, retry metadata, and checkpoint hits
+- **Application identities** — `item_key=lambda customer: customer.id` adds `ItemResult.key` to successes, failures, callbacks, collected receipts, and streams without changing index-based ordering; `checkpoint_key=` supplies it automatically on checkpointed runs
 
 **Choose the runtime and interface**
 

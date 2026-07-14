@@ -7,15 +7,34 @@ behaves like a list until something failed; then it forces you to look.
 from __future__ import annotations
 
 import enum
+import inspect
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, overload
+from typing import Any, cast, overload
 
 _MISSING = object()
 
 # Sentinel for "slot not yet filled" — distinct from a legitimate None return.
 # Lives here so ParallelResult can refuse to be built around a leaked one.
 _PENDING = object()
+
+
+def _validate_item_key(value: Any) -> str | int | bytes:
+    """Validate one user-facing result identity.
+
+    Key functions are deliberately synchronous and return only stable,
+    compact scalar identities. ``bool`` is rejected even though it is an
+    ``int`` subclass; accepting it would make ``True`` and ``1`` ambiguous.
+    """
+    if inspect.isawaitable(value):
+        if inspect.iscoroutine(value):
+            value.close()
+        raise TypeError("item_key must be synchronous, not return an awaitable")
+    if isinstance(value, bool) or not isinstance(value, (str, int, bytes)):
+        raise TypeError(
+            f"item_key must return str, int, or bytes, got {type(value).__name__}"
+        )
+    return cast(str | int | bytes, value)
 
 
 class RunStatus(enum.Enum):
@@ -77,7 +96,11 @@ class _Outcome:
     duration: float
 
 
-def _item_result(idx: int, outcome: _Outcome) -> ItemResult[Any]:
+def _item_result(
+    idx: int,
+    outcome: _Outcome,
+    key: str | int | bytes | None = None,
+) -> ItemResult[Any]:
     """Build the streaming result item from a task outcome."""
     if outcome.error is not None:
         return ItemResult(
@@ -85,17 +108,23 @@ def _item_result(idx: int, outcome: _Outcome) -> ItemResult[Any]:
             error=outcome.error,
             attempts=outcome.attempts,
             duration=outcome.duration,
+            key=key,
         )
     return ItemResult(
         idx,
         value=outcome.value,
         attempts=outcome.attempts,
         duration=outcome.duration,
+        key=key,
     )
 
 
 def _stored_item_result(
-    idx: int, entry: Any, attempts: int, duration: float
+    idx: int,
+    entry: Any,
+    attempts: int,
+    duration: float,
+    key: str | int | bytes | None = None,
 ) -> ItemResult[Any]:
     """Build an ``ItemResult`` from one collected-result slot."""
     if isinstance(entry, _Failure):
@@ -104,8 +133,15 @@ def _stored_item_result(
             error=entry.exception,
             attempts=attempts,
             duration=duration,
+            key=key,
         )
-    return ItemResult(idx, value=entry, attempts=attempts, duration=duration)
+    return ItemResult(
+        idx,
+        value=entry,
+        attempts=attempts,
+        duration=duration,
+        key=key,
+    )
 
 
 @dataclass(init=False, frozen=True, slots=True)
@@ -118,6 +154,9 @@ class ItemResult[R]:
     ``duration`` is wall-clock seconds from the start of the first
     attempt to the final outcome — *including* retry backoff sleeps,
     *excluding* time spent queued before a worker picked the item up.
+
+    ``key`` is an optional application identity supplied by ``item_key=``.
+    It does not affect ordering; ``index`` remains the source position.
     """
 
     index: int
@@ -125,6 +164,7 @@ class ItemResult[R]:
     error: Exception | None
     attempts: int
     duration: float
+    key: str | int | bytes | None
 
     def __init__(
         self,
@@ -133,6 +173,7 @@ class ItemResult[R]:
         error: Exception | None | object = _MISSING,
         attempts: int = 1,
         duration: float = 0.0,
+        key: str | int | bytes | None = None,
     ) -> None:
         has_value = value is not _MISSING
         has_error = error is not _MISSING
@@ -147,6 +188,7 @@ class ItemResult[R]:
         object.__setattr__(self, "error", error if has_error else None)
         object.__setattr__(self, "attempts", attempts)
         object.__setattr__(self, "duration", duration)
+        object.__setattr__(self, "key", key)
 
     @property
     def ok(self) -> bool:
@@ -174,7 +216,7 @@ class ParallelResult[R]:
     not a completion.
     """
 
-    __slots__ = ("_entries", "_meta", "_status")
+    __slots__ = ("_entries", "_keys", "_meta", "_status")
 
     def __init__(
         self,
@@ -182,6 +224,7 @@ class ParallelResult[R]:
         *,
         status: RunStatus = RunStatus.COMPLETED,
         meta: list[tuple[int, float]] | None = None,
+        keys: list[str | int | bytes | None] | None = None,
     ) -> None:
         # A leaked unfilled slot must fail loudly here, not surface later
         # as a silent "success" value from .values()/.ok.
@@ -197,11 +240,19 @@ class ParallelResult[R]:
                 "internal error: metadata misaligned with results "
                 f"({len(meta)} != {len(entries)})"
             )
+        if keys is not None and len(keys) != len(entries):
+            raise RuntimeError(
+                "internal error: keys misaligned with results "
+                f"({len(keys)} != {len(entries)})"
+            )
         self._entries = entries
         # Per-index (attempts, duration), index-aligned with entries. The
         # engines fill it; hand-constructed results leave it None and
         # item_results() synthesizes honest defaults.
         self._meta = meta
+        # Per-index application identities. As with metadata, engines keep
+        # this ledger aligned; manual construction synthesizes ``None``.
+        self._keys = keys
         self._status = status
 
     # --- Introspection ---
@@ -303,7 +354,7 @@ class ParallelResult[R]:
         """Every item as an ``ItemResult``, in input order. Never raises.
 
         The collected mirror of the streaming ``ItemResult`` — same
-        vocabulary (index/value/error/attempts/duration) so a collected
+        vocabulary (index/key/value/error/attempts/duration) so a collected
         run and a streamed run read identically. A partial-results
         accessor, like ``.successes()``: it does not raise on failures
         or truncation.
@@ -320,7 +371,8 @@ class ParallelResult[R]:
         out: list[ItemResult[R]] = []
         for i, e in enumerate(self._entries):
             attempts, duration = self._meta[i] if self._meta is not None else (1, 0.0)
-            out.append(_stored_item_result(i, e, attempts, duration))
+            key = self._keys[i] if self._keys is not None else None
+            out.append(_stored_item_result(i, e, attempts, duration, key))
         return out
 
     def raise_on_failure(self) -> None:

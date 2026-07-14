@@ -22,6 +22,7 @@ results = await async_parallel_map(
     on_result=None,                  # sync callback(ItemResult) in completion order
     window_size=None,                # Admission window: max unresolved items
     retry=None,                      # Retry(attempts=3, backoff=1.0)
+    item_key=None,                   # Application identity on ItemResult.key
     checkpoint=None,                 # Path to a resume file (SQLite)
     checkpoint_key=None,             # Stable per-item identity for resume
     max_errors=None,                 # Abort after N failures
@@ -44,6 +45,7 @@ results = await async_parallel_map(
 | `on_result` | `Callable[[ItemResult[R]], None] \| None` | `None` | Synchronous per-item callback on the event-loop thread, in completion order. Receives successes and failures with retry metadata; checkpoint hits have `attempts=0`. Exceptions propagate like `on_progress`; use `async_parallel_iter` when handling must be awaited |
 | `window_size` | `int \| None` | `None` | Admission window: max tasks created but unresolved (default `2 × concurrency`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
+| `item_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Synchronous application identity attached to `ItemResult.key` for successes, failures, callbacks, and `.item_results()`. It runs on the event-loop thread; duplicate values are allowed |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun |
 | `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — see the [sync docs](core.md#checkpoint-resume) |
 | `max_errors` | `int \| None` | `None` | Abort after this many failures (counted after retries). Windowed admission makes the abort cheap; unrun items are marked `Aborted`, `result.aborted` is set — see the [sync docs](core.md#early-abort-with-max_errors) |
@@ -119,7 +121,9 @@ results = await async_parallel_starmap(add, [(1, 2), (3, 4)], concurrency=4)
 # ParallelResult([3, 7])
 ```
 
-Takes the same options as `async_parallel_map`. Also available as `.starmap()` on `@async_parallel` decorated functions.
+Takes the same applicable options as `async_parallel_map`. With `item_key=`, the key
+function receives the original source tuple before argument unpacking. Also
+available as `.starmap()` on `@async_parallel` decorated functions.
 
 ---
 
@@ -148,6 +152,8 @@ async for item in async_parallel_iter(fetch, urls, concurrency=10):
 Takes the same `ordered=` and `on_progress=` options as `parallel_iter`:
 `ordered=True` yields in input order with a reorder buffer counted
 inside the window; `on_progress(done, total)` fires per completed item.
+It also accepts `item_key=` and attaches that application identity to every
+yielded `ItemResult` without changing the `index` ordering contract.
 
 To stop early, close the generator — unlike sync generators, a bare
 `break` does **not** finalize an async generator promptly (Python defers

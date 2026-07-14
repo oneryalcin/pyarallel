@@ -41,7 +41,7 @@ async def fetch_async(url: str) -> bytes:
 
 
 def check_parallel_map() -> None:
-    result = parallel_map(fetch, ["a", "b"])
+    result = parallel_map(fetch, ["a", "b"], item_key=lambda url: url)
     assert_type(result, ParallelResult[dict[str, int]])
     assert_type(result.values(), list[dict[str, int]])
     assert_type(result.successes(), list[tuple[int, dict[str, int]]])
@@ -51,19 +51,26 @@ def check_parallel_map() -> None:
 
 
 def check_parallel_starmap() -> None:
-    assert_type(parallel_starmap(add, [(1, 2), (3, 4)]), ParallelResult[int])
+    assert_type(
+        parallel_starmap(
+            add,
+            [(1, 2), (3, 4)],
+            item_key=lambda args: f"{args[0]}:{args[1]}",
+        ),
+        ParallelResult[int],
+    )
 
 
 def check_parallel_iter() -> None:
-    it = parallel_iter(fetch, ["a"])
+    it = parallel_iter(fetch, ["a"], item_key=lambda url: url)
     assert_type(it, Iterator[ItemResult[dict[str, int]]])
 
 
 async def check_async_parallel_map() -> None:
-    result = await async_parallel_map(fetch_async, ["a"])
+    result = await async_parallel_map(fetch_async, ["a"], item_key=lambda url: url)
     assert_type(result, ParallelResult[bytes])
 
-    stream = async_parallel_iter(fetch_async, ["a"])
+    stream = async_parallel_iter(fetch_async, ["a"], item_key=lambda url: url)
     assert_type(stream, AsyncIterator[ItemResult[bytes]])
 
 
@@ -189,6 +196,7 @@ def check_decorator_option_keys() -> None:
             on_result=collect_str,
             window_size=100,
             retry=Retry(attempts=2),
+            item_key=lambda item: f"item-{item}",
             checkpoint="run.ckpt",
             checkpoint_key=lambda item: str(item),
             checkpoint_version=("classify-v3", "gpt-4o"),
@@ -206,10 +214,21 @@ def check_decorator_option_keys() -> None:
     triple.map([1], executor=None)  # type: ignore[arg-type]  # None not a value
 
     assert_type(
-        triple.stream([1], ordered=True, max_errors=3, sequential=None),
+        triple.stream(
+            [1],
+            item_key=lambda item: f"item-{item}",
+            ordered=True,
+            max_errors=3,
+            sequential=None,
+        ),
         Iterator[ItemResult[str]],
     )
-    assert_type(triple.starmap([(1,)], sequential=True), ParallelResult[str])
+    assert_type(
+        triple.starmap(
+            [(1,)], item_key=lambda args: f"item-{args[0]}", sequential=True
+        ),
+        ParallelResult[str],
+    )
 
     triple.map([1], wrokers=4)  # type: ignore[call-arg]  # typo is caught
 
@@ -226,13 +245,16 @@ async def check_async_decorator_option_keys() -> None:
             task_timeout=5.0,
             on_result=collect_bytes,
             retry=Retry(attempts=2),
+            item_key=lambda item: item,
             checkpoint="run.ckpt",
             checkpoint_key=lambda item: str(item),
             max_errors=10,
         ),
         ParallelResult[bytes],
     )
-    stream = fetch_many.stream(["u"], ordered=True, max_errors=3)
+    stream = fetch_many.stream(
+        ["u"], item_key=lambda item: item, ordered=True, max_errors=3
+    )
     assert_type(stream, AsyncIterator[ItemResult[bytes]])
 
     await fetch_many.map(["u"], sequential=True)  # type: ignore[call-arg]  # sync-only option

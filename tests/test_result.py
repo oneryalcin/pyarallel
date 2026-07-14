@@ -3,7 +3,12 @@
 import pytest
 
 from pyarallel import ItemResult, ParallelResult, RunStatus
-from pyarallel.result import _Failure
+from pyarallel.result import (
+    _Failure,
+    _item_result,
+    _Outcome,
+    _validate_item_key,
+)
 
 
 class TestSuccessfulResult:
@@ -191,6 +196,21 @@ class TestItemResult:
         assert item.value is None
         assert item.error is err
 
+    def test_key_defaults_to_none(self):
+        assert ItemResult(index=0, value="ok").key is None
+
+    def test_key_is_available_on_success_and_failure(self):
+        success = ItemResult(index=0, value="ok", key="customer-8f2")
+        failure = ItemResult(index=1, error=ValueError("bad"), key=42)
+
+        assert success.key == "customer-8f2"
+        assert failure.key == 42
+
+    def test_internal_builder_carries_key(self):
+        result = _item_result(3, _Outcome("ok", None, 2, 0.5), b"record-3")
+
+        assert result.key == b"record-3"
+
     def test_requires_exactly_one_of_value_or_error(self):
         with pytest.raises(ValueError):
             ItemResult[int](index=0)
@@ -318,6 +338,51 @@ class TestItemResultInvariants:
         it = ItemResult(0, value=None)
         assert it.ok is True
         assert it.value is None
+
+
+class TestItemKeyValidation:
+    @pytest.mark.parametrize("key", ["customer-8f2", 42, b"record-3"])
+    def test_accepts_supported_key_types(self, key):
+        assert _validate_item_key(key) == key
+
+    @pytest.mark.parametrize("key", [True, False, None, 1.5, object()])
+    def test_rejects_unsupported_key_types(self, key):
+        with pytest.raises(TypeError, match="str, int, or bytes"):
+            _validate_item_key(key)
+
+    async def test_rejects_awaitable_key(self):
+        async def key():
+            return "customer-8f2"
+
+        with pytest.raises(TypeError, match="synchronous"):
+            _validate_item_key(key())
+
+
+class TestParallelResultKeys:
+    def test_item_results_use_aligned_key_ledger(self):
+        error = ValueError("bad")
+        result = ParallelResult(
+            ["ok", _Failure(error)],
+            meta=[(1, 0.1), (2, 0.2)],
+            keys=["customer-8f2", 42],
+        )
+
+        items = result.item_results()
+        assert [(item.index, item.key) for item in items] == [
+            (0, "customer-8f2"),
+            (1, 42),
+        ]
+        assert items[1].error is error
+
+    def test_manual_result_defaults_keys_to_none(self):
+        assert [item.key for item in ParallelResult([1, 2]).item_results()] == [
+            None,
+            None,
+        ]
+
+    def test_rejects_misaligned_key_ledger(self):
+        with pytest.raises(RuntimeError, match="keys misaligned"):
+            ParallelResult([1, 2], keys=["only-one"])
 
 
 class TestFailureProvenance:

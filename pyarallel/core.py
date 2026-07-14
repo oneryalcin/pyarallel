@@ -63,6 +63,7 @@ from .result import (
     _item_result,
     _Outcome,
     _stored_item_result,
+    _validate_item_key,
 )
 from .stop import StopToken
 
@@ -84,6 +85,7 @@ class SyncMapOptions(TypedDict, total=False):
     on_result: Callable[[ItemResult[Any]], None] | None
     window_size: int | None
     retry: Retry | None
+    item_key: Callable[[Any], str | int | bytes] | None
     checkpoint: str | Path | None
     checkpoint_key: Callable[[Any], str | int | bytes] | None
     checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None
@@ -105,6 +107,7 @@ class SyncStarmapOptions(TypedDict, total=False):
     on_result: Callable[[ItemResult[Any]], None] | None
     window_size: int | None
     retry: Retry | None
+    item_key: Callable[[tuple[Any, ...]], str | int | bytes] | None
     sequential: bool | None
     worker_init: Callable[[], None] | None
     max_tasks_per_worker: int | None
@@ -118,6 +121,7 @@ class SyncStreamOptions(TypedDict, total=False):
     rate_limit: Limiter | RateLimit | float | None
     window_size: int | None
     retry: Retry | None
+    item_key: Callable[[Any], str | int | bytes] | None
     ordered: bool | None
     on_progress: Callable[[int, int], None] | None
     max_errors: int | None
@@ -411,6 +415,7 @@ def parallel_map[T, R](
     on_result: Callable[[ItemResult[R]], None] | None = None,
     window_size: int | None = None,
     retry: Retry | None = None,
+    item_key: Callable[[T], str | int | bytes] | None = None,
     checkpoint: str | Path | None = None,
     checkpoint_key: Callable[[T], str | int | bytes] | None = None,
     checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None = None,
@@ -465,6 +470,10 @@ def parallel_map[T, R](
             no barriers, and input is consumed lazily, one window ahead,
             so generators are never materialized.
         retry: ``Retry`` object for per-item retry with backoff.
+        item_key: Application identity for each item (returns str, int, or
+            bytes). The key is attached to ``ItemResult`` receipts without
+            changing input-order indexing. Duplicate values are allowed. When
+            omitted, ``checkpoint_key`` supplies the result key automatically.
         checkpoint: Path to a checkpoint file (created if missing, SQLite).
             Completed item results are stored there; rerunning the same
             call resumes — cached items load from disk, failed and unseen
@@ -544,6 +553,7 @@ def parallel_map[T, R](
             on_progress=on_progress,
             on_result=on_result,
             retry=retry,
+            item_key=item_key,
             checkpoint=checkpoint,
             checkpoint_key=checkpoint_key,
             checkpoint_version=checkpoint_version,
@@ -563,6 +573,7 @@ def parallel_map[T, R](
         on_result=on_result,
         window_size=window_size,
         retry=retry,
+        item_key=item_key,
         checkpoint=checkpoint,
         checkpoint_key=checkpoint_key,
         checkpoint_version=checkpoint_version,
@@ -585,6 +596,7 @@ def _collected_map(
     on_result: Callable[[ItemResult[Any]], None] | None,
     window_size: int | None,
     retry: Retry | None,
+    item_key: Callable[[Any], str | int | bytes] | None,
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
     checkpoint_version: Any = None,
@@ -619,6 +631,7 @@ def _collected_map(
     # hit or truncation placeholder keeps; _absorb overwrites with the
     # worker's real receipt.
     meta: list[tuple[int, float]] = []
+    keys: list[str | int | bytes | None] = []
     in_flight: dict[Future[_Outcome], int] = {}
     # (future, index, outcome, infrastructure_error). Thread workers enqueue
     # from inside the submitted callable, before their Future becomes done;
@@ -650,7 +663,11 @@ def _collected_map(
     def _report_result(idx: int) -> None:
         if on_result:
             attempts, duration = meta[idx]
-            on_result(_stored_item_result(idx, results[idx], attempts, duration))
+            on_result(
+                _stored_item_result(
+                    idx, results[idx], attempts, duration, key=keys[idx]
+                )
+            )
 
     def _consume_completion(
         event: tuple[
@@ -710,27 +727,45 @@ def _collected_map(
             idx = len(results)
             results.append(_PENDING)
             meta.append((0, 0.0))
+            cached: tuple[Any] | None = None
+            checkpoint_item_key: str | int | bytes | None = None
             if store is not None:
-                cached = store.lookup(idx, item)
-                if cached is not None:
-                    results[idx] = cached[0]
-                    if executor != "thread":
-                        # A process/interpreter Future becomes done before its
-                        # callbacks run. If the source observed result() in
-                        # that gap, wait for the executor callback to publish
-                        # every already-done live result before this cache hit.
-                        with publication:
-                            while any(
-                                future.done() and future not in published
-                                for future in in_flight
-                            ):
-                                publication.wait()
-                    # Cache hits join the same FIFO as live completions.
-                    completions.put((None, idx, None, None))
-                    _drain_completions()
-                    if halt.stopped:
-                        return False
-                    continue  # cached — keep looking for work to admit
+                cached, checkpoint_item_key = store.lookup(idx, item)
+            if item_key is None or item_key is checkpoint_key:
+                key = checkpoint_item_key
+            else:
+                key = _validate_item_key(item_key(item))
+            keys.append(key)
+            if cached is not None:
+                results[idx] = cached[0]
+                if executor != "thread":
+                    # A process/interpreter Future becomes done before its
+                    # callbacks run. If the source observed result() in
+                    # that gap, wait for the executor callback to publish
+                    # every already-done live result before this cache hit.
+                    with publication:
+                        while any(
+                            future.done() and future not in published
+                            for future in in_flight
+                        ):
+                            publication.wait()
+                # Cache hits join the same FIFO as live completions.
+                completions.put((None, idx, None, None))
+                _drain_completions()
+                if halt.stopped:
+                    return False
+                continue  # cached — keep looking for work to admit
+            # Key evaluation and checkpoint lookup are admission work. A stop
+            # that lands during either must prevent the live task from starting.
+            if stop is not None and stop.stopped:
+                results[idx] = _Failure(Cancelled("cancelled by StopToken"))
+                halt.stop(RunStatus.CANCELLED)
+                return False
+            if deadline is not None and time.monotonic() >= deadline:
+                assert timeout is not None
+                results[idx] = _timeout_failure(timeout, idx)
+                halt.stop(RunStatus.TIMED_OUT)
+                return False
             if bucket is not None and stop is None:
                 # No token: one bounded wait. The limiter predicts —
                 # a grant beyond the budget returns False immediately
@@ -941,6 +976,7 @@ def _collected_map(
                 for idx in range(len(results), total):
                     results.append(_timeout_failure(timeout, idx))
                     meta.append((0, 0.0))
+                    keys.append(None)
         elif halt.aborted:
             # Salvage completions that raced the stop, drop the rest.
             _drain_completions()
@@ -954,6 +990,7 @@ def _collected_map(
                 pad = total - len(results)
                 results.extend(_Failure(Aborted(reason)) for _ in range(pad))
                 meta.extend((0, 0.0) for _ in range(pad))
+                keys.extend(None for _ in range(pad))
         elif halt.cancelled:
             # Same salvage as abort: keep completions that raced the
             # stop, mark everything unresolved Cancelled. Running
@@ -971,6 +1008,7 @@ def _collected_map(
                 pad = total - len(results)
                 results.extend(_Failure(Cancelled(reason)) for _ in range(pad))
                 meta.extend((0, 0.0) for _ in range(pad))
+                keys.extend(None for _ in range(pad))
     finally:
         # Every stop — timeout, abort, or an escaping driver error
         # (source iterator, checkpoint write, progress callback) —
@@ -983,7 +1021,7 @@ def _collected_map(
         if store is not None:
             store.close()
 
-    return ParallelResult(results, status=halt.status, meta=meta)
+    return ParallelResult(results, status=halt.status, meta=meta, keys=keys)
 
 
 def _sequential_collected_map(
@@ -995,6 +1033,7 @@ def _sequential_collected_map(
     on_progress: Callable[[int, int], None] | None,
     on_result: Callable[[ItemResult[Any]], None] | None,
     retry: Retry | None,
+    item_key: Callable[[Any], str | int | bytes] | None,
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
     checkpoint_version: Any = None,
@@ -1019,6 +1058,7 @@ def _sequential_collected_map(
     # same contract as the windowed engine (default (0, 0.0) = nothing ran
     # this run; overwritten with the task's real receipt).
     meta: list[tuple[int, float]] = []
+    keys: list[str | int | bytes | None] = []
     completed = 0
     failures = 0
     halt = _RunStop()
@@ -1041,16 +1081,34 @@ def _sequential_collected_map(
                 break
             results.append(_PENDING)
             meta.append((0, 0.0))
+            cached: tuple[Any] | None = None
+            checkpoint_item_key: str | int | bytes | None = None
             if store is not None:
-                cached = store.lookup(idx, item)
-                if cached is not None:
-                    results[idx] = cached[0]
-                    completed += 1
-                    if on_result:
-                        on_result(_stored_item_result(idx, results[idx], 0, 0.0))
-                    if on_progress:
-                        on_progress(completed, _progress_total(total, results))
-                    continue
+                cached, checkpoint_item_key = store.lookup(idx, item)
+            if item_key is None or item_key is checkpoint_key:
+                key = checkpoint_item_key
+            else:
+                key = _validate_item_key(item_key(item))
+            keys.append(key)
+            if cached is not None:
+                results[idx] = cached[0]
+                completed += 1
+                if on_result:
+                    on_result(
+                        _stored_item_result(idx, results[idx], 0, 0.0, key=keys[idx])
+                    )
+                if on_progress:
+                    on_progress(completed, _progress_total(total, results))
+                continue
+            if stop is not None and stop.stopped:
+                results[idx] = _Failure(Cancelled("cancelled by StopToken"))
+                halt.stop(RunStatus.CANCELLED)
+                break
+            if deadline is not None and time.monotonic() >= deadline:
+                assert timeout is not None
+                results[idx] = _timeout_failure(timeout, idx)
+                halt.stop(RunStatus.TIMED_OUT)
+                break
             if bucket is not None and stop is None:
                 # No token: one bounded, predicting wait (see the
                 # windowed engine — grant beyond budget times out now).
@@ -1110,7 +1168,11 @@ def _sequential_collected_map(
             if on_result:
                 on_result(
                     _stored_item_result(
-                        idx, results[idx], outcome.attempts, outcome.duration
+                        idx,
+                        results[idx],
+                        outcome.attempts,
+                        outcome.duration,
+                        key=keys[idx],
                     )
                 )
             if on_progress:
@@ -1126,22 +1188,25 @@ def _sequential_collected_map(
             for idx in range(len(results), total):
                 results.append(_timeout_failure(timeout, idx))
                 meta.append((0, 0.0))
+                keys.append(None)
         elif halt.cancelled and total is not None:
             pad = total - len(results)
             results.extend(
                 _Failure(Cancelled("cancelled by StopToken")) for _ in range(pad)
             )
             meta.extend((0, 0.0) for _ in range(pad))
+            keys.extend(None for _ in range(pad))
         elif halt.aborted and total is not None:
             reason = f"aborted after {failures} failures (max_errors={max_errors})"
             pad = total - len(results)
             results.extend(_Failure(Aborted(reason)) for _ in range(pad))
             meta.extend((0, 0.0) for _ in range(pad))
+            keys.extend(None for _ in range(pad))
     finally:
         if store is not None:
             store.close()
 
-    return ParallelResult(results, status=halt.status, meta=meta)
+    return ParallelResult(results, status=halt.status, meta=meta, keys=keys)
 
 
 def _sequential_iter(
@@ -1150,6 +1215,7 @@ def _sequential_iter(
     *,
     rate_limit: Limiter | RateLimit | float | None,
     retry: Retry | None,
+    item_key: Callable[[Any], str | int | bytes] | None,
     on_progress: Callable[[int, int], None] | None,
     max_errors: int | None,
     worker_init: Callable[[], None] | None,
@@ -1162,10 +1228,11 @@ def _sequential_iter(
         worker_init()
     failures = 0
     for idx, item in enumerate(items):
+        key = _validate_item_key(item_key(item)) if item_key is not None else None
         if bucket:
             bucket.wait()
         outcome = task_fn(item)
-        result = _item_result(idx, outcome)
+        result = _item_result(idx, outcome, key=key)
         if on_progress:
             done = idx + 1
             on_progress(done, total if total is not None else done)
@@ -1193,11 +1260,14 @@ def parallel_starmap[R](
     on_result: Callable[[ItemResult[R]], None] | None = None,
     window_size: int | None = None,
     retry: Retry | None = None,
+    item_key: Callable[[tuple[Any, ...]], str | int | bytes] | None = None,
     sequential: bool = False,
     worker_init: Callable[[], None] | None = None,
     max_tasks_per_worker: int | None = None,
 ) -> ParallelResult[R]:
     """Like ``parallel_map`` but unpacks each item as ``fn(*args)``.
+
+    ``item_key`` receives the original source tuple before unpacking.
 
     Example::
 
@@ -1228,6 +1298,7 @@ def parallel_starmap[R](
                 on_result=on_result,
                 window_size=window_size,
                 retry=retry,
+                item_key=item_key,
                 sequential=sequential,
                 worker_init=worker_init,
                 max_tasks_per_worker=max_tasks_per_worker,
@@ -1248,6 +1319,7 @@ def parallel_starmap[R](
         on_result=on_result,
         window_size=window_size,
         retry=retry,
+        item_key=item_key,
         sequential=sequential,
         worker_init=worker_init,
         max_tasks_per_worker=max_tasks_per_worker,
@@ -1263,6 +1335,7 @@ def parallel_iter[T, R](
     rate_limit: Limiter | RateLimit | float | None = None,
     window_size: int | None = None,
     retry: Retry | None = None,
+    item_key: Callable[[T], str | int | bytes] | None = None,
     ordered: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
     max_errors: int | None = None,
@@ -1322,6 +1395,10 @@ def parallel_iter[T, R](
     ``max_tasks_per_worker`` recycles process workers. Caller
     contextvars are visible inside thread-executor tasks.
 
+    ``item_key`` is a fast synchronous function evaluated on the driver before
+    submission. Its ``str``/``int``/``bytes`` value is attached to every
+    yielded ``ItemResult``; ``index`` remains the ordering field.
+
     Example::
 
         for item in parallel_iter(process, huge_list):
@@ -1341,6 +1418,7 @@ def parallel_iter[T, R](
             items,
             rate_limit=rate_limit,
             retry=retry,
+            item_key=item_key,
             on_progress=on_progress,
             max_errors=max_errors,
             worker_init=worker_init,
@@ -1362,6 +1440,7 @@ def parallel_iter[T, R](
     yielded_failures = 0
     in_flight: dict[Future[_Outcome], int] = {}
     buffered: dict[int, ItemResult[R]] = {}
+    keys: dict[int, str | int | bytes | None] = {}
     next_yield = 0
 
     pool = _make_pool(executor, workers, worker_init, max_tasks_per_worker)
@@ -1373,6 +1452,7 @@ def parallel_iter[T, R](
         except StopIteration:
             return False
         seen += 1
+        keys[idx] = _validate_item_key(item_key(item)) if item_key is not None else None
         if bucket:
             bucket.wait()
         in_flight[_submit_task(pool, executor, task_fn, item)] = idx
@@ -1416,11 +1496,12 @@ def parallel_iter[T, R](
             done, _pending = wait(in_flight, return_when=FIRST_COMPLETED)
             for future in done:
                 idx = in_flight.pop(future)
+                key = keys.pop(idx)
                 result: ItemResult[R]
                 try:
-                    result = _item_result(idx, future.result())
+                    result = _item_result(idx, future.result(), key=key)
                 except Exception as exc:
-                    result = ItemResult(idx, error=exc)
+                    result = ItemResult(idx, error=exc, key=key)
                 if not result.ok:
                     failures += 1
                 completed += 1

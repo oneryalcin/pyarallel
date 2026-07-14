@@ -221,7 +221,13 @@ Safety guards, stated honestly:
 
   Duplicate keys raise `CheckpointError`; keys are type-tagged (`1` vs
   `"1"` vs `b"1"` never collide); a changed payload under the same key
-  still recomputes.
+  still recomputes. The same identity is also exposed as `ItemResult.key` on
+  live callbacks and `result.item_results()`. You do not need to repeat the
+  function as `item_key=`: when `item_key` is omitted, `checkpoint_key`
+  supplies the result key automatically and is evaluated only once per item.
+  If you explicitly pass the same callable for both options, Pyarallel still
+  evaluates it only once. Distinct callables each run once and may return
+  different checkpoint and application identities.
 - Checkpoint files from pyarallel < 0.5 fail closed — delete and rerun.
 - Items and results must be picklable; a result that cannot be
   checkpointed aborts the run with `CheckpointError`.
@@ -239,6 +245,10 @@ Safety guards, stated honestly:
     locations) is not a safe home for one regardless.
 
 Available on `parallel_map`, `async_parallel_map`, and `.map()`.
+
+Outside checkpointing, `item_key=` is available on map, starmap, and streaming
+APIs, sync and async. Its values may repeat because they are descriptive
+application identities; only checkpoint row keys must be unique.
 
 ## Cooperative Stop — `StopToken`
 
