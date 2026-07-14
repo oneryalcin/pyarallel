@@ -5,7 +5,7 @@ from .aio import (
     async_parallel_map,
     async_parallel_starmap,
 )
-from .checkpoint import CheckpointError
+from .checkpoint import CheckpointError, CheckpointInfo, checkpoint_info
 from .core import (
     parallel_iter,
     parallel_map,
@@ -29,6 +29,8 @@ __all__ = [
     "RunStatus",
     "StopToken",
     "CheckpointError",
+    "CheckpointInfo",
+    "checkpoint_info",
     "parallel",
     "parallel_iter",
     "parallel_map",

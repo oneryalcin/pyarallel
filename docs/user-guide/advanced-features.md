@@ -246,6 +246,43 @@ Safety guards, stated honestly:
 
 Available on `parallel_map`, `async_parallel_map`, and `.map()`.
 
+### Inspect Before You Resume
+
+Use `checkpoint_info()` when an operator needs to identify a checkpoint before
+deciding whether to resume it or remove it. Inspection counts rows without
+loading their pickled values:
+
+```python
+from pathlib import Path
+
+from pyarallel import checkpoint_info
+
+
+checkpoint = Path("classify.ckpt")
+expected = ("classify-v3", "gpt-5")
+info = checkpoint_info(checkpoint)
+
+if info.checkpoint_version == expected:
+    print(f"resume candidate: {info.completed} rows already persisted")
+else:
+    checkpoint.unlink()  # deliberate policy choice: start this campaign fresh
+```
+
+`CheckpointInfo` also exposes `schema_version`, `task_signature`, and the
+primary database's pre-open `size_bytes`. The value is frozen, and all database
+metadata plus `completed` come from one coherent read snapshot. A concurrent
+writer can commit immediately afterward, so this is an inspection receipt, not
+a live monitor.
+
+!!! warning "Know what inspection cannot prove"
+    Inspection does not compare the stored identity with your current function,
+    does not know how many input items exist, and does not report a run status or
+    external-delivery state. `completed` means persisted rows only. The reader
+    does not unpickle result values, but the file must still be treated as
+    untrusted input: maliciously huge metadata can consume parser resources.
+    SQLite may also create or update `-wal`/`-shm` sidecars while opening a
+    WAL-mode checkpoint logically read-only.
+
 Outside checkpointing, `item_key=` is available on map, starmap, and streaming
 APIs, sync and async. Its values may repeat because they are descriptive
 application identities; only checkpoint row keys must be unique.

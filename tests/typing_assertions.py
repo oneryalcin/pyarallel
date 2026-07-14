@@ -6,9 +6,11 @@ Not collected by pytest (no test_ prefix, no test functions).
 """
 
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 from typing import assert_type
 
 from pyarallel import (
+    CheckpointInfo,
     ItemResult,
     Limiter,
     ParallelResult,
@@ -17,11 +19,26 @@ from pyarallel import (
     async_parallel,
     async_parallel_iter,
     async_parallel_map,
+    checkpoint_info,
     parallel,
     parallel_iter,
     parallel_map,
     parallel_starmap,
 )
+
+
+def check_checkpoint_info() -> None:
+    info = checkpoint_info("run.ckpt")
+    assert_type(info, CheckpointInfo)
+    assert_type(info.path, Path)
+    assert_type(info.schema_version, str)
+    assert_type(
+        info.checkpoint_version,
+        str | int | bytes | tuple[str | int | bytes, ...] | None,
+    )
+    assert_type(info.task_signature, str)
+    assert_type(info.completed, int)
+    assert_type(info.size_bytes, int)
 
 
 def fetch(url: str) -> dict[str, int]:
