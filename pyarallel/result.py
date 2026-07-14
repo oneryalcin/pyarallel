@@ -10,7 +10,7 @@ import enum
 import inspect
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, cast, overload
+from typing import Any, overload
 
 _MISSING = object()
 
@@ -30,11 +30,15 @@ def _validate_item_key(value: Any) -> str | int | bytes:
         if inspect.iscoroutine(value):
             value.close()
         raise TypeError("item_key must be synchronous, not return an awaitable")
-    if isinstance(value, bool) or not isinstance(value, (str, int, bytes)):
-        raise TypeError(
-            f"item_key must return str, int, or bytes, got {type(value).__name__}"
-        )
-    return cast(str | int | bytes, value)
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    raise TypeError(
+        f"item_key must return str, int, or bytes, got {type(value).__name__}"
+    )
 
 
 class RunStatus(enum.Enum):
