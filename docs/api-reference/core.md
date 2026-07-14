@@ -20,6 +20,7 @@ results = parallel_map(
     on_result=None,                  # callback(ItemResult) in completion order
     window_size=None,                # Admission window: max unresolved items
     retry=None,                      # Retry(attempts=3, backoff=1.0)
+    item_key=None,                   # Application identity on ItemResult.key
     checkpoint=None,                 # Path to a resume file (SQLite)
     checkpoint_key=None,             # Stable per-item identity for resume
     max_errors=None,                 # Abort after N failures
@@ -45,6 +46,7 @@ results = parallel_map(
 | `on_result` | `Callable[[ItemResult[R]], None] \| None` | `None` | Live per-item callback on the driver thread, in completion order. Receives successes and failures with retry metadata; checkpoint hits have `attempts=0`. Exceptions propagate like `on_progress`. Use `async_parallel_iter` for awaited callback work |
 | `window_size` | `int \| None` | `None` | Admission window: max items submitted but unresolved (default `2 × workers`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
+| `item_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Synchronous application identity attached to `ItemResult.key` for successes, failures, callbacks, and `.item_results()`. It does not affect ordering, and duplicate values are allowed |
 | `checkpoint` | `str \| Path \| None` | `None` | Checkpoint file for resumable runs — completed items load from disk on rerun. **Contains pickle: treat the file like code** — never resume from a file you didn't create ([details](../user-guide/advanced-features.md#checkpoint-resume)) |
 | `checkpoint_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires `checkpoint=` |
 | `checkpoint_version` | `str \| int \| bytes \| tuple \| None` | `None` | Semantic token joining checkpoint identity — the config function inspection can't see (prompt, model). Changed token fails closed with both versions in the error. Requires `checkpoint=` |
@@ -119,6 +121,58 @@ no work ran for that item during the resumed call.
     off expensive persistence or network I/O to another queue, or consume
     `parallel_iter` when result handling is the main workload. For async code,
     use `async_parallel_iter` when handling must be awaited.
+
+### Identify Results by Application Key
+
+Use `item_key=` when the source position is not the identity your logs,
+callbacks, or recovery tooling use. The function is synchronous and receives
+the original source item once as that item is admitted:
+
+```python
+from pyarallel import ItemResult, parallel_map
+
+
+customers = [
+    {"id": "customer-8f2", "email": "ada@example.com"},
+    {"id": "customer-a17", "email": "grace@example.com"},
+]
+
+
+def send_welcome(customer: dict[str, str]) -> str:
+    return f"sent:{customer['email']}"
+
+
+def audit(receipt: ItemResult[str]) -> None:
+    if receipt.ok:
+        print(f"{receipt.key}: {receipt.value}")
+    else:
+        print(f"{receipt.key}: failed: {receipt.error}")
+
+
+run = parallel_map(
+    send_welcome,
+    customers,
+    item_key=lambda customer: customer["id"],
+    on_result=audit,
+)
+
+# Collected receipts carry the same identity in input order.
+assert [receipt.key for receipt in run.item_results()] == [
+    "customer-8f2",
+    "customer-a17",
+]
+```
+
+`ItemResult.index` remains the zero-based source position and remains the
+ordering field. Keys need not be unique; they are labels, not dictionary
+keys. The uniqueness rule applies only when an identity is also used for
+checkpoint rows through `checkpoint_key=`.
+
+!!! warning "Key functions run inline"
+    `item_key` must be a fast synchronous scalar function returning `str`,
+    `int`, or `bytes`. It runs on the driver or event-loop thread before the
+    task starts, so blocking I/O delays admission. Async key functions and
+    other return types raise `TypeError`.
 
 ### Debug Mode with `sequential=True`
 
@@ -287,7 +341,8 @@ even `None` — overrides).
 | `on_result` | `Callable[[ItemResult], None] \| None` | `None` | Default live result callback for `.map()`/`.starmap()` — ignored by `.stream()`, which already yields each `ItemResult` |
 
 **Deliberately not accepted** (run-scoped, not function-scoped):
-`checkpoint`/`checkpoint_key`/`checkpoint_version` — a checkpoint file
+`item_key` and `checkpoint`/`checkpoint_key`/`checkpoint_version` — identities
+describe the input collection for a particular run, while a checkpoint file
 names a *run*; two `.map()` calls sharing a default file would collide
 keys and serve wrong resumes. `stop` — a token is a campaign latch.
 Pass these per call.
@@ -348,7 +403,9 @@ from pyarallel import parallel_starmap
 results = parallel_starmap(fn, [(arg1, arg2), (arg3, arg4), ...])
 ```
 
-Takes the same applicable options as `parallel_map`, including `on_result=`.
+Takes the same applicable options as `parallel_map`, including `on_result=`
+and `item_key=`. The key function receives the original source tuple, before
+it is unpacked into `fn(*args)`.
 
 ### Examples
 
@@ -412,6 +469,7 @@ checkpointing, `stop`, or `on_result` — the iterator already yields each
 | `rate_limit` | `Limiter \| RateLimit \| float \| None` | `None` | Rate limiting |
 | `window_size` | `int \| None` | `None` | Maximum items in flight (default `2 × workers`) |
 | `retry` | `Retry \| None` | `None` | Per-item retry |
+| `item_key` | `Callable[[T], str \| int \| bytes] \| None` | `None` | Synchronous application identity attached to each yielded `ItemResult`; duplicate values are allowed |
 | `ordered` | `bool` | `False` | Yield in input order instead of completion order |
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | `callback(done, total)` per completed item |
 
@@ -426,7 +484,8 @@ checkpointing, `stop`, or `on_result` — the iterator already yields each
 
 ### Yields
 
-`ItemResult[T]` — each item includes `.index`, `.ok`, `.value`, and `.error`.
+`ItemResult[T]` — each item includes `.index`, `.key`, `.ok`, `.value`, and
+`.error`.
 Results arrive in **completion order** by default; pass `ordered=True`
 for input order.
 
@@ -480,6 +539,7 @@ and `.stream()`.
 | Member | Returns | Description |
 |---|---|---|
 | `.index` | `int` | Original input index |
+| `.key` | `str \| int \| bytes \| None` | Optional application identity supplied by `item_key=` (or inherited from `checkpoint_key=`). Does not affect ordering |
 | `.ok` | `bool` | `True` when this item succeeded |
 | `.value` | `T \| None` | Result value for successful items. May legitimately be `None` |
 | `.error` | `Exception \| None` | Exception for failed items |
@@ -538,7 +598,7 @@ instead of quietly returning a partial list. Use `.successes()` /
 | `.ok_values()` | `list[R]` | Values of successful tasks only, in input order. Never raises |
 | `.successes()` | `list[tuple[int, R]]` | `(index, value)` for each success |
 | `.failures()` | `list[tuple[int, Exception]]` | `(index, exception)` for each failure |
-| `.item_results()` | `list[ItemResult[R]]` | Every item as an `ItemResult` (index/value/error/**attempts/duration**), input order. Never raises. The collected mirror of streaming `ItemResult`. Checkpoint hits and truncation placeholders carry `attempts=0, duration=0.0` (nothing ran this run) |
+| `.item_results()` | `list[ItemResult[R]]` | Every item as an `ItemResult` (index/key/value/error/**attempts/duration**), input order. Never raises. The collected mirror of streaming `ItemResult`. Checkpoint hits and truncation placeholders carry `attempts=0, duration=0.0` (nothing ran this run) |
 | `.raise_on_failure()` | `None` | Raises `ExceptionGroup` if any task failed; each sub-exception carries its item index as a PEP 678 note (`except*` matching untouched) |
 | `len(result)` | `int` | Number of tasks with a result entry |
 | `result[i]` | `R` | Index into values (raises on failure/truncation) |

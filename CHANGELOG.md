@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- New: `item_key=` adds a `str`/`int`/`bytes` application identity to
+  `ItemResult.key` across sync and async map, starmap, streaming, callbacks,
+  and collected `.item_results()`. `index` remains the ordering contract and
+  duplicate application keys are allowed. On checkpointed maps,
+  `checkpoint_key=` supplies the result key automatically when `item_key` is
+  omitted, reusing the single key evaluation for live and cached results.
 - New: collected APIs accept `on_result=` — a live callback receiving each
   success or failure as an `ItemResult` on the driver thread, in completion
   order. Retry metadata is preserved, checkpoint hits report `attempts=0`,

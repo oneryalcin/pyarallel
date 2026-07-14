@@ -203,6 +203,12 @@ def _encode_key(key: Any) -> str:
     ``1``, ``"1"``, and ``b"1"`` must be three distinct rows — plain text
     normalization would collide them and silently serve the wrong result.
     """
+    if inspect.isawaitable(key):
+        if inspect.iscoroutine(key):
+            key.close()
+        raise CheckpointError(
+            "checkpoint_key must be synchronous, not return an awaitable"
+        )
     if isinstance(key, bool) or not isinstance(key, (int, str, bytes)):
         raise CheckpointError(
             f"checkpoint_key must return str, int, or bytes, got {type(key).__name__}"
@@ -392,13 +398,23 @@ class _RunCheckpoint:
         self._seen: set[str] = set()
         self._rows: dict[int, tuple[str, bytes]] = {}
 
-    def lookup(self, idx: int, item: Any) -> tuple[Any] | None:
-        """Cached ``(value,)`` for *item*, else ``None`` (and remember the
-        row so a later ``put(idx, ...)`` writes to the right place)."""
+    def lookup(
+        self, idx: int, item: Any
+    ) -> tuple[tuple[Any] | None, str | int | bytes | None]:
+        """Return ``(cached_result, raw_key)`` for *item*.
+
+        ``cached_result`` is the existing ``(value,)`` hit marker or ``None``.
+        ``raw_key`` exposes the already-evaluated, validated checkpoint key
+        for result identity reuse; positional checkpoints report ``None``.
+        A cache miss is remembered so a later ``put(idx, ...)`` writes to the
+        same encoded row without evaluating the key function again.
+        """
         if self._key_fn is None:
             key = f"i:{idx}"
+            raw_key = None
         else:
-            key = _encode_key(self._key_fn(item))
+            raw_key = self._key_fn(item)
+            key = _encode_key(raw_key)
             if key in self._seen:
                 raise CheckpointError(
                     f"duplicate checkpoint_key {key!r} — two input items "
@@ -410,7 +426,7 @@ class _RunCheckpoint:
         cached = self._store.get(key, fingerprint)
         if cached is None:
             self._rows[idx] = (key, fingerprint)
-        return cached
+        return cached, raw_key
 
     def put(self, idx: int, value: Any) -> None:
         key, fingerprint = self._rows.pop(idx)

@@ -48,6 +48,7 @@ from .result import (
     _item_result,
     _Outcome,
     _stored_item_result,
+    _validate_item_key,
 )
 from .stop import StopToken
 
@@ -107,6 +108,7 @@ class AsyncMapOptions(TypedDict, total=False):
     on_result: Callable[[ItemResult[Any]], None] | None
     window_size: int | None
     retry: Retry | None
+    item_key: Callable[[Any], str | int | bytes] | None
     checkpoint: str | Path | None
     checkpoint_key: Callable[[Any], str | int | bytes] | None
     checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None
@@ -125,6 +127,7 @@ class AsyncStarmapOptions(TypedDict, total=False):
     on_result: Callable[[ItemResult[Any]], None] | None
     window_size: int | None
     retry: Retry | None
+    item_key: Callable[[tuple[Any, ...]], str | int | bytes] | None
 
 
 class AsyncStreamOptions(TypedDict, total=False):
@@ -135,6 +138,7 @@ class AsyncStreamOptions(TypedDict, total=False):
     task_timeout: float | None
     window_size: int | None
     retry: Retry | None
+    item_key: Callable[[Any], str | int | bytes] | None
     ordered: bool | None
     on_progress: Callable[[int, int], None] | None
     max_errors: int | None
@@ -203,6 +207,7 @@ async def async_parallel_map[T, R](
     on_result: Callable[[ItemResult[R]], None] | None = None,
     window_size: int | None = None,
     retry: Retry | None = None,
+    item_key: Callable[[T], str | int | bytes] | None = None,
     checkpoint: str | Path | None = None,
     checkpoint_key: Callable[[T], str | int | bytes] | None = None,
     checkpoint_version: str | int | bytes | tuple[str | int | bytes, ...] | None = None,
@@ -248,6 +253,10 @@ async def async_parallel_map[T, R](
             no barriers, and input is consumed lazily, one window ahead,
             so generators are never materialized.
         retry: ``Retry`` object for per-item retry with backoff.
+        item_key: Application identity for each item (returns str, int, or
+            bytes). The key is attached to ``ItemResult`` receipts without
+            changing input-order indexing. Duplicate values are allowed. When
+            omitted, ``checkpoint_key`` supplies the result key automatically.
         checkpoint: Path to a checkpoint file (created if missing, SQLite).
             Completed item results are stored there; rerunning the same
             call resumes — cached items load from disk, failed and unseen
@@ -298,6 +307,7 @@ async def async_parallel_map[T, R](
         on_result=on_result,
         window_size=window_size,
         retry=retry,
+        item_key=item_key,
         checkpoint=checkpoint,
         checkpoint_key=checkpoint_key,
         checkpoint_version=checkpoint_version,
@@ -318,6 +328,7 @@ async def _async_collected_map(
     on_result: Callable[[ItemResult[Any]], None] | None,
     window_size: int | None,
     retry: Retry | None,
+    item_key: Callable[[Any], str | int | bytes] | None,
     checkpoint: str | Path | None,
     checkpoint_key: Callable[[Any], str | int | bytes] | None,
     checkpoint_version: Any = None,
@@ -342,6 +353,7 @@ async def _async_collected_map(
     # Default (0, 0.0) = "nothing ran this run" (cache hit / truncation
     # placeholder); completion consumption overwrites with the task's receipt.
     meta: list[tuple[int, float]] = []
+    keys: list[str | int | bytes | None] = []
     in_flight: dict[asyncio.Task[_Outcome], int] = {}
     completions: asyncio.Queue[
         tuple[asyncio.Task[Any] | None, int, _Outcome | None, BaseException | None]
@@ -408,7 +420,11 @@ async def _async_collected_map(
     def _report_result(idx: int) -> None:
         if on_result:
             attempts, duration = meta[idx]
-            on_result(_stored_item_result(idx, results[idx], attempts, duration))
+            on_result(
+                _stored_item_result(
+                    idx, results[idx], attempts, duration, key=keys[idx]
+                )
+            )
 
     def _consume_completion(
         event: tuple[
@@ -508,15 +524,33 @@ async def _async_collected_map(
             idx = len(results)
             results.append(_PENDING)
             meta.append((0, 0.0))
+            cached: tuple[Any] | None = None
+            checkpoint_item_key: str | int | bytes | None = None
             if store is not None:
-                cached = store.lookup(idx, item)
-                if cached is not None:
-                    results[idx] = cached[0]
-                    completions.put_nowait((None, idx, None, None))
-                    _drain_completions()
-                    if halt.stopped:
-                        return False
-                    continue  # cached — keep looking for work to admit
+                cached, checkpoint_item_key = store.lookup(idx, item)
+            if item_key is None or item_key is checkpoint_key:
+                key = checkpoint_item_key
+            else:
+                key = _validate_item_key(item_key(item))
+            keys.append(key)
+            if cached is not None:
+                results[idx] = cached[0]
+                completions.put_nowait((None, idx, None, None))
+                _drain_completions()
+                if halt.stopped:
+                    return False
+                continue  # cached — keep looking for work to admit
+            # Key evaluation and checkpoint lookup are admission work. A stop
+            # that lands during either must prevent the live task from starting.
+            if stop is not None and stop.stopped:
+                results[idx] = _Failure(Cancelled("cancelled by StopToken"))
+                halt.stop(RunStatus.CANCELLED)
+                return False
+            if deadline is not None and time.monotonic() >= deadline:
+                assert timeout is not None
+                results[idx] = _timeout_failure(timeout, idx)
+                halt.stop(RunStatus.TIMED_OUT)
+                return False
             task = asyncio.create_task(_run(item, idx))
             in_flight[task] = idx
             return True
@@ -601,6 +635,7 @@ async def _async_collected_map(
                 for idx in range(len(results), total):
                     results.append(_timeout_failure(timeout, idx))
                     meta.append((0, 0.0))
+                    keys.append(None)
         elif halt.aborted:
             # Salvage completions that raced the stop, cancel the rest.
             _drain_completions()
@@ -615,6 +650,7 @@ async def _async_collected_map(
                 pad = total - len(results)
                 results.extend(_Failure(Aborted(reason)) for _ in range(pad))
                 meta.extend((0, 0.0) for _ in range(pad))
+                keys.extend(None for _ in range(pad))
         elif halt.cancelled:
             # Salvage completions that raced the stop; asyncio CAN
             # cancel in-flight tasks (the honest asymmetry vs sync,
@@ -630,6 +666,7 @@ async def _async_collected_map(
                 pad = total - len(results)
                 results.extend(_Failure(Cancelled(reason)) for _ in range(pad))
                 meta.extend((0, 0.0) for _ in range(pad))
+                keys.extend(None for _ in range(pad))
     finally:
         if unregister is not None:
             unregister()
@@ -645,7 +682,7 @@ async def _async_collected_map(
         if store is not None:
             store.close()
 
-    return ParallelResult(results, status=halt.status, meta=meta)
+    return ParallelResult(results, status=halt.status, meta=meta, keys=keys)
 
 
 async def async_parallel_starmap[R](
@@ -660,8 +697,12 @@ async def async_parallel_starmap[R](
     on_result: Callable[[ItemResult[R]], None] | None = None,
     window_size: int | None = None,
     retry: Retry | None = None,
+    item_key: Callable[[tuple[Any, ...]], str | int | bytes] | None = None,
 ) -> ParallelResult[R]:
-    """Like ``async_parallel_map`` but unpacks each item as ``fn(*args)``."""
+    """Like ``async_parallel_map`` but unpacks each item as ``fn(*args)``.
+
+    ``item_key`` receives the original source tuple before unpacking.
+    """
 
     async def _unpack(args: tuple[Any, ...]) -> R:
         return await fn(*args)
@@ -677,6 +718,7 @@ async def async_parallel_starmap[R](
         on_result=on_result,
         window_size=window_size,
         retry=retry,
+        item_key=item_key,
     )
 
 
@@ -689,6 +731,7 @@ async def async_parallel_iter[T, R](
     task_timeout: float | None = None,
     window_size: int | None = None,
     retry: Retry | None = None,
+    item_key: Callable[[T], str | int | bytes] | None = None,
     ordered: bool = False,
     on_progress: Callable[[int, int], None] | None = None,
     max_errors: int | None = None,
@@ -744,6 +787,11 @@ async def async_parallel_iter[T, R](
             async for item in s:
                 if found(item):
                     break  # aclosing cancels in-flight tasks here
+
+    ``item_key`` is a fast synchronous function evaluated on the event-loop
+    thread before task creation. Its ``str``/``int``/``bytes`` value is
+    attached to every yielded ``ItemResult``; ``index`` remains the ordering
+    field.
     """
     if window_size is not None and window_size < 1:
         raise ValueError(f"window_size must be >= 1, got {window_size}")
@@ -773,6 +821,7 @@ async def async_parallel_iter[T, R](
     exhausted = False
     in_flight: dict[asyncio.Task[_Outcome], int] = {}
     buffered: dict[int, ItemResult[R]] = {}
+    keys: dict[int, str | int | bytes | None] = {}
     next_yield = 0
 
     # THE PULL RACES AS A TASK (v0.9 review): parking the driver in
@@ -817,6 +866,7 @@ async def async_parallel_iter[T, R](
             return
         idx = seen  # admission order is the item's index
         seen += 1
+        keys[idx] = _validate_item_key(item_key(item)) if item_key is not None else None
         in_flight[asyncio.create_task(_run(item))] = idx
         _maybe_start_pull()
 
@@ -841,11 +891,12 @@ async def async_parallel_iter[T, R](
                 _absorb_pull(pull)
             for task in done:
                 idx = in_flight.pop(task)
+                key = keys.pop(idx)
                 result: ItemResult[R]
                 try:
-                    result = _item_result(idx, task.result())
+                    result = _item_result(idx, task.result(), key=key)
                 except Exception as exc:
-                    result = ItemResult(idx, error=exc)
+                    result = ItemResult(idx, error=exc, key=key)
                 if not result.ok:
                     failures += 1
                 completed += 1
