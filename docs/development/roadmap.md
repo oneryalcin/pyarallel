@@ -48,6 +48,11 @@ fan-out jobs**.
   pull races beside the workers
 - `ParallelResult.item_results()` — per-item `attempts`/`duration` on
   collected maps
+- `on_result=` — live success/failure callbacks on collected map and
+  starmap APIs, delivered on the driver in completion order
+- `item_key=` / `ItemResult.key` — application identity across collected,
+  callback, starmap, and streaming results; `checkpoint_key=` supplies the
+  identity automatically when no separate item key is given
 - The resilience demo (`examples/resilience_demo.py`) — headline claims
   self-asserted in CI against the installed wheel
 - `ParallelResult` with `RunStatus` (`.ok` = completed AND all
@@ -182,13 +187,13 @@ Criteria, not features. No headline feature ships in 1.0.
 Tracked in one place —
 [issue #32](https://github.com/oneryalcin/pyarallel/issues/32) — so 1.0
 ships lean. All are additive (none would require a breaking change,
-which is why none block the freeze). `on_result=` was selected from this
-list and is implemented in Unreleased; the remaining candidates are
-stable item identity (`item_key=`), read-only checkpoint inspection,
-weighted/composite quotas (see the
-[design spike record](plans/design-spikes-pre-1.0.md)), and a reusable
-execution session. Selection happens on real user feedback, not
-speculation.
+which is why none block the freeze). `on_result=` and stable item identity
+(`item_key=` / `ItemResult.key`) were selected from this list and are
+implemented in Unreleased. The next candidate selected for planning is
+read-only checkpoint inspection. Weighted/composite quotas (see the
+[design spike record](plans/design-spikes-pre-1.0.md)) and a reusable
+execution session remain candidates. Selection happens on real user
+feedback, not speculation.
 
 ## Distribution
 
