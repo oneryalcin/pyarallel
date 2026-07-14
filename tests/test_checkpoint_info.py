@@ -245,9 +245,7 @@ class TestCheckpointInfoRefusals:
         path = tmp_path / "blob-meta.ckpt"
         conn = _create_raw_checkpoint(path)
         if key == "checkpoint_version":
-            conn.execute(
-                "INSERT INTO meta (key, value) VALUES (?, ?)", (key, b"'v2'")
-            )
+            conn.execute("INSERT INTO meta (key, value) VALUES (?, ?)", (key, b"'v2'"))
         else:
             conn.execute("UPDATE meta SET value = ? WHERE key = ?", (b"sig", key))
         conn.commit()
