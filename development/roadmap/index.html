@@ -1358,10 +1358,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#current-0100-on-pypi" class="md-nav__link">
+  <a href="#current-0110-on-pypi" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current (0.10.0 on PyPI)
+        Current (0.11.0 on PyPI)
       
     </span>
   </a>
@@ -1395,6 +1395,17 @@
     <span class="md-ellipsis">
       
         v0.10 — Prove and package (shipped in 0.10.0)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v011-observable-resumable-production-jobs-shipped-in-0110" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.11 — Observable, resumable production jobs (shipped in 0.11.0)
       
     </span>
   </a>
@@ -1726,10 +1737,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#current-0100-on-pypi" class="md-nav__link">
+  <a href="#current-0110-on-pypi" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Current (0.10.0 on PyPI)
+        Current (0.11.0 on PyPI)
       
     </span>
   </a>
@@ -1763,6 +1774,17 @@
     <span class="md-ellipsis">
       
         v0.10 — Prove and package (shipped in 0.10.0)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v011-observable-resumable-production-jobs-shipped-in-0110" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.11 — Observable, resumable production jobs (shipped in 0.11.0)
       
     </span>
   </a>
@@ -1852,7 +1874,7 @@ decisively better than hand-rolling for API fan-out?</em></p>
 <p>The best direction toward 1.0 is not more kinds of parallelism — it is being
 <strong>the most trustworthy single-machine runtime for expensive, rate-limited
 fan-out jobs</strong>.</p>
-<h2 id="current-0100-on-pypi">Current (0.10.0 on PyPI)<a class="headerlink" href="#current-0100-on-pypi" title="Permanent link">&para;</a></h2>
+<h2 id="current-0110-on-pypi">Current (0.11.0 on PyPI)<a class="headerlink" href="#current-0110-on-pypi" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>parallel_map()</code> / <code>parallel_starmap()</code> / <code>parallel_iter()</code> and async
   mirrors; <code>@parallel</code> / <code>@async_parallel</code> decorators with <code>.map()</code> /
@@ -1876,6 +1898,11 @@ fan-out jobs</strong>.</p>
   pull races beside the workers</li>
 <li><code>ParallelResult.item_results()</code> — per-item <code>attempts</code>/<code>duration</code> on
   collected maps</li>
+<li><code>on_result=</code> — live success/failure callbacks on collected map and
+  starmap APIs, delivered on the driver in completion order</li>
+<li><code>item_key=</code> / <code>ItemResult.key</code> — application identity across collected,
+  callback, starmap, and streaming results; <code>checkpoint_key=</code> supplies the
+  identity automatically when no separate item key is given</li>
 <li>The resilience demo (<code>examples/resilience_demo.py</code>) — headline claims
   self-asserted in CI against the installed wheel</li>
 <li><code>ParallelResult</code> with <code>RunStatus</code> (<code>.ok</code> = completed AND all
@@ -1982,6 +2009,14 @@ can proceed in parallel.</p>
   <code>tests/api_snapshot.txt</code> renders the whole exported surface;
   accidental changes are a red build, deliberate ones a reviewed diff.</li>
 </ul>
+<h2 id="v011-observable-resumable-production-jobs-shipped-in-0110">v0.11 — Observable, resumable production jobs <em>(shipped in 0.11.0)</em><a class="headerlink" href="#v011-observable-resumable-production-jobs-shipped-in-0110" title="Permanent link">&para;</a></h2>
+<p>The delta after <code>v0.10.0</code> is now packaged as <code>0.11.0</code>: live result
+callbacks, stable application identities for every result path, read-only
+checkpoint inspection, and a runnable production API-job template. The
+release also promotes the executable documentation gates, API snapshot, and
+benchmark lab as maintained delivery infrastructure. The reusable-session
+benchmark and lifecycle design remain evidence and design artifacts only;
+they are explicitly deferred from this release.</p>
 <h2 id="v10-freeze">v1.0 — Freeze<a class="headerlink" href="#v10-freeze" title="Permanent link">&para;</a></h2>
 <p>Criteria, not features. No headline feature ships in 1.0.</p>
 <ul>
@@ -1993,26 +2028,42 @@ can proceed in parallel.</p>
   documented.</li>
 <li>Release artifacts and docs generated from the same tag; API/typing
   snapshots enforced in CI.</li>
-<li>The comparison page, cookbook, and one good write-up (blog / Show HN /
-  r/Python) published — distribution is a 1.0 criterion, not an
-  afterthought.</li>
+<li>The comparison page, cookbook, and one good write-up are published.
+  <a href="https://oneryalcin.hashnode.dev/what-happens-when-your-50-000-item-api-job-dies">What Happens When Your 50,000-Item API Job Dies?</a>
+  demonstrates the server-driven-backoff and crash/resume case against a
+  real public workload. The publication criterion is complete.</li>
 </ul>
 <h2 id="post-10-candidates">Post-1.0 candidates<a class="headerlink" href="#post-10-candidates" title="Permanent link">&para;</a></h2>
 <p>Tracked in one place —
 <a href="https://github.com/oneryalcin/pyarallel/issues/32">issue #32</a> — so 1.0
 ships lean. All are additive (none would require a breaking change,
-which is why none block the freeze): <code>on_result=</code> completion callback,
-stable item identity (<code>item_key=</code>), read-only checkpoint inspection,
-weighted/composite quotas (see the
-<a href="../plans/design-spikes-pre-1.0/">design spike record</a>), and a reusable
-execution session. Selection happens on real user feedback, not
+which is why none block the freeze). <code>on_result=</code>, stable item identity
+(<code>item_key=</code> / <code>ItemResult.key</code>), and read-only checkpoint inspection
+(<code>checkpoint_info()</code>) were selected from this list and are implemented in
+0.11.0. A reusable execution session was selected for a
+<a href="../plans/reusable-execution-session-benchmark/">benchmark spike</a>. The
+2026-07-14 campaign produced two clean, matching CPython 3.12 runs: repeated
+small process maps saved roughly 110-114 ms per additional call, while the
+thread control stayed near zero. The combined verdict is <code>advance-to-design</code>.
+A standard GIL-enabled 3.14 context run was also clean, with all process and
+interpreter cells valid. The raw record is in
+<a href="https://github.com/oneryalcin/pyarallel/blob/main/benchmarks/RESULTS.md#reusable-execution-session-spike--2026-07-14"><code>benchmarks/RESULTS.md</code></a>.
+The resulting <a href="../plans/reusable-execution-session-lifecycle/">reviewed lifecycle/API design</a>
+selects a sync-only <code>ParallelSession</code> with one active collected call, fixed
+worker configuration, clean-run-only reuse, and terminal retirement after
+truncation or infrastructure failure. Streaming and implementation remain
+demand-gated; this does not approve a public session API or <code>0.11.0</code> work.
+Weighted/composite quotas (see the
+<a href="../plans/design-spikes-pre-1.0/">design spike record</a>) remain deferred until
+real user demand appears. Selection happens on evidence and feedback, not
 speculation.</p>
 <h2 id="distribution">Distribution<a class="headerlink" href="#distribution" title="Permanent link">&para;</a></h2>
-<p>Recipes (Cookbook) and the comparison page shipped with 0.7. Remaining:
-<strong>one good write-up</strong> demonstrating server-driven backoff + resume
-(and/or the free-threading angle), submitted to the channels where this
-niche looks for tools. Without it the engineering work is unfalsifiable
-effort.</p>
+<p>Recipes (Cookbook) and the comparison page shipped with 0.7. The required
+write-up is now published:
+<a href="https://oneryalcin.hashnode.dev/what-happens-when-your-50-000-item-api-job-dies">What Happens When Your 50,000-Item API Job Dies?</a>,
+a concrete server-driven-backoff and crash/resume case study. The 1.0
+distribution criterion is complete; further promotion is ongoing product
+work, not a release blocker.</p>
 <hr />
 <h2 id="not-planned">Not Planned<a class="headerlink" href="#not-planned" title="Permanent link">&para;</a></h2>
 <p>Things we've considered and decided against. Pyarallel is a parallelization

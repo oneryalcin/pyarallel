@@ -1152,6 +1152,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#handle-results-as-they-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handle Results as They Complete
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#identify-results-by-application-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Identify Results by Application Key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#debug-mode-with-sequentialtrue" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1200,6 +1222,17 @@
     <span class="md-ellipsis">
       
         Checkpoint / Resume
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inspect-an-existing-checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspect an Existing Checkpoint
       
     </span>
   </a>
@@ -2116,6 +2149,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#handle-results-as-they-complete" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handle Results as They Complete
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#identify-results-by-application-key" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Identify Results by Application Key
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#debug-mode-with-sequentialtrue" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2164,6 +2219,17 @@
     <span class="md-ellipsis">
       
         Checkpoint / Resume
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#inspect-an-existing-checkpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspect an Existing Checkpoint
       
     </span>
   </a>
@@ -2582,8 +2648,10 @@
     <span class="n">rate_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># RateLimit spec, shared Limiter, or ops/second</span>
     <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                    <span class="c1"># Total timeout in seconds</span>
     <span class="n">on_progress</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># callback(completed, total)</span>
+    <span class="n">on_result</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                  <span class="c1"># callback(ItemResult) in completion order</span>
     <span class="n">window_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># Admission window: max unresolved items</span>
     <span class="n">retry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                      <span class="c1"># Retry(attempts=3, backoff=1.0)</span>
+    <span class="n">item_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                   <span class="c1"># Application identity on ItemResult.key</span>
     <span class="n">checkpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Path to a resume file (SQLite)</span>
     <span class="n">checkpoint_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>             <span class="c1"># Stable per-item identity for resume</span>
     <span class="n">max_errors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Abort after N failures</span>
@@ -2647,6 +2715,12 @@
 <td>Progress callback <code>(completed, total)</code>. For unsized iterables, <code>total</code> is items seen so far</td>
 </tr>
 <tr>
+<td><code>on_result</code></td>
+<td><code>Callable[[ItemResult[R]], None] \| None</code></td>
+<td><code>None</code></td>
+<td>Live per-item callback on the driver thread, in completion order. Receives successes and failures with retry metadata; checkpoint hits have <code>attempts=0</code>. Exceptions propagate like <code>on_progress</code>. Use <code>async_parallel_iter</code> for awaited callback work</td>
+</tr>
+<tr>
 <td><code>window_size</code></td>
 <td><code>int \| None</code></td>
 <td><code>None</code></td>
@@ -2657,6 +2731,12 @@
 <td><code>Retry \| None</code></td>
 <td><code>None</code></td>
 <td>Per-item retry with backoff</td>
+</tr>
+<tr>
+<td><code>item_key</code></td>
+<td><code>Callable[[T], str \| int \| bytes] \| None</code></td>
+<td><code>None</code></td>
+<td>Synchronous application identity attached to <code>ItemResult.key</code> for successes, failures, callbacks, and <code>.item_results()</code>. It does not affect ordering, and duplicate values are allowed</td>
 </tr>
 <tr>
 <td><code>checkpoint</code></td>
@@ -2734,11 +2814,92 @@
 <span class="c1"># Abort early — a dead API costs tens of calls, not thousands</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">max_errors</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 </code></pre></div>
+<h3 id="handle-results-as-they-complete">Handle Results as They Complete<a class="headerlink" href="#handle-results-as-they-complete" title="Permanent link">&para;</a></h3>
+<p>Use <code>on_result=</code> when each result should be logged, measured, or handed to a
+fast synchronous sink without waiting for the complete <code>ParallelResult</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">ItemResult</span><span class="p">,</span> <span class="n">parallel_map</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">divide</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">return</span> <span class="mi">100</span> <span class="o">/</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">record</span><span class="p">(</span><span class="n">item</span><span class="p">:</span> <span class="n">ItemResult</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;item </span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">attempts</span><span class="si">}</span><span class="s2"> attempt(s), </span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">duration</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">s)&quot;</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;item </span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">index</span><span class="si">}</span><span class="s2"> failed: </span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">divide</span><span class="p">,</span> <span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="n">workers</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">on_result</span><span class="o">=</span><span class="n">record</span><span class="p">)</span>
+</code></pre></div>
+<p>The callback receives both successes and failures in completion order. A
+checkpoint hit is reported too, with <code>attempts=0</code> and <code>duration=0.0</code> because
+no work ran for that item during the resumed call.</p>
+<div class="admonition warning">
+<p class="admonition-title">Keep result callbacks fast</p>
+<p><code>on_result</code> runs inline on the driver thread. A slow or blocking callback
+delays completion processing and can hold up admission of more work. Hand
+off expensive persistence or network I/O to another queue, or consume
+<code>parallel_iter</code> when result handling is the main workload. For async code,
+use <code>async_parallel_iter</code> when handling must be awaited.</p>
+</div>
+<h3 id="identify-results-by-application-key">Identify Results by Application Key<a class="headerlink" href="#identify-results-by-application-key" title="Permanent link">&para;</a></h3>
+<p>Use <code>item_key=</code> when the source position is not the identity your logs,
+callbacks, or recovery tooling use. The function is synchronous and receives
+the original source item once as that item is admitted:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">ItemResult</span><span class="p">,</span> <span class="n">parallel_map</span>
+
+
+<span class="n">customers</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;customer-8f2&quot;</span><span class="p">,</span> <span class="s2">&quot;email&quot;</span><span class="p">:</span> <span class="s2">&quot;ada@example.com&quot;</span><span class="p">},</span>
+    <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;customer-a17&quot;</span><span class="p">,</span> <span class="s2">&quot;email&quot;</span><span class="p">:</span> <span class="s2">&quot;grace@example.com&quot;</span><span class="p">},</span>
+<span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">send_welcome</span><span class="p">(</span><span class="n">customer</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;sent:</span><span class="si">{</span><span class="n">customer</span><span class="p">[</span><span class="s1">&#39;email&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">audit</span><span class="p">(</span><span class="n">receipt</span><span class="p">:</span> <span class="n">ItemResult</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">receipt</span><span class="o">.</span><span class="n">ok</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">receipt</span><span class="o">.</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">receipt</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">receipt</span><span class="o">.</span><span class="n">key</span><span class="si">}</span><span class="s2">: failed: </span><span class="si">{</span><span class="n">receipt</span><span class="o">.</span><span class="n">error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+
+<span class="n">run</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span>
+    <span class="n">send_welcome</span><span class="p">,</span>
+    <span class="n">customers</span><span class="p">,</span>
+    <span class="n">item_key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">customer</span><span class="p">:</span> <span class="n">customer</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span>
+    <span class="n">on_result</span><span class="o">=</span><span class="n">audit</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Collected receipts carry the same identity in input order.</span>
+<span class="k">assert</span> <span class="p">[</span><span class="n">receipt</span><span class="o">.</span><span class="n">key</span> <span class="k">for</span> <span class="n">receipt</span> <span class="ow">in</span> <span class="n">run</span><span class="o">.</span><span class="n">item_results</span><span class="p">()]</span> <span class="o">==</span> <span class="p">[</span>
+    <span class="s2">&quot;customer-8f2&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;customer-a17&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+</code></pre></div>
+<p><code>ItemResult.index</code> remains the zero-based source position and remains the
+ordering field. Keys need not be unique; they are labels, not dictionary
+keys. The uniqueness rule applies only when an identity is also used for
+checkpoint rows through <code>checkpoint_key=</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Key functions run inline</p>
+<p><code>item_key</code> must be a fast synchronous scalar function returning <code>str</code>,
+<code>int</code>, or <code>bytes</code>. It runs on the driver or event-loop thread before the
+task starts, so blocking I/O delays admission. Async key functions and
+other return types raise <code>TypeError</code>.</p>
+</div>
 <h3 id="debug-mode-with-sequentialtrue">Debug Mode with <code>sequential=True</code><a class="headerlink" href="#debug-mode-with-sequentialtrue" title="Permanent link">&para;</a></h3>
 <p><code>sequential=True</code> runs every item inline in the calling thread: no pool,
 no futures — real stack traces, working breakpoints, deterministic input
 order. It honors <code>rate_limit</code>, <code>retry</code>, <code>checkpoint</code>, <code>on_progress</code>, and
-<code>max_errors</code>; <code>timeout</code> is checked between items only (an in-flight item
+<code>on_result</code>, and <code>max_errors</code>; <code>timeout</code> is checked between items only (an in-flight item
 cannot be interrupted). <code>workers</code> is ignored rather than rejected, so a
 single flag can flip production code into debug mode:</p>
 <div class="highlight"><pre><span></span><code><span class="n">results</span> <span class="o">=</span> <span class="n">parallel_map</span><span class="p">(</span><span class="n">fetch</span><span class="p">,</span> <span class="n">urls</span><span class="p">,</span> <span class="n">workers</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
@@ -2835,6 +2996,75 @@ sync and async APIs — never wrapped in an <code>ExceptionGroup</code>.</p>
   jobs is not supported.</p>
 <p>Available on <code>parallel_map</code>, <code>async_parallel_map</code>, and <code>.map()</code> — not on
 starmap or the streaming APIs.</p>
+<h3 id="inspect-an-existing-checkpoint">Inspect an Existing Checkpoint<a class="headerlink" href="#inspect-an-existing-checkpoint" title="Permanent link">&para;</a></h3>
+<p><code>checkpoint_info(path)</code> reads operational metadata without loading any pickled
+result value:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">checkpoint_info</span>
+
+
+<span class="n">EXPECTED_VERSION</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;classify-v3&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-5&quot;</span><span class="p">)</span>
+<span class="n">info</span> <span class="o">=</span> <span class="n">checkpoint_info</span><span class="p">(</span><span class="s2">&quot;classify.ckpt&quot;</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">info</span><span class="o">.</span><span class="n">checkpoint_version</span> <span class="o">!=</span> <span class="n">EXPECTED_VERSION</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;checkpoint belongs to a different campaign&quot;</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">completed</span><span class="si">}</span><span class="s2"> persisted rows in </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">size_bytes</span><span class="si">}</span><span class="s2"> bytes&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>It returns a frozen <code>CheckpointInfo</code> with these fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>path</code></td>
+<td><code>Path</code></td>
+<td>The supplied checkpoint location</td>
+</tr>
+<tr>
+<td><code>schema_version</code></td>
+<td><code>str</code></td>
+<td>Pyarallel's stored checkpoint schema version</td>
+</tr>
+<tr>
+<td><code>checkpoint_version</code></td>
+<td><code>str \| int \| bytes \| tuple \| None</code></td>
+<td>Decoded semantic token supplied when the run was created</td>
+</tr>
+<tr>
+<td><code>task_signature</code></td>
+<td><code>str</code></td>
+<td>Stored mapped-function identity</td>
+</tr>
+<tr>
+<td><code>completed</code></td>
+<td><code>int</code></td>
+<td>Number of result rows persisted in the inspected SQLite snapshot</td>
+</tr>
+<tr>
+<td><code>size_bytes</code></td>
+<td><code>int</code></td>
+<td>Primary database file size observed before SQLite opens it; excludes WAL/SHM sidecars</td>
+</tr>
+</tbody>
+</table>
+<p>The reader validates the version-2 table shapes, reads metadata and the row
+count in one SQLite snapshot, and never selects <code>results.value</code>. Missing files
+raise <code>FileNotFoundError</code>; malformed, foreign, or unsupported files raise
+<code>CheckpointError</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Inspection is not resume validation or total progress</p>
+<p><code>checkpoint_info()</code> reports what the file contains. It does not compare the
+stored signature or version with a live callable, does not know the original
+input total, and cannot prove that results reached an external sink. Treat
+<code>completed</code> as persisted rows, not a percentage or successful-run status.
+SQLite may create or update <code>-wal</code>/<code>-shm</code> sidecars while reading a WAL-mode
+database, even though the database is opened logically read-only.</p>
+</div>
 <h3 id="notes-on-progress-and-unsized-iterables">Notes on Progress and Unsized Iterables<a class="headerlink" href="#notes-on-progress-and-unsized-iterables" title="Permanent link">&para;</a></h3>
 <p>When <code>items</code> has a known length, <code>on_progress(done, total)</code> reports the final
 total.</p>
@@ -2847,7 +3077,7 @@ guaranteed final total.</p>
 <p>Decorator that adds <code>.map()</code> for parallel execution. The decorated function <strong>keeps its original signature and return type</strong>.</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@parallel</span><span class="p">(</span><span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">executor</span><span class="o">=</span><span class="s2">&quot;thread&quot;</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
           <span class="n">retry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">window_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-          <span class="n">max_errors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">on_progress</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+          <span class="n">max_errors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">on_progress</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">on_result</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">fn</span><span class="p">(</span><span class="n">item</span><span class="p">):</span> <span class="o">...</span>
 </code></pre></div>
 <h3 id="parameters_1">Parameters<a class="headerlink" href="#parameters_1" title="Permanent link">&para;</a></h3>
@@ -2913,10 +3143,17 @@ even <code>None</code> — overrides).</p>
 <td><code>None</code></td>
 <td>Default progress callback</td>
 </tr>
+<tr>
+<td><code>on_result</code></td>
+<td><code>Callable[[ItemResult], None] \| None</code></td>
+<td><code>None</code></td>
+<td>Default live result callback for <code>.map()</code>/<code>.starmap()</code> — ignored by <code>.stream()</code>, which already yields each <code>ItemResult</code></td>
+</tr>
 </tbody>
 </table>
 <p><strong>Deliberately not accepted</strong> (run-scoped, not function-scoped):
-<code>checkpoint</code>/<code>checkpoint_key</code>/<code>checkpoint_version</code> — a checkpoint file
+<code>item_key</code> and <code>checkpoint</code>/<code>checkpoint_key</code>/<code>checkpoint_version</code> — identities
+describe the input collection for a particular run, while a checkpoint file
 names a <em>run</em>; two <code>.map()</code> calls sharing a default file would collide
 keys and serve wrong resumes. <code>stop</code> — a token is a campaign latch.
 Pass these per call.</p>
@@ -2934,6 +3171,7 @@ Pass these per call.</p>
 <span class="n">results</span> <span class="o">=</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span>       <span class="c1"># override rate limit</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">30.0</span><span class="p">)</span>         <span class="c1"># add timeout</span>
 <span class="n">results</span> <span class="o">=</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">on_progress</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span> <span class="c1"># add progress</span>
+<span class="n">results</span> <span class="o">=</span> <span class="n">fetch</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">urls</span><span class="p">,</span> <span class="n">on_result</span><span class="o">=</span><span class="n">save_result</span><span class="p">)</span> <span class="c1"># handle each completion</span>
 
 <span class="c1"># Bare decorator (uses all defaults)</span>
 <span class="nd">@parallel</span>
@@ -2963,7 +3201,9 @@ Pass these per call.</p>
 
 <span class="n">results</span> <span class="o">=</span> <span class="n">parallel_starmap</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="p">[(</span><span class="n">arg1</span><span class="p">,</span> <span class="n">arg2</span><span class="p">),</span> <span class="p">(</span><span class="n">arg3</span><span class="p">,</span> <span class="n">arg4</span><span class="p">),</span> <span class="o">...</span><span class="p">])</span>
 </code></pre></div>
-<p>Takes the same options as <code>parallel_map</code> (workers, executor, rate_limit, timeout, window_size, retry).</p>
+<p>Takes the same applicable options as <code>parallel_map</code>, including <code>on_result=</code>
+and <code>item_key=</code>. The key function receives the original source tuple, before
+it is unpacked into <code>fn(*args)</code>.</p>
 <h3 id="examples_1">Examples<a class="headerlink" href="#examples_1" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span>
@@ -3000,7 +3240,9 @@ and a slow item delays only itself — items behind it keep streaming.</p>
 <li><strong><code>parallel_iter</code></strong> — large-scale processing where results should be consumed and discarded (10M+ items, ETL pipelines, streaming to DB)</li>
 </ul>
 <h3 id="parameters_2">Parameters<a class="headerlink" href="#parameters_2" title="Permanent link">&para;</a></h3>
-<p>Same as <code>parallel_map</code> except no <code>timeout</code> or <code>on_progress</code> (results stream as they complete).</p>
+<p>Same execution controls as <code>parallel_map</code>, except no total <code>timeout</code>,
+checkpointing, <code>stop</code>, or <code>on_result</code> — the iterator already yields each
+<code>ItemResult</code> as work completes. <code>on_progress</code> remains available.</p>
 <table>
 <thead>
 <tr>
@@ -3054,6 +3296,12 @@ and a slow item delays only itself — items behind it keep streaming.</p>
 <td>Per-item retry</td>
 </tr>
 <tr>
+<td><code>item_key</code></td>
+<td><code>Callable[[T], str \| int \| bytes] \| None</code></td>
+<td><code>None</code></td>
+<td>Synchronous application identity attached to each yielded <code>ItemResult</code>; duplicate values are allowed</td>
+</tr>
+<tr>
 <td><code>ordered</code></td>
 <td><code>bool</code></td>
 <td><code>False</code></td>
@@ -3078,7 +3326,8 @@ already gives constant memory; raise <code>window_size</code> only to increase
 lookahead.</p>
 </div>
 <h3 id="yields">Yields<a class="headerlink" href="#yields" title="Permanent link">&para;</a></h3>
-<p><code>ItemResult[T]</code> — each item includes <code>.index</code>, <code>.ok</code>, <code>.value</code>, and <code>.error</code>.
+<p><code>ItemResult[T]</code> — each item includes <code>.index</code>, <code>.key</code>, <code>.ok</code>, <code>.value</code>, and
+<code>.error</code>.
 Results arrive in <strong>completion order</strong> by default; pass <code>ordered=True</code>
 for input order.</p>
 <h3 id="ordered-streaming">Ordered streaming<a class="headerlink" href="#ordered-streaming" title="Permanent link">&para;</a></h3>
@@ -3126,6 +3375,11 @@ and <code>.stream()</code>.</p>
 <td><code>.index</code></td>
 <td><code>int</code></td>
 <td>Original input index</td>
+</tr>
+<tr>
+<td><code>.key</code></td>
+<td><code>str \| int \| bytes \| None</code></td>
+<td>Optional application identity supplied by <code>item_key=</code> (or inherited from <code>checkpoint_key=</code>). Does not affect ordering</td>
 </tr>
 <tr>
 <td><code>.ok</code></td>
@@ -3239,7 +3493,7 @@ instead of quietly returning a partial list. Use <code>.successes()</code> /
 <tr>
 <td><code>.item_results()</code></td>
 <td><code>list[ItemResult[R]]</code></td>
-<td>Every item as an <code>ItemResult</code> (index/value/error/<strong>attempts/duration</strong>), input order. Never raises. The collected mirror of streaming <code>ItemResult</code>. Checkpoint hits and truncation placeholders carry <code>attempts=0, duration=0.0</code> (nothing ran this run)</td>
+<td>Every item as an <code>ItemResult</code> (index/key/value/error/<strong>attempts/duration</strong>), input order. Never raises. The collected mirror of streaming <code>ItemResult</code>. Checkpoint hits and truncation placeholders carry <code>attempts=0, duration=0.0</code> (nothing ran this run)</td>
 </tr>
 <tr>
 <td><code>.raise_on_failure()</code></td>

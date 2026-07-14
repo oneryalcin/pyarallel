@@ -1,0 +1,3309 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="Mehmet Oner Yalcin">
+      
+      
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/development/plans/reusable-execution-session-lifecycle/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Reusable Execution Session Lifecycle Design - Pyarallel</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#reusable-execution-session-lifecycle-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Pyarallel
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Reusable Execution Session Lifecycle Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Pyarallel
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/choosing-an-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which API Should I Use?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cookbook
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cookbook
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/llm-batch-calls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch LLM Calls
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Embedding Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/dataset-enrichment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Enrichment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/web-scraping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web Scraping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/bulk-file-download/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bulk File Download
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/github-bulk-repo-changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bulk GitHub Repo Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/docker-registry-cleanup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker Registry Cleanup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/secrets-rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/streaming-etl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming ETL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/ncbi-entrez-batch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NCBI / Entrez Batch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/cpu-fanout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPU-Bound Fan-Out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/advanced-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/async/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Async
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/rate-limiting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rate Limiting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../devx-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DevX Principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture & History
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture & History
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.5.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5.0 Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.6-engine-unification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.6 Engine Unification Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.6-ledger-refactor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.6 Ledger Refactor Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.7-free-threaded-and-interpreters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.7 Free-Threaded & Interpreters Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-spikes-pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-record" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review Record
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ralplan-dr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RALPLAN-DR
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="RALPLAN-DR">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Principles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decision-drivers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision Drivers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#viable-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Viable Options
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Viable Options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-a-parallelsession-high-level-facade-selected" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A — ParallelSession high-level facade (selected)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-accept-executor-objects-in-existing-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B — accept executor= objects in existing functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-c-parallelpool-raw-pool-facade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option C — ParallelPool raw-pool facade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-d-implicit-executor-cache-behind-standalone-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option D — implicit executor cache behind standalone functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-e-replace-the-pool-after-every-abnormal-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option E — replace the pool after every abnormal run
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#premortem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Premortem
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Scope">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#first-public-implementation-slice-if-authorized" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        First public implementation slice, if authorized
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#designed-but-held-behind-a-separate-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Designed but held behind a separate gate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-public-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed Public API
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#construction-and-worker-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Construction and Worker Start
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Construction and Worker Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#method-preflight-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method preflight boundary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-machine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State Machine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="State Machine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#atomic-acquisition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Atomic acquisition
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-completion-classification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run Completion Classification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#residual-work-and-retirement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Residual Work and Retirement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#close-and-context-manager-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Close and Context-Manager Semantics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Close and Context-Manager Semantics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#external-contract-probe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External contract probe
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#broken-executor-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Broken Executor Contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-ownership-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State Ownership Matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worker-identity-and-initializer-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worker Identity and Initializer Semantics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#process-pickle-and-fork-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Process, Pickle, and Fork Boundaries
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#streaming-design-and-gate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming Design and Gate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#internal-architecture-seam" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Internal Architecture Seam
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Internal Architecture Seam">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finalization-exception-precedence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Finalization exception precedence
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-messages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Messages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#documentation-contract-if-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation Contract If Implemented
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-sequence-if-demand-arrives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Sequence If Demand Arrives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-specification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test Specification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Test Specification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unit tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#integration-tests-shared-by-threadprocessinterpreter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration tests shared by thread/process/interpreter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lifecycle-and-recovery-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Lifecycle and recovery tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#streaming-gate-tests-before-iter-may-ship" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streaming gate tests, before iter() may ship
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#end-to-end-and-workspace-isolation-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        End-to-end and workspace-isolation tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#static-typing-and-documentation-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Static, typing, and documentation verification
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#observability-and-diagnostic-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Observability and diagnostic acceptance
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#definition-of-done-for-a-future-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Definition of Done for a Future Implementation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADR
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ADR">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#drivers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drivers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#alternatives-considered" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Alternatives considered
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-this-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why this decision
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Consequences
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#follow-ups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Follow-ups
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-and-execution-handoff" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review and Execution Handoff
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="reusable-execution-session-lifecycle-design">Reusable Execution Session Lifecycle Design<a class="headerlink" href="#reusable-execution-session-lifecycle-design" title="Permanent link">&para;</a></h1>
+<h2 id="status">Status<a class="headerlink" href="#status" title="Permanent link">&para;</a></h2>
+<p><strong>Reviewed design; implementation deliberately deferred.</strong></p>
+<p>This document defines the lifecycle and API that would be implemented if a
+real workload justifies the feature. It does not add a public class, change
+executor ownership, start <code>0.11.0</code>, or promise that the feature will ship.</p>
+<p>The preceding benchmark earned this design pass, not implementation. Two clean
+CPython 3.12 campaigns independently returned <code>advance-to-design</code>: repeated
+small process maps saved roughly 110-114 ms per additional call, while the
+thread control stayed below 1 ms. A standard GIL-enabled CPython 3.14 context
+run was also clean for process and interpreter executors. Those measurements
+used a reused stdlib executor as an optimistic lower bound; they did not measure
+the API designed here.</p>
+<h2 id="decision-summary">Decision Summary<a class="headerlink" href="#decision-summary" title="Permanent link">&para;</a></h2>
+<p>If implementation is later authorized, the first public slice should add a
+sync-only, explicitly resource-owning <code>ParallelSession</code> with these properties:</p>
+<ul>
+<li><code>executor</code>, <code>workers</code>, <code>worker_init</code>, and <code>max_tasks_per_worker</code> are fixed for
+  the session lifetime;</li>
+<li><code>map()</code> and <code>starmap()</code> reuse one executor across sequential, fully completed
+  calls;</li>
+<li>retry, limiting, timeouts, callbacks, item identity, checkpoints,
+  <code>max_errors</code>, and <code>StopToken</code> remain isolated per call;</li>
+<li>exactly one call may be active; concurrent and callback-reentrant calls fail
+  immediately rather than queueing invisibly;</li>
+<li>only a fully exhausted, infrastructure-healthy call returns the session to
+  idle, even when individual items failed;</li>
+<li>every truncated or abandoned call retires the session permanently and starts
+  prompt cancellation of queued work;</li>
+<li>a broken executor makes the session terminally broken; it is never rebuilt
+  behind the caller's back;</li>
+<li><code>close()</code> is explicit and idempotent, and the context manager is the primary
+  ownership form;</li>
+<li><code>iter()</code> is excluded from the first public slice. Its lifecycle is specified
+  below, but it must pass a separate usability gate because a suspended or
+  abandoned iterator can own the session indefinitely.</li>
+</ul>
+<p>The implementation remains demand-gated after this design is approved.</p>
+<h2 id="review-record">Review Record<a class="headerlink" href="#review-record" title="Permanent link">&para;</a></h2>
+<p>This design completed a deliberate sequential review on 2026-07-14:</p>
+<ol>
+<li>repository seam exploration identified residual work, run-local state, and
+   broken-executor gaps;</li>
+<li>architecture review required revision for process shutdown finality, thread
+   future quiescence, starmap parity, fork scope, and broken-executor branching;</li>
+<li>adversarial review required revision for thread initializer wake-up,
+   cleanup/state ordering, close-error precedence, preflight boundaries, and
+   cancellation deduplication;</li>
+<li>both architecture and adversarial reviewers approved the revised design.</li>
+</ol>
+<p>Review approval means the lifecycle is coherent enough to preserve. It does not
+authorize implementation or a release.</p>
+<h2 id="ralplan-dr">RALPLAN-DR<a class="headerlink" href="#ralplan-dr" title="Permanent link">&para;</a></h2>
+<h3 id="principles">Principles<a class="headerlink" href="#principles" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>No hidden interleaving.</strong> Once a run returns early, its uncancellable work
+   must never overlap a later run on the same public session.</li>
+<li><strong>Ownership is visible.</strong> The object that creates the executor owns its
+   shutdown. Run-local policies do not quietly become session-global state.</li>
+<li><strong>Preserve current run semantics.</strong> Standalone functions keep their current
+   prompt cancellation, ordering, checkpoint, callback, and isolation
+   contracts.</li>
+<li><strong>Fail closed after infrastructure uncertainty.</strong> Worker death or
+   initializer failure cannot be repaired by silently constructing workers
+   whose external state may differ.</li>
+<li><strong>Keep the first surface small.</strong> Reuse the existing map engines and expose
+   only the operations supported by benchmark evidence and a deterministic
+   lifecycle.</li>
+</ol>
+<h3 id="decision-drivers">Decision Drivers<a class="headerlink" href="#decision-drivers" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Correctness after early return.</strong> Today, timeout, cancellation, abort, and
+   driver exceptions may return while already-running tasks continue. This is
+   the load-bearing constraint, not executor construction itself.</li>
+<li><strong>A legible resource lifetime.</strong> Users must know when workers and initialized
+   worker state exist, when calls may reuse them, and when shutdown can wait.</li>
+<li><strong>Compatibility with existing Pyarallel semantics.</strong> Item ordering, callback
+   threading, context propagation, checkpoint ownership, rate-limit sharing,
+   and prompt source-error propagation must not drift merely to enable reuse.</li>
+</ol>
+<h3 id="viable-options">Viable Options<a class="headerlink" href="#viable-options" title="Permanent link">&para;</a></h3>
+<h4 id="option-a-parallelsession-high-level-facade-selected">Option A — <code>ParallelSession</code> high-level facade (selected)<a class="headerlink" href="#option-a-parallelsession-high-level-facade-selected" title="Permanent link">&para;</a></h4>
+<p>The session owns a fixed executor and exposes Pyarallel-shaped <code>map()</code> and
+<code>starmap()</code> methods. The engines receive a private executor lease instead of
+constructing and shutting down a pool directly.</p>
+<p>Advantages:</p>
+<ul>
+<li>resource ownership is explicit at the call site;</li>
+<li>method signatures can omit construction-only settings;</li>
+<li>Pyarallel remains responsible for bounded admission, receipts, retries,
+  callbacks, checkpoints, and result status;</li>
+<li>a one-active-call state machine gives a single place to reject unsafe reuse;</li>
+<li>no stdlib <code>Future</code> or <code>submit()</code> API becomes public.</li>
+</ul>
+<p>Costs:</p>
+<ul>
+<li>adds one public resource-owning class;</li>
+<li>requires a terminal policy for early-return and broken-pool cases;</li>
+<li>duplicates the existing function signatures at the method level;</li>
+<li>users must understand that reuse is conditional on a clean run.</li>
+</ul>
+<h4 id="option-b-accept-executor-objects-in-existing-functions">Option B — accept <code>executor=</code> objects in existing functions<a class="headerlink" href="#option-b-accept-executor-objects-in-existing-functions" title="Permanent link">&para;</a></h4>
+<p>Let callers construct a stdlib executor and pass it to <code>parallel_map()</code> or
+<code>parallel_iter()</code>.</p>
+<p>Advantages:</p>
+<ul>
+<li>no new high-level class;</li>
+<li>advanced callers can configure stdlib executors directly;</li>
+<li>executor reuse is mechanically narrow.</li>
+</ul>
+<p>Rejected because:</p>
+<ul>
+<li><code>executor=</code> already means the string executor kind, so the public contract
+  becomes overloaded or needs another name;</li>
+<li>ownership and shutdown become ambiguous: should Pyarallel close a borrowed
+  executor after timeout or driver failure?</li>
+<li>the same executor could be used concurrently outside Pyarallel, defeating
+  run isolation and failure-state accounting;</li>
+<li>custom executors create an open-ended compatibility and testing surface;</li>
+<li>a broken or contaminated borrowed executor cannot be made safe by the run
+  engine.</li>
+</ul>
+<h4 id="option-c-parallelpool-raw-pool-facade">Option C — <code>ParallelPool</code> raw-pool facade<a class="headerlink" href="#option-c-parallelpool-raw-pool-facade" title="Permanent link">&para;</a></h4>
+<p>Expose a class named around the executor pool, potentially including <code>submit()</code>
+or future-like operations.</p>
+<p>Advantages:</p>
+<ul>
+<li>communicates worker reuse directly;</li>
+<li>follows stdlib executor vocabulary.</li>
+</ul>
+<p>Rejected because the abstraction is not a general pool. It owns a sequence of
+Pyarallel runs with rate limiting, retries, result ledgers, callbacks,
+checkpoints, and stop semantics. <code>ParallelPool</code> invites assumptions about raw
+submission, concurrent scheduling, and executor compatibility that the first
+surface should explicitly reject.</p>
+<h4 id="option-d-implicit-executor-cache-behind-standalone-functions">Option D — implicit executor cache behind standalone functions<a class="headerlink" href="#option-d-implicit-executor-cache-behind-standalone-functions" title="Permanent link">&para;</a></h4>
+<p>Cache pools by executor configuration and reuse them automatically.</p>
+<p>Rejected because it hides process lifetime, initializer state, shutdown, fork
+safety, failure contamination, memory retention, and cross-call concurrency.
+It would make a currently stateless function API stateful without a visible
+ownership boundary.</p>
+<h4 id="option-e-replace-the-pool-after-every-abnormal-run">Option E — replace the pool after every abnormal run<a class="headerlink" href="#option-e-replace-the-pool-after-every-abnormal-run" title="Permanent link">&para;</a></h4>
+<p>Return promptly from the failed run, detach its old executor, and create a new
+one so the same session can continue.</p>
+<p>Rejected for the first version. Old tasks could still run while the new pool
+starts, so process count and side effects overlap. The new workers would rerun
+<code>worker_init</code> against potentially changed external state. Automatic replacement
+also makes a stable session identity falsely imply stable worker state.</p>
+<h3 id="premortem">Premortem<a class="headerlink" href="#premortem" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>A timed-out process task writes after the next map starts.</strong> The caller
+   assumes run B follows run A, but run A's uncancellable task mutates the same
+   database during run B. Prevention: any truncated run transitions the session
+   to <code>RETIRED</code>; no later call can acquire it.</li>
+<li><strong>A worker dies and the session silently rebuilds.</strong> The initializer opens a
+   new model, credential, or snapshot, so later items run under different state
+   while the object still looks continuous. Prevention: broken executors are
+   terminal, the infrastructure exception is surfaced, and recreation requires
+   a new explicit session.</li>
+<li><strong>A callback recursively calls <code>session.map()</code>.</strong> Silent serialization
+   deadlocks because the outer driver waits for the callback and the nested call
+   waits for the active lease. Prevention: acquisition is non-blocking and
+   raises immediately while <code>ACTIVE</code>.</li>
+</ol>
+<h2 id="scope">Scope<a class="headerlink" href="#scope" title="Permanent link">&para;</a></h2>
+<h3 id="first-public-implementation-slice-if-authorized">First public implementation slice, if authorized<a class="headerlink" href="#first-public-implementation-slice-if-authorized" title="Permanent link">&para;</a></h3>
+<ul>
+<li>synchronous <code>map()</code>;</li>
+<li>synchronous <code>starmap()</code>;</li>
+<li>thread, process, and Python 3.14+ interpreter executors;</li>
+<li>fixed workers, initializer, and process worker-recycling configuration;</li>
+<li>context-manager and explicit close;</li>
+<li>sequential calls from one or more caller threads, but never concurrent calls;</li>
+<li>all current per-run collected-map policies.</li>
+</ul>
+<h3 id="designed-but-held-behind-a-separate-gate">Designed but held behind a separate gate<a class="headerlink" href="#designed-but-held-behind-a-separate-gate" title="Permanent link">&para;</a></h3>
+<ul>
+<li>streaming <code>iter()</code> on a session. The terminal rules are defined here, but
+  the public iterator ownership shape must be validated before it ships.</li>
+</ul>
+<h3 id="non-goals">Non-goals<a class="headerlink" href="#non-goals" title="Permanent link">&para;</a></h3>
+<ul>
+<li>no async session: async execution uses asyncio tasks, not this executor seam;</li>
+<li>no <code>sequential=True</code>: inline debugging has no pool to reuse;</li>
+<li>no concurrent maps, queued maps, scheduler, priorities, or nested submission;</li>
+<li>no raw <code>submit()</code>, public futures, borrowed/custom executor, or pool resizing;</li>
+<li>no automatic recovery, worker-generation rotation, or retry of a whole run;</li>
+<li>no session-scoped checkpoint, callback, retry, timeout, stop token, numeric
+  rate limit, result ledger, index sequence, or item-key registry;</li>
+<li>no decorator binding or decorator-default precedence in the first slice;</li>
+<li>no guarantee that a configured number of workers is eagerly started;</li>
+<li>no promise that benchmarked stdlib savings equal shipped end-to-end savings;</li>
+<li>no release number, changelog feature entry, roadmap completion, or user-facing
+  API documentation until implementation is separately approved and complete.</li>
+</ul>
+<h2 id="proposed-public-api">Proposed Public API<a class="headerlink" href="#proposed-public-api" title="Permanent link">&para;</a></h2>
+<p>The advanced surface requires an explicit executor kind rather than defaulting
+quietly to threads:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ParallelSession</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">executor</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;thread&quot;</span><span class="p">,</span> <span class="s2">&quot;process&quot;</span><span class="p">,</span> <span class="s2">&quot;interpreter&quot;</span><span class="p">],</span>
+        <span class="n">workers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">worker_init</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">max_tasks_per_worker</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">map</span><span class="p">[</span><span class="n">T</span><span class="p">,</span> <span class="n">R</span><span class="p">](</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">T</span><span class="p">],</span> <span class="n">R</span><span class="p">],</span>
+        <span class="n">items</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">T</span><span class="p">],</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">rate_limit</span><span class="p">:</span> <span class="n">Limiter</span> <span class="o">|</span> <span class="n">RateLimit</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">on_progress</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">on_result</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">ItemResult</span><span class="p">[</span><span class="n">R</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">window_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">retry</span><span class="p">:</span> <span class="n">Retry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">item_key</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">T</span><span class="p">],</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">checkpoint</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">checkpoint_key</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">T</span><span class="p">],</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">checkpoint_version</span><span class="p">:</span> <span class="n">VersionToken</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">max_errors</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">stop</span><span class="p">:</span> <span class="n">StopToken</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ParallelResult</span><span class="p">[</span><span class="n">R</span><span class="p">]:</span> <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">starmap</span><span class="p">[</span><span class="n">R</span><span class="p">](</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">R</span><span class="p">],</span>
+        <span class="n">items</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">rate_limit</span><span class="p">:</span> <span class="n">Limiter</span> <span class="o">|</span> <span class="n">RateLimit</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">on_progress</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">on_result</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">ItemResult</span><span class="p">[</span><span class="n">R</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">window_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">retry</span><span class="p">:</span> <span class="n">Retry</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">item_key</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ParallelResult</span><span class="p">[</span><span class="n">R</span><span class="p">]:</span> <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">wait</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc</span><span class="p">,</span> <span class="n">traceback</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p><code>VersionToken</code> above is explanatory shorthand for the existing
+<code>checkpoint_version</code> union, not a proposed public alias.</p>
+<p>Example of the intended ownership:</p>
+<div class="highlight"><pre><span></span><code><span class="k">with</span> <span class="n">ParallelSession</span><span class="p">(</span>
+    <span class="n">executor</span><span class="o">=</span><span class="s2">&quot;process&quot;</span><span class="p">,</span>
+    <span class="n">workers</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+    <span class="n">worker_init</span><span class="o">=</span><span class="n">load_model</span><span class="p">,</span>
+<span class="p">)</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+    <span class="n">first</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">classify</span><span class="p">,</span> <span class="n">first_batch</span><span class="p">)</span>
+    <span class="n">second</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">classify</span><span class="p">,</span> <span class="n">second_batch</span><span class="p">)</span>
+</code></pre></div>
+<p>Construction-only arguments do not appear on methods. <code>starmap()</code> mirrors the
+current standalone starmap surface, including its lack of checkpoint options.
+Standalone functions remain unchanged.</p>
+<p>The first slice does not add public lifecycle exceptions or a public state
+enum. Misuse (<code>ACTIVE</code>, <code>RETIRED</code>, <code>BROKEN</code>, or <code>CLOSED</code>) raises <code>RuntimeError</code>
+with a stable, actionable message. The original infrastructure exception is
+chained where available. This keeps the public surface small; dedicated
+exception types should be added only if a real caller needs programmatic
+session orchestration.</p>
+<h2 id="construction-and-worker-start">Construction and Worker Start<a class="headerlink" href="#construction-and-worker-start" title="Permanent link">&para;</a></h2>
+<p>The constructor validates the same worker options as a standalone pool call and
+constructs the stdlib executor. Stdlib may start workers lazily on first
+submission; neither construction nor <code>__enter__</code> promises that all workers or
+their initializers have run.</p>
+<p>There is no <code>start()</code>, <code>warmup()</code>, health probe, or eager rendezvous. A warmup
+would execute user code, distort initializer semantics, and require a synthetic
+picklable task. If eager readiness becomes a real requirement, it needs its own
+contract and evidence.</p>
+<p>Validation remains fail-fast for:</p>
+<ul>
+<li>unsupported executor names;</li>
+<li><code>workers &lt; 1</code>;</li>
+<li>interpreter execution before Python 3.14;</li>
+<li>non-process <code>max_tasks_per_worker</code> or values below one;</li>
+<li>non-picklable process initializers;</li>
+<li>non-importable interpreter initializers.</li>
+</ul>
+<p>Initializer runtime failure can occur only once a worker starts. That is an
+executor infrastructure failure and transitions the session to <code>BROKEN</code>.</p>
+<h3 id="method-preflight-boundary">Method preflight boundary<a class="headerlink" href="#method-preflight-boundary" title="Permanent link">&para;</a></h3>
+<p>Every method performs pure, non-resource-owning validation before atomically
+acquiring <code>IDLE -&gt; ACTIVE</code>. The following failures leave the session <code>IDLE</code> and
+usable:</p>
+<ul>
+<li>timeout, window, and max-error value validation;</li>
+<li>checkpoint option dependencies such as <code>checkpoint_key</code> without
+  <code>checkpoint</code>;</li>
+<li>process/interpreter callable resolution and importability checks;</li>
+<li>process/interpreter retry picklability checks;</li>
+<li>rate-limit specification normalization that does not wait or mutate a shared
+  limiter;</li>
+<li>starmap callable adaptation and interpreter <code>__main__</code> rejection.</li>
+</ul>
+<p>After pure preflight succeeds, the call acquires the session. Opening or
+validating a checkpoint, consuming the source, evaluating item/checkpoint keys,
+waiting on a limiter, submitting work, and invoking callbacks all happen while
+<code>ACTIVE</code>; failures there retire the session. Checkpoint open deliberately stays
+post-acquisition because it owns a live resource and may inspect or create a
+file. The boundary is based on side effects and ownership, not on whether an
+error looks likely or harmless.</p>
+<h2 id="state-machine">State Machine<a class="headerlink" href="#state-machine" title="Permanent link">&para;</a></h2>
+<p>The public class has an internal lock and these internal states:</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Meaning</th>
+<th>Calls allowed</th>
+<th><code>close()</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IDLE</code></td>
+<td>Executor exists and the previous run ended cleanly</td>
+<td>One caller may atomically acquire</td>
+<td>Shuts down and becomes <code>CLOSED</code></td>
+</tr>
+<tr>
+<td><code>ACTIVE</code></td>
+<td>One map/starmap owns the run lease</td>
+<td>None; fail immediately</td>
+<td>Fails immediately; it does not interrupt another caller</td>
+</tr>
+<tr>
+<td><code>RETIRED</code></td>
+<td>A run was truncated/abandoned or driver integrity is uncertain</td>
+<td>None, permanently</td>
+<td>Idempotently finishes shutdown and becomes <code>CLOSED</code></td>
+</tr>
+<tr>
+<td><code>BROKEN</code></td>
+<td>Executor/worker infrastructure failed</td>
+<td>None, permanently</td>
+<td>Idempotently finishes shutdown and becomes <code>CLOSED</code></td>
+</tr>
+<tr>
+<td><code>CLOSED</code></td>
+<td>Shutdown was requested</td>
+<td>None</td>
+<td>No-op, including repeated calls</td>
+</tr>
+</tbody>
+</table>
+<p>Transitions:</p>
+<div class="highlight"><pre><span></span><code>construct ------------------------------&gt; IDLE
+IDLE -- atomic acquire -----------------&gt; ACTIVE
+ACTIVE -- clean, fully exhausted -------&gt; IDLE
+ACTIVE -- timeout/cancel/abort ----------&gt; RETIRED
+ACTIVE -- source/key/checkpoint/callback
+          or other driver exception ----&gt; RETIRED
+ACTIVE -- broken executor/init/worker ---&gt; BROKEN
+IDLE/RETIRED/BROKEN -- close -----------&gt; CLOSED
+CLOSED -- close ------------------------&gt; CLOSED
+</code></pre></div>
+<p>There is deliberately no <code>RETIRED -&gt; IDLE</code>, <code>BROKEN -&gt; IDLE</code>, or automatic
+executor generation change. A new session is the recovery boundary.</p>
+<h3 id="atomic-acquisition">Atomic acquisition<a class="headerlink" href="#atomic-acquisition" title="Permanent link">&para;</a></h3>
+<p>State acquisition is non-blocking. Two racing caller threads cannot both start;
+one transitions <code>IDLE -&gt; ACTIVE</code>, and the other gets <code>RuntimeError</code>. Calls are
+not queued or silently serialized. The engine runs outside the state lock, and
+the final transition occurs under the lock.</p>
+<p>This also rejects reentrancy from <code>on_result</code>, <code>on_progress</code>, a source iterator,
+<code>item_key</code>, <code>checkpoint_key</code>, or other driver-thread code. Failing immediately
+is required to avoid self-deadlock.</p>
+<p>Sequential handoff between different caller threads is allowed when the session
+is idle. Per-task thread context is still copied at submission, so each run sees
+the submitting caller's context. The session is accurately described as
+single-active-run, not generally thread-safe.</p>
+<h2 id="run-completion-classification">Run Completion Classification<a class="headerlink" href="#run-completion-classification" title="Permanent link">&para;</a></h2>
+<p>A run is reusable only when all of the following are true:</p>
+<ol>
+<li>the input source was exhausted;</li>
+<li>every admitted future resolved;</li>
+<li>all normal result publication and checkpoint writes completed;</li>
+<li>no timeout, <code>StopToken</code>, or <code>max_errors</code> halt occurred;</li>
+<li>no driver exception escaped;</li>
+<li>no broken-executor signal was observed.</li>
+</ol>
+<p>For thread execution, consuming the run's last private completion-queue entry is
+not sufficient evidence for item 2. The current thread wrapper can publish its
+outcome immediately before the submitted callable returns and its <code>Future</code>
+becomes done. The session lease must track every submitted future and perform a
+clean-path quiescence barrier before releasing <code>ACTIVE -&gt; IDLE</code>. Run-local
+cleanup, including checkpoint-store closure, must also finish before that state
+transition.</p>
+<p>Individual task failures do not retire the session. They are ordinary
+<code>ItemResult</code> failures, and a fully exhausted result remains
+<code>RunStatus.COMPLETED</code>. Retry exhaustion likewise remains item-level unless it
+triggers <code>max_errors</code>.</p>
+<p>The following outcomes always retire the session, even if a race means no task
+is still running by finalization:</p>
+<ul>
+<li><code>RunStatus.TIMED_OUT</code>;</li>
+<li><code>RunStatus.CANCELLED</code> from <code>StopToken</code>;</li>
+<li><code>RunStatus.ABORTED</code> from <code>max_errors</code>;</li>
+<li>source iteration failure;</li>
+<li><code>item_key</code> or <code>checkpoint_key</code> failure;</li>
+<li>limiter, checkpoint, progress callback, or result callback failure;</li>
+<li><code>KeyboardInterrupt</code>, <code>SystemExit</code>, or another escaping driver-side
+  <code>BaseException</code>.</li>
+</ul>
+<p>The state rule is status-based, not timing-based. The same timeout must not
+sometimes leave a reusable session merely because its last worker happened to
+finish a microsecond earlier.</p>
+<h2 id="residual-work-and-retirement">Residual Work and Retirement<a class="headerlink" href="#residual-work-and-retirement" title="Permanent link">&para;</a></h2>
+<p>On transition to <code>RETIRED</code>, the session atomically disables reuse and calls
+<code>cancel()</code> on every future still tracked by the run. It does <strong>not</strong> call
+<code>executor.shutdown()</code> yet. Queued work is cancelled where the runtime supports
+it. Already-running thread, process, or interpreter work cannot be interrupted
+and may continue performing side effects. The session object is unusable
+immediately, so that residual work cannot overlap a later call through the same
+resource boundary.</p>
+<p>Deferring physical shutdown is required because <code>concurrent.futures</code> does not
+promise that <code>shutdown(wait=False)</code> can later be upgraded into a join. In
+particular, a process executor may discard the manager-thread and process
+references during its first shutdown call. The first explicit <code>close()</code> or
+<code>__exit__</code> therefore owns the executor's one physical shutdown decision.</p>
+<p>Retirement does not claim that work stopped. Error text and future user docs
+must say that a new session can run concurrently with residual work from the
+old one. Callers needing strict no-overlap must make task functions bounded and
+then call <code>close(wait=True)</code> before constructing a replacement.</p>
+<p>This conservative policy gives up reuse after an abnormal call. That is
+intentional: the feature optimizes the clean repeated-call path, not failure
+recovery.</p>
+<h2 id="close-and-context-manager-semantics">Close and Context-Manager Semantics<a class="headerlink" href="#close-and-context-manager-semantics" title="Permanent link">&para;</a></h2>
+<p><code>close(wait=True)</code> is idempotent, with <strong>first-close-wins</strong> wait semantics.
+The first closer atomically transitions the session to <code>CLOSED</code> before invoking
+the potentially blocking physical shutdown, so a racing map cannot acquire an
+executor whose shutdown has begun. It then calls exactly
+<code>executor.shutdown(wait=wait, cancel_futures=True)</code>.</p>
+<ul>
+<li>From <code>IDLE</code>, it requests executor shutdown and moves to <code>CLOSED</code>.</li>
+<li>From <code>RETIRED</code> or <code>BROKEN</code>, it performs the executor's first physical shutdown
+  using the requested wait policy.</li>
+<li>From <code>CLOSED</code>, it is a no-op.</li>
+<li>From <code>ACTIVE</code>, it raises immediately. One caller may not asynchronously close
+  another caller's run through this first API.</li>
+</ul>
+<p>With <code>wait=True</code>, running tasks are allowed to finish, so the call can block
+forever if user code never returns. With <code>wait=False</code>, queued futures are
+cancelled and shutdown returns promptly, but running work and its side effects
+may continue. <code>wait=False</code> never makes the session reusable and does not promise
+prompt Python process exit: the interpreter's executor-exit handling may still
+wait for pending work. A later <code>close(wait=True)</code> is a no-op and cannot upgrade
+an earlier non-waiting shutdown into a join.</p>
+<p>If the first physical shutdown raises, that exception propagates and is retained
+internally as the close cause. The session remains <code>CLOSED</code>; retrying shutdown
+through this object is unsafe and every later <code>close()</code> remains a no-op. A later
+attempt to use the closed session raises the normal closed-state <code>RuntimeError</code>
+chained from that cause. If <code>__exit__</code> encounters only a shutdown error, it
+propagates it. If the <code>with</code> body and shutdown both fail, the shutdown error
+propagates with the body error retained as its Python exception context,
+matching normal context-manager cleanup precedence.</p>
+<p><code>__exit__</code> calls <code>close(wait=True)</code>, matching the deterministic ownership
+expectation of stdlib executors. This produces an important warning: a
+<code>session.map(..., timeout=...)</code> call can return promptly, but immediately
+leaving the surrounding <code>with</code> block may then wait for uncancellable tasks.
+The map timeout bounds the run driver, not worker termination or context-manager
+shutdown. Callers whose task may hang indefinitely must put a timeout inside the
+task and may choose explicit <code>close(wait=False)</code> instead of a context manager.</p>
+<p>There is no correctness dependency on <code>__del__</code>. The implementation should not
+promise finalizer timing or attempt automatic pool replacement. At most, a
+best-effort <code>ResourceWarning</code> may be considered separately; it is not required
+for the first slice.</p>
+<h3 id="external-contract-probe">External contract probe<a class="headerlink" href="#external-contract-probe" title="Permanent link">&para;</a></h3>
+<p>The Python 3.14 <a href="https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.Executor.shutdown"><code>Executor.shutdown()</code> documentation</a>
+guarantees that <code>wait=True</code> waits for pending futures and that <code>wait=False</code>
+returns immediately while the Python program still waits for pending futures
+before exit. It does not guarantee that a second shutdown call can upgrade an
+earlier non-waiting call.</p>
+<p>A focused local probe on the supported CPython 3.12.8 and 3.14.6 runtimes
+submitted a one-second process task, called <code>shutdown(wait=False)</code>, and then
+immediately called <code>shutdown(wait=True)</code>. Both second calls returned in 0.0000
+seconds rather than joining the task. The CPython process-executor source also
+clears manager-thread and process references during its first non-waiting
+shutdown. The design therefore relies only on the documented first-call wait
+contract and makes the first close final.</p>
+<h2 id="broken-executor-contract">Broken Executor Contract<a class="headerlink" href="#broken-executor-contract" title="Permanent link">&para;</a></h2>
+<p><code>concurrent.futures.BrokenExecutor</code> and its process/thread/interpreter
+specializations are infrastructure failures, not ordinary item failures in a
+reusable session.</p>
+<p>When detected during submission or completion:</p>
+<ol>
+<li>stop admitting source items;</li>
+<li>classify the session as <code>BROKEN</code>;</li>
+<li>cancel every still-tracked future without physically shutting down the
+   executor;</li>
+<li>raise the infrastructure exception from the current session call;</li>
+<li>reject every later operation with <code>RuntimeError</code> chained from the stored
+   cause;</li>
+<li>keep <code>close()</code> safe and idempotent.</li>
+</ol>
+<p>There is no health-check submission and no automatic reconstruction. The
+worker initializer may have established database connections, loaded state, or
+acquired credentials; recreating that state is an application decision.</p>
+<p>Standalone function behavior must not change incidentally in this slice. If
+existing standalone conversion of a broken future into an item failure is to be
+reconsidered, that requires a separate compatibility decision and tests.</p>
+<p>The lease alone cannot classify an exception that the current engine has
+already converted to an item failure. The engine therefore needs one narrow,
+explicit branch at submission and <code>Future.result()</code>: an owned standalone lease
+retains the current item-failure behavior, while a session lease records and
+re-raises <code>BrokenExecutor</code>. This difference must be direct-testable and must not
+broaden to ordinary task exceptions.</p>
+<p>Thread futures need one additional exactly-once publication rule. Today, a
+thread wrapper publishes a normal outcome before its callable returns, while a
+done callback is attached only for process/interpreter futures. If the thread
+initializer fails, the wrapper never runs: its future fails with
+<code>BrokenThreadPool</code>, but no event wakes the driver. The refactor must attach a
+fallback done callback to thread futures as well and coordinate it with a
+per-submission publication flag:</p>
+<ol>
+<li>the wrapper atomically claims publication before enqueueing a normal outcome
+   or driver-visible <code>BaseException</code>;</li>
+<li>the future done callback atomically checks the same flag;</li>
+<li>if the wrapper claimed it, the callback publishes nothing;</li>
+<li>if the wrapper never ran and the future is cancelled, the callback claims
+   and suppresses publication; the existing timeout/cancel/abort aftermath owns
+   the item's final placeholder classification;</li>
+<li>if the wrapper never ran and the future completed without cancellation, the
+   callback claims the flag and enqueues the failed future for infrastructure
+   classification, covering initializer-driven <code>BrokenThreadPool</code>.</li>
+</ol>
+<p>The publication flag operation and queue put must have a deliberate order, and
+callbacks must not be registered or invoked while holding a non-reentrant state
+lock. This prevents both the initializer-failure hang and duplicate absorption
+of ordinary thread results. The fallback is part of the engine prerequisite,
+not a generic executor-health monitor.</p>
+<h2 id="state-ownership-matrix">State Ownership Matrix<a class="headerlink" href="#state-ownership-matrix" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Owner</th>
+<th>Cross-call behavior</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Executor kind and worker count</td>
+<td>Session</td>
+<td>Fixed</td>
+</tr>
+<tr>
+<td>Worker initializer</td>
+<td>Session/actual worker generation</td>
+<td>Runs once per actual worker start, not once per call</td>
+</tr>
+<tr>
+<td>Process worker recycling</td>
+<td>Session/stdlib executor</td>
+<td>Continues across calls; replacement workers rerun initializer</td>
+</tr>
+<tr>
+<td>Task callable</td>
+<td>Run</td>
+<td>May differ between calls</td>
+</tr>
+<tr>
+<td>Source and admission window</td>
+<td>Run</td>
+<td>Fresh; never shared</td>
+</tr>
+<tr>
+<td>Completion queue and result ledger</td>
+<td>Run</td>
+<td>Fresh; late callbacks can reach only the retired run's private queue</td>
+</tr>
+<tr>
+<td>Indices and item keys</td>
+<td>Run</td>
+<td>Restart from zero; no cross-call uniqueness</td>
+</tr>
+<tr>
+<td>Retry object/wrapper</td>
+<td>Run</td>
+<td>Fresh binding to that task</td>
+</tr>
+<tr>
+<td>Numeric/<code>RateLimit</code> limiter</td>
+<td>Run</td>
+<td>New limiter per call</td>
+</tr>
+<tr>
+<td>Explicit <code>Limiter</code> instance</td>
+<td>Caller</td>
+<td>Shared only because caller passed the same object</td>
+</tr>
+<tr>
+<td>Timeout, max-errors halt, <code>StopToken</code></td>
+<td>Run/caller</td>
+<td>Never session defaults; a stopped token keeps its existing caller-owned latch semantics</td>
+</tr>
+<tr>
+<td>Progress/result callbacks</td>
+<td>Run</td>
+<td>Driver-thread only; no cross-call callback registry</td>
+</tr>
+<tr>
+<td>Checkpoint store</td>
+<td>Run</td>
+<td>Opened and closed on every call</td>
+</tr>
+<tr>
+<td>Checkpoint path/version/key policy</td>
+<td>Run</td>
+<td>No implicit session campaign</td>
+</tr>
+<tr>
+<td>Thread contextvars</td>
+<td>Submission</td>
+<td>Fresh caller context copied per item</td>
+</tr>
+</tbody>
+</table>
+<h2 id="worker-identity-and-initializer-semantics">Worker Identity and Initializer Semantics<a class="headerlink" href="#worker-identity-and-initializer-semantics" title="Permanent link">&para;</a></h2>
+<p>Reuse promises one executor instance, not a fixed set of worker identities.
+Stdlib executors start workers lazily and may start fewer than <code>workers</code>.
+Process <code>max_tasks_per_worker</code> deliberately replaces workers. Every actual
+replacement runs <code>worker_init</code> before taking work.</p>
+<p>Therefore documentation must say:</p>
+<ul>
+<li>initializer work is amortized across calls only while that worker survives;</li>
+<li><code>workers=N</code> is a concurrency ceiling, not an eager N-worker receipt;</li>
+<li>worker-local caches may disappear when a process is recycled;</li>
+<li>a broken worker does not trigger a transparent new session generation.</li>
+</ul>
+<h2 id="process-pickle-and-fork-boundaries">Process, Pickle, and Fork Boundaries<a class="headerlink" href="#process-pickle-and-fork-boundaries" title="Permanent link">&para;</a></h2>
+<p><code>ParallelSession</code> is not picklable. Attempted serialization should fail with a
+clear <code>TypeError</code>; transferring an executor-owning object into a worker would
+make shutdown ownership undefined.</p>
+<p>The session records its creating process ID. Any method, including <code>close()</code>,
+used after <code>fork()</code> in a different PID fails before touching the inherited
+executor. The inherited session is unusable in the child. Prefer spawn; a fresh
+session may be constructed in the child only where the platform and runtime
+permit safe post-fork executor creation. The PID check is relevant even when the
+configured executor is <code>thread</code>, because locks and worker-thread state do not
+survive fork safely.</p>
+<p>Normal process/interpreter callable and retry pickling/importability rules stay
+unchanged and are evaluated per run. A session may map different importable
+functions across calls.</p>
+<h2 id="streaming-design-and-gate">Streaming Design and Gate<a class="headerlink" href="#streaming-design-and-gate" title="Permanent link">&para;</a></h2>
+<p>A future <code>session.iter()</code> must obey these invariants:</p>
+<ul>
+<li>acquiring the iterator transitions <code>IDLE -&gt; ACTIVE</code> before source
+  consumption;</li>
+<li>the iterator owns that lease until complete exhaustion or explicit close;</li>
+<li>clean exhaustion with all admitted work resolved returns to <code>IDLE</code>;</li>
+<li><code>max_errors</code>, source failure, infrastructure failure, explicit early close,
+  or generator finalization retires/breaks the session using the same rules as
+  collected maps;</li>
+<li>a suspended iterator prevents every other session operation;</li>
+<li>an early <code>break</code> does not itself guarantee deterministic close if another
+  reference to the iterator remains;</li>
+<li>no later run may start merely because queued futures were cancelled.</li>
+</ul>
+<p>The first implementation slice excludes <code>iter()</code> because returning a bare
+generator makes resource ownership too easy to abandon accidentally. Before
+streaming ships, a focused design/review must select and test one of:</p>
+<ol>
+<li>a public closeable/context-managed <code>SessionStream</code> object;</li>
+<li>a documented <code>contextlib.closing(session.iter(...))</code> contract plus robust
+   session cleanup behavior;</li>
+<li>a stream-scoped context manager such as <code>session.stream(...)</code>.</li>
+</ol>
+<p>That review must prove deterministic lease release, early-break behavior,
+cross-thread close behavior, garbage-collection non-reliance, and API snapshot
+cost. Until then, callers use standalone <code>parallel_iter()</code> with its existing
+one-run executor ownership.</p>
+<h2 id="internal-architecture-seam">Internal Architecture Seam<a class="headerlink" href="#internal-architecture-seam" title="Permanent link">&para;</a></h2>
+<p>The implementation should not fork a second map engine. Introduce one small
+private executor-lease boundary used by collected map and, only later, streaming.</p>
+<p>Conceptually:</p>
+<div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">_ExecutionLease</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
+    <span class="n">executor</span><span class="p">:</span> <span class="n">Executor</span>
+    <span class="n">executor_kind</span><span class="p">:</span> <span class="n">ExecutorType</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">track</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">future</span><span class="p">:</span> <span class="n">Future</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">finish</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">outcome</span><span class="p">:</span> <span class="n">_RunExit</span><span class="p">,</span>
+        <span class="n">cleanup</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p><code>_RunExit</code> is an internal, explicit classification such as <code>CLEAN</code>,
+<code>TRUNCATED</code>, <code>DRIVER_ERROR</code>, or <code>BROKEN</code>. It is not inferred from exception text
+or from whether <code>Future.cancel()</code> returned true.</p>
+<ul>
+<li>Standalone functions acquire an owned per-call lease. Its finish behavior
+  reproduces current shutdown semantics exactly.</li>
+<li>A session atomically acquires a session lease. Clean finish releases it back
+  to <code>IDLE</code>; truncated/error finish retires it; infrastructure failure breaks
+  it.</li>
+<li>The session lease maintains a condition-protected, bounded set of unresolved
+  submitted futures. Future done-callbacks remove entries. <code>finish(CLEAN)</code> waits
+  for that set to become empty before releasing the session. A truncated or
+  broken finish snapshots the set and attempts <code>cancel()</code> on every entry.</li>
+<li><code>finish()</code> owns the complete finalization order and is invoked exactly once by
+  one outer <code>finally</code>; the engine must not call <code>store.close()</code> or
+  <code>pool.shutdown()</code> afterward. For a session lease it keeps the state <code>ACTIVE</code>,
+  cancels tracked work immediately for abnormal outcomes, invokes run-local
+  cleanup, performs clean quiescence when applicable, and only then publishes
+  <code>IDLE</code>, <code>RETIRED</code>, or <code>BROKEN</code>. A racing caller therefore cannot acquire
+  between result publication and cleanup failure.</li>
+<li>The owned standalone lease preserves today's order: executor shutdown first,
+  then checkpoint cleanup. If shutdown itself raises, later cleanup remains
+  skipped exactly as it is now. This parity is locked before adding the public
+  class.</li>
+<li>The run engine continues to allocate its limiter, task wrapper, checkpoint
+  store, source, window, completion queue, counters, ledgers, keys, and callbacks
+  locally.</li>
+<li><code>parallel_starmap()</code> continues to adapt its callable and delegate to the same
+  collected engine.</li>
+</ul>
+<p>The abstraction earns its place because ownership finalization is duplicated in
+collected and streaming engines and because raw <code>pool.shutdown()</code> is precisely
+the seam that changes. It must remain private and small; it is not a general
+executor adapter.</p>
+<p>The highest-risk refactor is finalization. Implement it in two phases if coding
+is authorized:</p>
+<ol>
+<li>move standalone pool creation/shutdown behind the lease without adding the
+   public class, proving behavior parity;</li>
+<li>add the session owner and public methods only after the parity suite is
+   green.</li>
+</ol>
+<h3 id="finalization-exception-precedence">Finalization exception precedence<a class="headerlink" href="#finalization-exception-precedence" title="Permanent link">&para;</a></h3>
+<p>The finalizer first captures whether the body is returning normally or already
+has an escaping exception. For a session, cleanup runs while acquisition is
+still blocked. If cleanup fails, the run is terminally retired and no result is
+returned.</p>
+<ul>
+<li>cleanup failure by itself propagates;</li>
+<li>when body execution and cleanup both fail, the cleanup exception propagates
+  with the body exception retained as its Python exception context, matching
+  ordinary <code>finally</code> semantics;</li>
+<li>state transition and cancellation still complete before propagation;</li>
+<li>clean future quiescence and successful cleanup are both required before
+  <code>IDLE</code> is published.</li>
+</ul>
+<p>These rules apply to <code>Exception</code> and <code>BaseException</code>; cleanup must not leave the
+session <code>ACTIVE</code> merely because error propagation is complex.</p>
+<h2 id="error-messages">Error Messages<a class="headerlink" href="#error-messages" title="Permanent link">&para;</a></h2>
+<p>Without new public exception types, messages are part of usability but not a
+machine protocol. Required forms should identify the recovery:</p>
+<ul>
+<li>active: <code>ParallelSession already has an active call; concurrent and reentrant calls are not supported</code>;</li>
+<li>retired: <code>ParallelSession cannot be reused after a timed-out, cancelled, aborted, or failed run; close it and create a new session</code>;</li>
+<li>broken: <code>ParallelSession executor is broken; close it and create a new session</code>;</li>
+<li>closed: <code>ParallelSession is closed</code>;</li>
+<li>forked: <code>ParallelSession cannot be used in a different process; create a new session after fork</code>.</li>
+</ul>
+<p>The stored broken-executor cause is chained on later broken-state errors.</p>
+<h2 id="documentation-contract-if-implemented">Documentation Contract If Implemented<a class="headerlink" href="#documentation-contract-if-implemented" title="Permanent link">&para;</a></h2>
+<p>Implementation would require, in the same PR:</p>
+<ul>
+<li>API reference for construction, methods, close behavior, and every fixed vs
+  run-local option;</li>
+<li>one user-facing process example with repeated small batches or expensive
+  initialization;</li>
+<li>a prominent warning that early termination retires the session and that
+  context-manager exit can wait for uncancellable tasks;</li>
+<li>cookbook guidance that threads showed no meaningful startup saving in the
+  benchmark and that long single maps have little reason to use a session;</li>
+<li>API snapshot and typing assertion updates;</li>
+<li>roadmap wording that distinguishes design approval from implementation;</li>
+<li>an Unreleased changelog entry only after the public API exists.</li>
+</ul>
+<p>This design document itself is developer-facing and does not add user-facing
+claims before implementation.</p>
+<h2 id="implementation-sequence-if-demand-arrives">Implementation Sequence If Demand Arrives<a class="headerlink" href="#implementation-sequence-if-demand-arrives" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Re-run or extend the benchmark on the motivating workload and record the
+   expected end-to-end saving.</li>
+<li>Add parity tests that lock current standalone finalization behavior.</li>
+<li>Introduce <code>_RunExit</code> and the private owned lease; keep public functions
+   behavior-identical.</li>
+<li>Add session state/lock ownership and tests without exporting the class.</li>
+<li>Add <code>map()</code> and <code>starmap()</code> methods and lifecycle tests for every executor.</li>
+<li>Add broken-executor, fork, reentrancy, checkpoint, limiter, callback, and
+   context-isolation tests.</li>
+<li>Export <code>ParallelSession</code>, update typing/API snapshots, and write user docs.</li>
+<li>Re-run the benchmark through the actual session API and publish honest
+   end-to-end numbers.</li>
+<li>Run normal and adversarial independent review. Do not merge while any
+   lifecycle, residual-work, or documentation gate remains open.</li>
+</ol>
+<h2 id="test-specification">Test Specification<a class="headerlink" href="#test-specification" title="Permanent link">&para;</a></h2>
+<p>No timing threshold belongs in CI. Correctness should be proved through state,
+worker identity, initializer receipts, bounded admission, and deterministic
+events.</p>
+<h3 id="unit-tests">Unit tests<a class="headerlink" href="#unit-tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li>constructor accepts every valid fixed configuration and rejects every current
+  invalid worker option;</li>
+<li>constructor requires explicit <code>executor=</code>;</li>
+<li>state transitions match the table, including idempotent close;</li>
+<li>atomic acquisition permits exactly one racing caller;</li>
+<li>concurrent and callback-reentrant calls fail immediately rather than block;</li>
+<li>calls after retired, broken, closed, forked, or unpickled misuse fail with the
+  required recovery message;</li>
+<li>the session cannot be pickled;</li>
+<li><code>close(wait=True)</code> and <code>close(wait=False)</code> pass the exact shutdown flags;</li>
+<li>the first closer publishes <code>CLOSED</code> before physical shutdown, preventing a
+  racing acquire while it waits;</li>
+<li>each <code>_RunExit</code> value drives the correct owned-lease and session-lease
+  finalization;</li>
+<li>a session clean finish waits until every tracked future is formally done,
+  including a test hook that pauses a thread task after completion-queue
+  publication but before callable return;</li>
+<li>a thread initializer failure with no run timeout wakes the driver exactly
+  once, while an ordinary thread result is never absorbed twice;</li>
+<li>a deterministic one-worker timeout/stop case cancels queued thread futures
+  and proves the fallback emits neither a duplicate event nor an ordinary
+  <code>CancelledError</code> receipt; halt aftermath remains the sole classifier;</li>
+<li>standalone owned-lease behavior remains byte-for-byte equivalent in shutdown
+  choices to the pre-refactor behavior;</li>
+<li>session method signatures omit constructor-owned settings and preserve all
+  collected-map per-run settings;</li>
+<li>starmap adapts but does not fork lifecycle logic.</li>
+</ul>
+<h3 id="integration-tests-shared-by-threadprocessinterpreter">Integration tests shared by thread/process/interpreter<a class="headerlink" href="#integration-tests-shared-by-threadprocessinterpreter" title="Permanent link">&para;</a></h3>
+<ul>
+<li>two clean calls reuse worker receipts from one executor generation;</li>
+<li>two calls may use different functions, iterable types, window sizes, retries,
+  callbacks, and item-key functions;</li>
+<li>per-call indices restart at zero and duplicate keys across calls are allowed;</li>
+<li>ordinary item failures in call one do not prevent a clean call two;</li>
+<li>callback receipts never cross calls and always execute on the relevant driver
+  thread;</li>
+<li>completion queues and result ledgers from call one cannot publish into call
+  two;</li>
+<li>an explicit shared <code>Limiter</code> spans calls, while numeric and <code>RateLimit</code> inputs
+  create independent call budgets;</li>
+<li>thread contextvars are captured from each submitting call, not construction;</li>
+<li>process/interpreter callable and retry validation is repeated per call;</li>
+<li>every pure preflight failure leaves the session idle and permits a following
+  valid call; every post-acquisition checkpoint-open failure retires it;</li>
+<li>the worker initializer runs per actual worker generation, not per call;</li>
+<li>process recycling can replace a worker across calls and reruns initialization;</li>
+<li>every checkpoint store closes at the end of its call and the next call can
+  open the same or a different checkpoint safely;</li>
+<li><code>checkpoint_key</code> populates result keys exactly as standalone map does;</li>
+<li>a stopped <code>StopToken</code> retains its existing caller-owned latch semantics and
+  retires the acquired session call;</li>
+<li>repeated thread starmaps exercise the ordinary <code>_apply_star</code> adapter and
+  preserve original-tuple <code>item_key</code> values;</li>
+<li>repeated process/interpreter starmaps exercise the resolved-target adapter,
+  preserve importability and interpreter <code>__main__</code> rejection, and prove that
+  both adapter paths reuse the same executor lifecycle rather than constructing
+  a hidden pool.</li>
+</ul>
+<h3 id="lifecycle-and-recovery-tests">Lifecycle and recovery tests<a class="headerlink" href="#lifecycle-and-recovery-tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li>clean sized and unsized maps return <code>ACTIVE -&gt; IDLE</code>;</li>
+<li>a fully exhausted map with item failures remains reusable;</li>
+<li>timeout returns promptly, produces the existing result status, transitions to
+  <code>RETIRED</code>, rejects a next call, and lets <code>close(wait=False)</code> return promptly;</li>
+<li>cancellation and max-error abort follow the same terminal policy and preserve
+  completed-work salvage/no-source-drain behavior;</li>
+<li>source, key, limiter, checkpoint, progress callback, and result callback
+  exceptions propagate promptly and retire the session;</li>
+<li>injected checkpoint-close failure occurs before terminal state publication,
+  prevents a racing acquire, retires the session, and follows the documented
+  exception precedence when a body error is already active;</li>
+<li><code>KeyboardInterrupt</code>/<code>BaseException</code> finalization retires rather than releases;</li>
+<li>a worker deliberately terminated with <code>os._exit()</code> makes process session
+  <code>BROKEN</code>, stops admission, surfaces the infrastructure failure, and causes
+  later calls to fail with the stored cause;</li>
+<li>initializer failure makes the session broken and never triggers automatic
+  reconstruction;</li>
+<li>close from <code>ACTIVE</code> fails without cancelling the active caller;</li>
+<li>context-manager exit from <code>IDLE</code> waits and closes;</li>
+<li>context-manager exit after retirement waits for a finite slow task, with a
+  separate non-waiting close test proving the documented alternative;</li>
+<li>the first <code>close(wait=False)</code> is the only physical shutdown call and a later
+  <code>close(wait=True)</code> is a no-op rather than a false join promise;</li>
+<li>a fault-injected shutdown exception propagates, leaves <code>CLOSED</code>, is retained
+  as the cause of later closed-state errors, and cannot trigger a second
+  physical shutdown;</li>
+<li><code>__exit__</code> tests cover shutdown failure both with and without an exception
+  already leaving the body;</li>
+<li>no test uses a truly hung worker; finite events and subprocess deadlines keep
+  the suite killable.</li>
+</ul>
+<h3 id="streaming-gate-tests-before-iter-may-ship">Streaming gate tests, before <code>iter()</code> may ship<a class="headerlink" href="#streaming-gate-tests-before-iter-may-ship" title="Permanent link">&para;</a></h3>
+<ul>
+<li>lease acquisition happens before source consumption;</li>
+<li>clean exhaustion returns to idle;</li>
+<li>explicit close, early break with close, source failure, max-error termination,
+  and infrastructure failure retire/break the session;</li>
+<li>a suspended stream rejects every new call;</li>
+<li>iterator abandonment cannot depend on CPython reference counting for
+  correctness;</li>
+<li>cross-thread close has an explicit tested outcome;</li>
+<li>bounded window, prompt close, no-source-drain, ordering, and interpreter-close
+  tests retain current standalone semantics.</li>
+</ul>
+<h3 id="end-to-end-and-workspace-isolation-tests">End-to-end and workspace-isolation tests<a class="headerlink" href="#end-to-end-and-workspace-isolation-tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li>a subprocess opens a process session, performs two calls, closes it, and exits
+  without child processes or checkpoint sidecars left open;</li>
+<li>a controlled worker event proves <code>close(wait=False)</code> itself returns promptly;
+  subprocess termination is asserted separately only after finite work is
+  released, because non-waiting close does not promise prompt interpreter exit;</li>
+<li>a forked child cannot use or close the inherited session; fresh child-session
+  construction is tested only on a platform/runtime combination that documents
+  it as safe;</li>
+<li>two sessions with separate checkpoints and limiters do not share state;</li>
+<li>a session exception leaves no repository files, temporary checkpoints, or
+  benchmark rendezvous artifacts;</li>
+<li>Windows spawn, macOS spawn, Linux process, Python 3.14 interpreter, and
+  free-threaded CI lanes exercise their supported matrix without timing gates.</li>
+</ul>
+<h3 id="static-typing-and-documentation-verification">Static, typing, and documentation verification<a class="headerlink" href="#static-typing-and-documentation-verification" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>tests/api_snapshot.txt</code> changes only for the intentionally exported class and
+  methods;</li>
+<li>typing assertions cover generic map/starmap inference, callback item types,
+  context-manager <code>Self</code>, and invalid construction/method options;</li>
+<li><code>pytest -q</code>, Ruff, MyPy, and strict MkDocs build pass;</li>
+<li>executable docs compile the public example and verify its arguments against
+  the live signatures;</li>
+<li>the actual session benchmark records raw artifacts and keeps its result out of
+  CI pass/fail logic.</li>
+</ul>
+<h3 id="observability-and-diagnostic-acceptance">Observability and diagnostic acceptance<a class="headerlink" href="#observability-and-diagnostic-acceptance" title="Permanent link">&para;</a></h3>
+<p>The first slice adds no metrics system or public state property. Diagnostics are
+provided by:</p>
+<ul>
+<li>explicit state-specific error text;</li>
+<li>original exception chaining for broken executors;</li>
+<li>existing <code>ParallelResult.status</code> and <code>ItemResult</code> receipts;</li>
+<li>test-only worker/initializer receipts;</li>
+<li>benchmark JSON for performance claims.</li>
+</ul>
+<p>Logs must not be emitted implicitly by the library. If production demand later
+requires state observation, a read-only public property can be designed from
+real use rather than exposing the private state enum prematurely.</p>
+<h2 id="definition-of-done-for-a-future-implementation">Definition of Done for a Future Implementation<a class="headerlink" href="#definition-of-done-for-a-future-implementation" title="Permanent link">&para;</a></h2>
+<p>Implementation is not done until all of the following are true:</p>
+<ul>
+<li>the motivating real workload still shows material end-to-end benefit;</li>
+<li>standalone behavior parity is locked before the executor seam refactor;</li>
+<li>every state transition and abnormal-exit class is tested;</li>
+<li>no run-local state leaks across calls;</li>
+<li>no residual work can overlap a later call on the same session;</li>
+<li>broken infrastructure never auto-recovers;</li>
+<li>process/interpreter/spawn/fork boundaries are tested where supported;</li>
+<li>user docs contain the timeout-versus-shutdown warning and honest benchmark
+  scope;</li>
+<li>API snapshot, typing, lint, full tests, strict docs, and the actual API
+  benchmark pass;</li>
+<li>a normal reviewer and an adversarial lifecycle reviewer independently approve;</li>
+<li>the PR contains no unrelated release or <code>0.11.0</code> work.</li>
+</ul>
+<h2 id="adr">ADR<a class="headerlink" href="#adr" title="Permanent link">&para;</a></h2>
+<h3 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h3>
+<p>Design a high-level <code>ParallelSession</code> that serially reuses one fixed executor
+for clean <code>map()</code> and <code>starmap()</code> calls. Make abnormal completion and broken
+infrastructure terminal, keep every policy other than worker lifecycle per run,
+and defer streaming plus all implementation until real demand clears a separate
+gate.</p>
+<h3 id="drivers">Drivers<a class="headerlink" href="#drivers" title="Permanent link">&para;</a></h3>
+<ul>
+<li>prevent background work from one call interleaving with the next;</li>
+<li>make ownership, shutdown, and initialized worker state explicit;</li>
+<li>preserve existing Pyarallel function behavior and keep the new surface small.</li>
+</ul>
+<h3 id="alternatives-considered">Alternatives considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h3>
+<ul>
+<li>borrowed executor injection;</li>
+<li>raw <code>ParallelPool</code> facade;</li>
+<li>implicit global executor cache;</li>
+<li>automatic executor replacement after abnormal completion.</li>
+</ul>
+<h3 id="why-this-decision">Why this decision<a class="headerlink" href="#why-this-decision" title="Permanent link">&para;</a></h3>
+<p>The benchmark shows a real clean-path opportunity, but every more permissive
+design either hides executor ownership or permits old and new work to overlap.
+A terminal abnormal state is conservative, predictable, and implementable
+without turning Pyarallel into a scheduler or recovery manager.</p>
+<h3 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h3>
+<ul>
+<li>repeated clean process/interpreter calls can amortize startup and initializer
+  cost;</li>
+<li>a timeout, cancellation, abort, or driver failure sacrifices the session;</li>
+<li>users must explicitly construct a replacement and decide whether to wait for
+  residual work;</li>
+<li>streaming remains standalone until its iterator ownership is earned;</li>
+<li>method signatures add maintenance cost but keep configuration boundaries
+  legible;</li>
+<li>no implementation proceeds solely because this design is approved.</li>
+</ul>
+<h3 id="follow-ups">Follow-ups<a class="headerlink" href="#follow-ups" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Wait for a concrete repeated-map or expensive-initializer workload.</li>
+<li>Validate this API against that workload and measure expected end-to-end gain.</li>
+<li>If implementation is authorized, execute the two-phase internal seam then
+   public surface sequence above.</li>
+<li>Design streaming ownership separately only after collected sessions prove
+   useful.</li>
+</ol>
+<h2 id="review-and-execution-handoff">Review and Execution Handoff<a class="headerlink" href="#review-and-execution-handoff" title="Permanent link">&para;</a></h2>
+<p>Available specialist roles for a future implementation include <code>executor</code> for
+the private seam/public class, <code>test-engineer</code> for lifecycle and subprocess
+coverage, <code>writer</code> for user-facing documentation, and independent
+<code>code-reviewer</code>/<code>critic</code> lanes for normal and adversarial review. Because the
+first slice changes one load-bearing engine seam, a single implementation owner
+should integrate it; tests and review can run in parallel after parity is
+locked.</p>
+<p>Goal-mode execution is intentionally not started by this design. If demand
+arrives, the work should be tracked as one durable goal with explicit gates for
+standalone parity, lifecycle implementation, cross-runtime verification,
+documentation, and independent review. Team verification should compare each
+claimed state transition and error path against this document rather than
+treating reviewer consensus as evidence.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

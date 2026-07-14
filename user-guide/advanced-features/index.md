@@ -177,7 +177,7 @@ result = parallel_map(fetch, users, checkpoint="run.ckpt",
 # next week: three new users prepended — only they run
 ```
 
-Duplicate keys raise `CheckpointError`; keys are type-tagged (`1` vs `"1"` vs `b"1"` never collide); a changed payload under the same key still recomputes.
+Duplicate keys raise `CheckpointError`; keys are type-tagged (`1` vs `"1"` vs `b"1"` never collide); a changed payload under the same key still recomputes. The same identity is also exposed as `ItemResult.key` on live callbacks and `result.item_results()`. You do not need to repeat the function as `item_key=`: when `item_key` is omitted, `checkpoint_key` supplies the result key automatically and is evaluated only once per item. If you explicitly pass the same callable for both options, Pyarallel still evaluates it only once. Distinct callables each run once and may return different checkpoint and application identities.
 
 - Checkpoint files from pyarallel < 0.5 fail closed — delete and rerun.
 - Items and results must be picklable; a result that cannot be checkpointed aborts the run with `CheckpointError`.
@@ -188,6 +188,34 @@ Checkpoint files are code, not data
 Rows are stored as **pickle** — resuming from a checkpoint executes whatever its pickle streams contain. Anyone who can *write* the file can run code in your process on the next resume. Never resume from a file you didn't create; never accept one from an untrusted source (a bug report, a shared bucket). Pyarallel creates new checkpoint files owner-only (`0o600`, POSIX) and leaves existing files' permissions alone — but a directory writable by others (`/tmp`-like locations) is not a safe home for one regardless.
 
 Available on `parallel_map`, `async_parallel_map`, and `.map()`.
+
+### Inspect Before You Resume
+
+Use `checkpoint_info()` when an operator needs to identify a checkpoint before deciding whether to resume it or remove it. Inspection counts rows without loading their pickled values:
+
+```
+from pathlib import Path
+
+from pyarallel import checkpoint_info
+
+
+checkpoint = Path("classify.ckpt")
+expected = ("classify-v3", "gpt-5")
+info = checkpoint_info(checkpoint)
+
+if info.checkpoint_version == expected:
+    print(f"resume candidate: {info.completed} rows already persisted")
+else:
+    checkpoint.unlink()  # deliberate policy choice: start this campaign fresh
+```
+
+`CheckpointInfo` also exposes `schema_version`, `task_signature`, and the primary database's pre-open `size_bytes`. The value is frozen, and all database metadata plus `completed` come from one coherent read snapshot. A concurrent writer can commit immediately afterward, so this is an inspection receipt, not a live monitor.
+
+Know what inspection cannot prove
+
+Inspection does not compare the stored identity with your current function, does not know how many input items exist, and does not report a run status or external-delivery state. `completed` means persisted rows only. The reader does not unpickle result values, but the file must still be treated as untrusted input: maliciously huge metadata can consume parser resources. SQLite may also create or update `-wal`/`-shm` sidecars while opening a WAL-mode checkpoint logically read-only.
+
+Outside checkpointing, `item_key=` is available on map, starmap, and streaming APIs, sync and async. Its values may repeat because they are descriptive application identities; only checkpoint row keys must be unique.
 
 ## Cooperative Stop — `StopToken`
 

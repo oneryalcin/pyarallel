@@ -1939,8 +1939,10 @@
     <span class="n">timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                    <span class="c1"># Total wall-clock timeout (mirror of sync)</span>
     <span class="n">task_timeout</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>               <span class="c1"># Per-task timeout in seconds</span>
     <span class="n">on_progress</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># callback(completed, total)</span>
+    <span class="n">on_result</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                  <span class="c1"># sync callback(ItemResult) in completion order</span>
     <span class="n">window_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                <span class="c1"># Admission window: max unresolved items</span>
     <span class="n">retry</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                      <span class="c1"># Retry(attempts=3, backoff=1.0)</span>
+    <span class="n">item_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                   <span class="c1"># Application identity on ItemResult.key</span>
     <span class="n">checkpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Path to a resume file (SQLite)</span>
     <span class="n">checkpoint_key</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>             <span class="c1"># Stable per-item identity for resume</span>
     <span class="n">max_errors</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>                 <span class="c1"># Abort after N failures</span>
@@ -2001,6 +2003,12 @@
 <td>Progress callback. For unsized iterables, <code>total</code> is items seen so far</td>
 </tr>
 <tr>
+<td><code>on_result</code></td>
+<td><code>Callable[[ItemResult[R]], None] \| None</code></td>
+<td><code>None</code></td>
+<td>Synchronous per-item callback on the event-loop thread, in completion order. Receives successes and failures with retry metadata; checkpoint hits have <code>attempts=0</code>. Exceptions propagate like <code>on_progress</code>; use <code>async_parallel_iter</code> when handling must be awaited</td>
+</tr>
+<tr>
 <td><code>window_size</code></td>
 <td><code>int \| None</code></td>
 <td><code>None</code></td>
@@ -2011,6 +2019,12 @@
 <td><code>Retry \| None</code></td>
 <td><code>None</code></td>
 <td>Per-item retry with backoff</td>
+</tr>
+<tr>
+<td><code>item_key</code></td>
+<td><code>Callable[[T], str \| int \| bytes] \| None</code></td>
+<td><code>None</code></td>
+<td>Synchronous application identity attached to <code>ItemResult.key</code> for successes, failures, callbacks, and <code>.item_results()</code>. It runs on the event-loop thread; duplicate values are allowed</td>
 </tr>
 <tr>
 <td><code>checkpoint</code></td>
@@ -2032,6 +2046,14 @@
 </tr>
 </tbody>
 </table>
+<div class="admonition warning">
+<p class="admonition-title">Keep result callbacks fast</p>
+<p><code>on_result</code> is synchronous and runs inline on the event-loop thread. A
+slow callback delays completion processing; blocking I/O blocks the whole
+event loop. Keep it brief, hand work to a queue, or use
+<code>async_parallel_iter</code> when result handling must be awaited. See the
+<a href="../core/#handle-results-as-they-complete">complete callback example</a>.</p>
+</div>
 <h3 id="why-concurrency-instead-of-workers">Why <code>concurrency</code> instead of <code>workers</code>?<a class="headerlink" href="#why-concurrency-instead-of-workers" title="Permanent link">&para;</a></h3>
 <p>The sync API uses <code>workers</code> because it sizes a thread/process <strong>pool</strong> — you're creating real OS threads or processes. The async API uses <code>concurrency</code> because there's no pool — everything runs on one event loop, and <code>concurrency</code> controls how many tasks are allowed to run at the same time via a semaphore.</p>
 <p>Calling both <code>workers</code> would be misleading because async execution has no worker pool. Calling both <code>concurrency</code> would be wrong for sync because the implementation really is sizing <code>ThreadPoolExecutor(max_workers=N)</code> or <code>ProcessPoolExecutor(max_workers=N)</code>. The names match what each API actually controls.</p>
@@ -2081,7 +2103,9 @@ over it is meaningless. Pass a sized input for a real total.</p>
 <span class="n">results</span> <span class="o">=</span> <span class="k">await</span> <span class="n">async_parallel_starmap</span><span class="p">(</span><span class="n">add</span><span class="p">,</span> <span class="p">[(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">)],</span> <span class="n">concurrency</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
 <span class="c1"># ParallelResult([3, 7])</span>
 </code></pre></div>
-<p>Takes the same options as <code>async_parallel_map</code>. Also available as <code>.starmap()</code> on <code>@async_parallel</code> decorated functions.</p>
+<p>Takes the same applicable options as <code>async_parallel_map</code>. With <code>item_key=</code>, the key
+function receives the original source tuple before argument unpacking. Also
+available as <code>.starmap()</code> on <code>@async_parallel</code> decorated functions.</p>
 <hr />
 <h2 id="async_parallel_iter"><code>async_parallel_iter</code><a class="headerlink" href="#async_parallel_iter" title="Permanent link">&para;</a></h2>
 <p>Async streaming — yields <code>ItemResult</code> in completion order. A bounded
@@ -2104,7 +2128,9 @@ input is never materialized.</p>
 </div>
 <p>Takes the same <code>ordered=</code> and <code>on_progress=</code> options as <code>parallel_iter</code>:
 <code>ordered=True</code> yields in input order with a reorder buffer counted
-inside the window; <code>on_progress(done, total)</code> fires per completed item.</p>
+inside the window; <code>on_progress(done, total)</code> fires per completed item.
+It also accepts <code>item_key=</code> and attaches that application identity to every
+yielded <code>ItemResult</code> without changing the <code>index</code> ordering contract.</p>
 <p>To stop early, close the generator — unlike sync generators, a bare
 <code>break</code> does <strong>not</strong> finalize an async generator promptly (Python defers
 it to event-loop shutdown, so tasks keep running). Wrap the stream in
@@ -2131,7 +2157,7 @@ generator is closed, in-flight work stops.</p>
 <hr />
 <h2 id="async_parallel"><code>@async_parallel</code><a class="headerlink" href="#async_parallel" title="Permanent link">&para;</a></h2>
 <p>Decorator that adds <code>.map()</code> for async parallel execution.</p>
-<div class="highlight"><pre><span></span><code><span class="nd">@async_parallel</span><span class="p">(</span><span class="n">concurrency</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="nd">@async_parallel</span><span class="p">(</span><span class="n">concurrency</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">rate_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">on_result</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">fn</span><span class="p">(</span><span class="n">item</span><span class="p">):</span> <span class="o">...</span>
 </code></pre></div>
 <h3 id="parameters_1">Parameters<a class="headerlink" href="#parameters_1" title="Permanent link">&para;</a></h3>
@@ -2156,6 +2182,12 @@ generator is closed, in-flight work stops.</p>
 <td><code>Limiter \| RateLimit \| float \| None</code></td>
 <td><code>None</code></td>
 <td>Default rate limiting</td>
+</tr>
+<tr>
+<td><code>on_result</code></td>
+<td><code>Callable[[ItemResult], None] \| None</code></td>
+<td><code>None</code></td>
+<td>Default synchronous live-result callback for <code>.map()</code>/<code>.starmap()</code> — ignored by <code>.stream()</code>, which already yields each result</td>
 </tr>
 </tbody>
 </table>

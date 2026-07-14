@@ -1,0 +1,2049 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="Mehmet Oner Yalcin">
+      
+      
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/development/plans/checkpoint-info/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Read-only Checkpoint Inspection - Pyarallel</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#read-only-checkpoint-inspection" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Pyarallel
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Read-only Checkpoint Inspection
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Pyarallel
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/choosing-an-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which API Should I Use?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cookbook
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cookbook
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/llm-batch-calls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch LLM Calls
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Embedding Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/dataset-enrichment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Enrichment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/web-scraping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web Scraping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/bulk-file-download/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bulk File Download
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/github-bulk-repo-changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bulk GitHub Repo Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/docker-registry-cleanup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker Registry Cleanup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/secrets-rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/streaming-etl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming ETL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/ncbi-entrez-batch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NCBI / Entrez Batch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/cpu-fanout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPU-Bound Fan-Out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/advanced-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/async/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Async
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/rate-limiting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rate Limiting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../devx-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DevX Principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture & History
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture & History
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.5.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5.0 Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.6-engine-unification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.6 Engine Unification Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.6-ledger-refactor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.6 Ledger Refactor Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.7-free-threaded-and-interpreters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.7 Free-Threaded & Interpreters Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-spikes-pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#proposed-public-surface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Proposed Public Surface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-only-and-security-invariants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Read-only and Security Invariants
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#external-contract-probe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        External Contract Probe
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-and-cleanup-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error and Cleanup Matrix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uri-construction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        URI Construction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#semantic-version-decoding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Semantic Version Decoding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicit-boundaries-and-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit Boundaries and Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acceptance-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Acceptance Criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and Mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification-and-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification and Review
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stop-condition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stop Condition
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="read-only-checkpoint-inspection">Read-only Checkpoint Inspection<a class="headerlink" href="#read-only-checkpoint-inspection" title="Permanent link">&para;</a></h1>
+<h2 id="goal">Goal<a class="headerlink" href="#goal" title="Permanent link">&para;</a></h2>
+<p>Add a small public API that answers operational questions about an existing
+checkpoint before a rerun:</p>
+<div class="highlight"><pre><span></span><code><span class="n">info</span> <span class="o">=</span> <span class="n">checkpoint_info</span><span class="p">(</span><span class="s2">&quot;run.ckpt&quot;</span><span class="p">)</span>
+</code></pre></div>
+<p>It reports the schema version, semantic <code>checkpoint_version</code>, task signature,
+completed row count, and primary database file size without loading any stored
+result value. This is the next candidate selected from issue #32. It remains
+Unreleased work and does not start a <code>0.11.0</code> release.</p>
+<h2 id="proposed-public-surface">Proposed Public Surface<a class="headerlink" href="#proposed-public-surface" title="Permanent link">&para;</a></h2>
+<p>In <code>pyarallel.checkpoint</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CheckpointInfo</span><span class="p">:</span>
+    <span class="n">path</span><span class="p">:</span> <span class="n">Path</span>
+    <span class="n">schema_version</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">checkpoint_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">task_signature</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">completed</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">size_bytes</span><span class="p">:</span> <span class="nb">int</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">checkpoint_info</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CheckpointInfo</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div>
+<p>Both names are re-exported from <code>pyarallel.__init__</code> and therefore join the
+public API snapshot (<code>pyarallel/__init__.py:8-40</code>,
+<code>tests/test_api_snapshot.py:28-94</code>).</p>
+<p><code>completed</code> means persisted rows in the current checkpoint, not successful
+items in the original input and not a percentage. The checkpoint format does
+not store the input total, failed items, unseen items, or a run status, so the
+API must not manufacture those claims.</p>
+<p><code>path</code> is the supplied location normalized to a <code>Path</code>; it is not resolved to a
+different target. <code>size_bytes</code> comes from the same initial <code>os.lstat()</code> receipt
+used to validate the leaf as a regular file. It is the pre-open primary SQLite
+file size, excludes transient <code>-wal</code>/<code>-shm</code> sidecars, and is not transactionally
+coherent with a live writer.</p>
+<h2 id="read-only-and-security-invariants">Read-only and Security Invariants<a class="headerlink" href="#read-only-and-security-invariants" title="Permanent link">&para;</a></h2>
+<ol>
+<li>The function never creates a missing path. Missing files raise
+   <code>FileNotFoundError</code> with the supplied path.</li>
+<li>The function rejects symlinks, directories, and special files with
+   <code>CheckpointError</code>, matching the checkpoint path safety boundary in
+   <code>pyarallel/checkpoint.py:72-83</code>.</li>
+<li>SQLite opens through a <code>file:</code> URI with <code>mode=ro&amp;cache=private</code>, and the
+   connection sets <code>PRAGMA query_only=ON</code>. Inspection never runs schema
+   creation, migration, journal-mode changes, or logical database writes.</li>
+<li>Inspection first validates <code>sqlite_master</code> and <code>PRAGMA table_info</code> for both
+   objects. <code>meta</code> and <code>results</code> must be ordinary tables with the exact
+   writer-compatible columns, declared types, primary-key positions, and
+   nullability from <code>pyarallel/checkpoint.py:247-249</code> and
+   <code>pyarallel/checkpoint.py:278-283</code>. A view or a v2-looking foreign table such
+   as <code>results(x)</code> is rejected before metadata is reported.</li>
+<li>After shape validation, inspection reads only the <code>meta.value</code> rows for
+   <code>schema_version</code>, <code>task_signature</code>, and <code>checkpoint_version</code>, plus
+   <code>COUNT(*)</code> from <code>results</code>. It never selects <code>results.value</code> or calls
+   <code>pickle.loads</code>; malicious or corrupt result blobs cannot execute during
+   inspection.</li>
+<li>All schema, metadata, and count queries run inside one explicit read
+   transaction begun with <code>BEGIN</code>, so they observe one coherent SQLite
+   snapshot even if a writer commits between queries. <code>size_bytes</code> is an
+   earlier pre-open filesystem observation from the initial <code>lstat()</code> and is not
+   transactionally coherent with that logical snapshot during a live writer.</li>
+<li>The current checkpoint format remains schema version <code>2</code>
+   (<code>pyarallel/checkpoint.py:199-199</code>, <code>pyarallel/checkpoint.py:247-323</code>).
+   Missing, unsupported, or internally inconsistent metadata raises
+   <code>CheckpointError</code> with delete/recreate guidance. Inspection does not bless
+   foreign or legacy SQLite files.</li>
+<li>SQLite parse, lock, and corruption failures are translated to
+   <code>CheckpointError</code>, consistent with normal checkpoint opening
+   (<code>pyarallel/checkpoint.py:254-262</code>). The connection closes on every exit.</li>
+<li>Inspection never compares the stored task signature or semantic version to
+   a live callable or caller token; it reports what the file contains. Normal
+   resume remains responsible for compatibility enforcement.</li>
+<li>Do not use SQLite's <code>immutable=1</code> shortcut. Pyarallel's core reliability
+   case is inspecting a checkpoint after abrupt process death, where committed
+   rows may live only in an existing WAL. Immutable mode can ignore that WAL
+   and undercount or even miss the schema.</li>
+</ol>
+<p><code>mode=ro</code> is a logical read-only guarantee, not a byte-for-byte filesystem
+immutability guarantee. SQLite may create or update <code>-wal</code>/<code>-shm</code> sidecars to
+read a WAL-mode database. The API must document that possibility and must not
+promise unchanged directory entries or sidecar mtimes. The primary database is
+never created when missing, and SQL writes remain prohibited.</p>
+<h2 id="external-contract-probe">External Contract Probe<a class="headerlink" href="#external-contract-probe" title="Permanent link">&para;</a></h2>
+<p>SQLite's official URI documentation defines <code>mode=ro</code> as a read-only open and
+shows <code>mode=ro&amp;cache=private</code> as the private-cache form:
+<a href="https://sqlite.org/uri.html">https://sqlite.org/uri.html</a>. Its WAL documentation states that a read-only
+WAL database requires readable existing sidecars, permission to create them,
+or immutable mode: <a href="https://sqlite.org/wal.html#readonly">https://sqlite.org/wal.html#readonly</a>.</p>
+<p>A focused Python <code>sqlite3</code> probe confirmed both load-bearing consequences on
+the supported runtime:</p>
+<ul>
+<li>opening a clean WAL-mode database with <code>mode=ro</code> read the data but created
+  empty <code>-wal</code> and <code>-shm</code> sidecars;</li>
+<li>after a subprocess committed and exited without closing SQLite, the main file
+  contained no visible schema under <code>immutable=1</code>, while <code>mode=ro</code> read the
+  committed row through the surviving WAL.</li>
+</ul>
+<p>Therefore implementation must preserve WAL visibility and document possible
+sidecar activity rather than claiming physical immutability.</p>
+<h2 id="error-and-cleanup-matrix">Error and Cleanup Matrix<a class="headerlink" href="#error-and-cleanup-matrix" title="Permanent link">&para;</a></h2>
+<ul>
+<li>An initial leaf <code>lstat()</code> reporting <code>ENOENT</code> propagates as
+  <code>FileNotFoundError</code> with the supplied path.</li>
+<li>An initial leaf that exists but is a symlink, directory, or special file
+  raises <code>CheckpointError</code>.</li>
+<li>Other initial <code>lstat()</code> failures, and all OS/SQLite/schema/decode errors
+  after leaf validation (including disappearance or replacement races), raise
+  <code>CheckpointError</code> chained from the cause.</li>
+<li>The connection closes in <code>finally</code> on success and failure. A cleanup error is
+  reported when it is the only error, but must not replace an active validation
+  error.</li>
+</ul>
+<p>The safety check covers the final path component only, matching
+<code>_create_secure()</code> today. Parent directories are trusted. A hostile parent can
+replace the leaf between <code>lstat()</code> and SQLite open; schema validation limits
+the consequence but cannot provide race-free directory authority. This API
+does not claim protection from a hostile checkpoint directory.</p>
+<h2 id="uri-construction">URI Construction<a class="headerlink" href="#uri-construction" title="Permanent link">&para;</a></h2>
+<p>Return <code>Path(path)</code> exactly. For SQLite only, derive a lexical absolute path
+with <code>Path(path).absolute().as_uri()</code> and append
+<code>?mode=ro&amp;cache=private</code>. Never call <code>resolve()</code>: it follows symlinks and would
+change both the trusted-parent boundary and the reported path.</p>
+<p>Tests cover relative paths and names containing spaces, <code>#</code>, <code>?</code>, <code>%</code>, and
+Unicode. The Windows lane additionally covers drive-letter paths and, where
+the runner permits it, UNC handling. It also proves the connection is closed
+by renaming and deleting the file after inspection.</p>
+<h2 id="semantic-version-decoding">Semantic Version Decoding<a class="headerlink" href="#semantic-version-decoding" title="Permanent link">&para;</a></h2>
+<p>The current store persists <code>checkpoint_version</code> as the stable <code>repr</code> produced
+by <code>_encode_version()</code> (<code>pyarallel/checkpoint.py:444-464</code>). <code>checkpoint_info()</code>
+decodes accepted text with <code>ast.literal_eval</code>, then validates it by re-encoding
+with <code>_encode_version()</code> and requiring an exact text match. No new size limit is
+introduced: current Pyarallel can write and resume arbitrarily large valid
+tokens, so inspection must not silently reject its own checkpoints.</p>
+<p>Accepted decoded values are exactly a scalar <code>str</code>, <code>int</code>, or <code>bytes</code>, or a
+flat tuple of those types (including an empty tuple). <code>bool</code>, nested tuples,
+and decoded <code>None</code> are rejected. Only a missing metadata row maps to <code>None</code>.
+<code>SyntaxError</code>, <code>ValueError</code>, <code>TypeError</code>, and <code>RecursionError</code> are translated to
+<code>CheckpointError</code>. <code>literal_eval</code> avoids code execution but can consume CPU or
+memory on adversarially large/deep text. Inspection is safe from pickle code
+execution, not a resource-isolation sandbox for arbitrary hostile files; use OS
+resource limits when inspecting an untrusted checkpoint.</p>
+<p>A missing metadata row maps to <code>None</code>. A malformed row raises
+<code>CheckpointError</code>; it is evidence of corruption or a foreign writer, not a
+version string to expose optimistically.</p>
+<h2 id="explicit-boundaries-and-non-goals">Explicit Boundaries and Non-goals<a class="headerlink" href="#explicit-boundaries-and-non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>No result values, keys, fingerprints, or per-row listing.</li>
+<li>No deletion, repair, migration, vacuum, checkpoint truncation, or resume.</li>
+<li>No progress percentage or original-input total; the schema does not know it.</li>
+<li>No claim that a completed computation was committed to an external sink.</li>
+<li>No live-run monitoring guarantee. SQLite provides a read snapshot while
+  another process may write, but concurrent execution runs remain unsupported
+  and the returned count is simply the snapshot observed by this call.</li>
+<li>No CLI or JSON-specific wrapper; callers can use the frozen dataclass.</li>
+<li>No checkpoint schema change. The reader consumes existing version-2 files.</li>
+</ul>
+<h2 id="implementation-steps">Implementation Steps<a class="headerlink" href="#implementation-steps" title="Permanent link">&para;</a></h2>
+<ol>
+<li>In <code>pyarallel/checkpoint.py</code>, add the frozen <code>CheckpointInfo</code> dataclass,
+   safe path validation, exact schema-shape validation, validated
+   semantic-version decoding, one-transaction snapshot reads, and
+   <code>checkpoint_info()</code>.
+   Keep the reader separate from <code>_CheckpointStore.__init__</code>, because that
+   constructor intentionally creates and validates a checkpoint for a specific
+   live function (<code>pyarallel/checkpoint.py:237-323</code>).</li>
+<li>In <code>pyarallel/__init__.py</code>, export <code>CheckpointInfo</code> and <code>checkpoint_info</code>.
+   Regenerate <code>tests/api_snapshot.txt</code> so the new function and constructor are
+   visible in review.</li>
+<li>Add focused tests in <code>tests/test_checkpoint.py</code> or a dedicated
+   <code>tests/test_checkpoint_info.py</code> covering the acceptance matrix below.</li>
+<li>Add user-facing documentation to <code>docs/api-reference/core.md</code>, the
+   checkpoint section of <code>docs/user-guide/advanced-features.md</code>, and
+   <code>CHANGELOG.md</code>. Include one example that checks <code>completed</code> and
+   <code>checkpoint_version</code> before deciding whether to resume or delete a file,
+   plus an explicit warning that inspection does not validate against a live
+   function and does not report total progress.</li>
+<li>Update typing assertions for <code>Path</code>, field types, and the function return.
+   Run the public API, docs, packaging, and cross-platform gates before review.</li>
+</ol>
+<h2 id="acceptance-criteria">Acceptance Criteria<a class="headerlink" href="#acceptance-criteria" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Inspecting a valid positional or identity-keyed version-2 checkpoint returns
+  the supplied path as a <code>Path</code>, schema <code>"2"</code>, decoded semantic token or
+  <code>None</code>, stored task signature, exact <code>COUNT(*)</code>, and the pre-open primary-file
+  size from the validating <code>lstat()</code> receipt.</li>
+<li>Zero-row checkpoints report <code>completed == 0</code>.</li>
+<li><code>checkpoint_info()</code> does not create a missing file and raises
+  <code>FileNotFoundError</code>.</li>
+<li>A symlink, directory, or special file is refused before SQLite opens it.</li>
+<li>Legacy schema; missing or malformed required metadata; malformed <code>meta</code>
+  shape; missing/wrong-shaped <code>results</code>; a <code>results</code> view; missing columns;
+  wrong primary-key/nullability declarations; random bytes; and SQLite
+  corruption fail with actionable <code>CheckpointError</code> rather than raw
+  <code>sqlite3</code>/<code>ast</code>/OS exceptions.</li>
+<li>Semantic-version tests cover each scalar type, heterogeneous and empty flat
+  tuples, bool, nested tuple, stored <code>'None'</code>, malformed syntax, recursion, and
+  a large valid token produced by the current writer.</li>
+<li>A result row containing a pickle payload that would execute or raise if
+  loaded can still be counted safely; a test makes <code>pickle.loads</code> fail if
+  called and proves inspection succeeds.</li>
+<li>SQL trace/authorizer evidence shows inspection issues only the explicit
+  <code>BEGIN</code>, schema/metadata/count reads, <code>PRAGMA table_info</code>, and
+  <code>PRAGMA query_only=ON</code>: no DDL, DML, attach, vacuum, journal-mode change, or
+  result-value projection. Persisted logical rows remain unchanged and a
+  missing primary database is never created. Tests do not assert sidecar
+  immutability because SQLite may legitimately manage WAL/SHM files for a
+  read-only connection.</li>
+<li>A writer committing between inspection queries cannot produce mixed metadata
+  and counts; a controlled second connection proves the explicit transaction
+  returns one coherent logical snapshot. <code>size_bytes</code> is asserted separately,
+  not as part of that transaction.</li>
+<li>A crash-left checkpoint whose committed rows exist in WAL is counted
+  correctly; the test proves an immutable open would miss those rows.</li>
+<li>Repeated inspection of a closed, quiescent checkpoint returns equal frozen
+  values and leaves no open handle preventing rename/delete on Windows.</li>
+<li>Public imports, strict mypy, Pyright, the API snapshot, executable docs,
+  strict MkDocs, full pytest matrix, clean wheel/sdist installation, macOS,
+  Windows, Python 3.12-3.14, and free-threaded lanes pass.</li>
+</ul>
+<h2 id="risks-and-mitigations">Risks and Mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Accidental unpickling:</strong> keep the SQL projection explicit and regression
+  test with a hostile blob plus a failing <code>pickle.loads</code> monkeypatch.</li>
+<li><strong>Accidental logical mutation:</strong> validate with <code>lstat</code>, use
+  <code>mode=ro&amp;cache=private</code>, set query-only, and compare checkpoint metadata and
+  row counts before and after. Document SQLite-managed sidecar activity.</li>
+<li><strong>Misleading progress:</strong> call the field <code>completed</code>, not <code>progress</code>; document
+  that total input and external sink state are unknowable.</li>
+<li><strong>Leaking internal encoding:</strong> decode only the existing version token through
+  <code>literal_eval</code> plus exact re-encoding; keep row keys/fingerprints private.</li>
+<li><strong>Reader/writer drift:</strong> validate the same required schema metadata as the
+  writer, hold one explicit read transaction, and keep version-specific parsing
+  local to <code>checkpoint.py</code>.</li>
+<li><strong>Windows URI/path handling:</strong> use lexical <code>absolute().as_uri()</code> and exercise
+  reserved characters, Unicode, drive-letter paths, handle closure, and
+  available UNC behavior in the Windows lane.</li>
+<li><strong>False clean snapshot after a crash:</strong> never set <code>immutable=1</code>; retain a
+  regression with a subprocess-left WAL whose committed row must be counted.</li>
+</ul>
+<h2 id="verification-and-review">Verification and Review<a class="headerlink" href="#verification-and-review" title="Permanent link">&para;</a></h2>
+<p>Run focused checkpoint-info tests first, then Ruff, pinned strict mypy, latest
+installed-wheel mypy, Pyright, API snapshot, executable documentation, strict
+MkDocs, full pytest, and package clean-install smoke tests. Re-read the entire
+checkpoint open/create/read/close path after the change.</p>
+<p>Because this is a public persistence API, require one normal and one
+adversarial post-implementation review. The adversarial lane must specifically
+attempt primary-file creation, logical database mutation, result unpickling,
+schema/view confusion, mixed-snapshot reads, symlink/TOCTOU boundaries, URI
+edge cases, leaked handles, parser exhaustion, and false progress claims.</p>
+<h2 id="stop-condition">Stop Condition<a class="headerlink" href="#stop-condition" title="Permanent link">&para;</a></h2>
+<p>The slice is ready for implementation only after this plan is independently
+reviewed with no unresolved blocker. Implementation is complete only when the
+reader is demonstrably read-only and non-unpickling, the public API and docs
+match, every applicable verification gate passes, both post-change reviewers
+approve, and the feature branch is committed for a PR. Do not release or bump
+<code>0.11.0</code> as part of this work.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1059,6 +1059,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Checkpoint / Resume">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inspect-before-you-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspect Before You Resume
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1913,6 +1930,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Checkpoint / Resume">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#inspect-before-you-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspect Before You Resume
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2172,7 +2206,13 @@ load from disk, failed and unseen items execute:</p>
 </code></pre></div>
 <p>Duplicate keys raise <code>CheckpointError</code>; keys are type-tagged (<code>1</code> vs
   <code>"1"</code> vs <code>b"1"</code> never collide); a changed payload under the same key
-  still recomputes.
+  still recomputes. The same identity is also exposed as <code>ItemResult.key</code> on
+  live callbacks and <code>result.item_results()</code>. You do not need to repeat the
+  function as <code>item_key=</code>: when <code>item_key</code> is omitted, <code>checkpoint_key</code>
+  supplies the result key automatically and is evaluated only once per item.
+  If you explicitly pass the same callable for both options, Pyarallel still
+  evaluates it only once. Distinct callables each run once and may return
+  different checkpoint and application identities.
 - Checkpoint files from pyarallel &lt; 0.5 fail closed — delete and rerun.
 - Items and results must be picklable; a result that cannot be
   checkpointed aborts the run with <code>CheckpointError</code>.
@@ -2190,6 +2230,42 @@ permissions alone — but a directory writable by others (<code>/tmp</code>-like
 locations) is not a safe home for one regardless.</p>
 </div>
 <p>Available on <code>parallel_map</code>, <code>async_parallel_map</code>, and <code>.map()</code>.</p>
+<h3 id="inspect-before-you-resume">Inspect Before You Resume<a class="headerlink" href="#inspect-before-you-resume" title="Permanent link">&para;</a></h3>
+<p>Use <code>checkpoint_info()</code> when an operator needs to identify a checkpoint before
+deciding whether to resume it or remove it. Inspection counts rows without
+loading their pickled values:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyarallel</span><span class="w"> </span><span class="kn">import</span> <span class="n">checkpoint_info</span>
+
+
+<span class="n">checkpoint</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;classify.ckpt&quot;</span><span class="p">)</span>
+<span class="n">expected</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;classify-v3&quot;</span><span class="p">,</span> <span class="s2">&quot;gpt-5&quot;</span><span class="p">)</span>
+<span class="n">info</span> <span class="o">=</span> <span class="n">checkpoint_info</span><span class="p">(</span><span class="n">checkpoint</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">info</span><span class="o">.</span><span class="n">checkpoint_version</span> <span class="o">==</span> <span class="n">expected</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;resume candidate: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">completed</span><span class="si">}</span><span class="s2"> rows already persisted&quot;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">checkpoint</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>  <span class="c1"># deliberate policy choice: start this campaign fresh</span>
+</code></pre></div>
+<p><code>CheckpointInfo</code> also exposes <code>schema_version</code>, <code>task_signature</code>, and the
+primary database's pre-open <code>size_bytes</code>. The value is frozen, and all database
+metadata plus <code>completed</code> come from one coherent read snapshot. A concurrent
+writer can commit immediately afterward, so this is an inspection receipt, not
+a live monitor.</p>
+<div class="admonition warning">
+<p class="admonition-title">Know what inspection cannot prove</p>
+<p>Inspection does not compare the stored identity with your current function,
+does not know how many input items exist, and does not report a run status or
+external-delivery state. <code>completed</code> means persisted rows only. The reader
+does not unpickle result values, but the file must still be treated as
+untrusted input: maliciously huge metadata can consume parser resources.
+SQLite may also create or update <code>-wal</code>/<code>-shm</code> sidecars while opening a
+WAL-mode checkpoint logically read-only.</p>
+</div>
+<p>Outside checkpointing, <code>item_key=</code> is available on map, starmap, and streaming
+APIs, sync and async. Its values may repeat because they are descriptive
+application identities; only checkpoint row keys must be unique.</p>
 <h2 id="cooperative-stop-stoptoken">Cooperative Stop — <code>StopToken</code><a class="headerlink" href="#cooperative-stop-stoptoken" title="Permanent link">&para;</a></h2>
 <p>SIGTERM during a deploy, the notebook stop button, a spend-limit
 watchdog: long runs need a way to say <em>land the plane</em> (v0.9):</p>

@@ -16,8 +16,10 @@ results = parallel_map(
     rate_limit=None,                 # RateLimit spec, shared Limiter, or ops/second
     timeout=None,                    # Total timeout in seconds
     on_progress=None,                # callback(completed, total)
+    on_result=None,                  # callback(ItemResult) in completion order
     window_size=None,                # Admission window: max unresolved items
     retry=None,                      # Retry(attempts=3, backoff=1.0)
+    item_key=None,                   # Application identity on ItemResult.key
     checkpoint=None,                 # Path to a resume file (SQLite)
     checkpoint_key=None,             # Stable per-item identity for resume
     max_errors=None,                 # Abort after N failures
@@ -40,8 +42,10 @@ results = parallel_map(
 | `rate_limit`           | `Limiter \| RateLimit \| float \| None`      | `None`     | Rate limiting (float = ops/second). Pass a shared `Limiter` to draw from one budget across calls                                                                                                                                                                                                      |
 | `timeout`              | `float \| None`                              | `None`     | Total wall-clock timeout in seconds. Sets `result.timed_out` on expiry; the source is never drained after a stop                                                                                                                                                                                      |
 | `on_progress`          | `Callable[[int, int], None] \| None`         | `None`     | Progress callback `(completed, total)`. For unsized iterables, `total` is items seen so far                                                                                                                                                                                                           |
+| `on_result`            | `Callable[[ItemResult[R]], None] \| None`    | `None`     | Live per-item callback on the driver thread, in completion order. Receives successes and failures with retry metadata; checkpoint hits have `attempts=0`. Exceptions propagate like `on_progress`. Use `async_parallel_iter` for awaited callback work                                                |
 | `window_size`          | `int \| None`                                | `None`     | Admission window: max items submitted but unresolved (default `2 × workers`). A lookahead/memory bound, not a chunk size — no barriers, input consumed lazily                                                                                                                                         |
 | `retry`                | `Retry \| None`                              | `None`     | Per-item retry with backoff                                                                                                                                                                                                                                                                           |
+| `item_key`             | `Callable[[T], str \| int \| bytes] \| None` | `None`     | Synchronous application identity attached to `ItemResult.key` for successes, failures, callbacks, and `.item_results()`. It does not affect ordering, and duplicate values are allowed                                                                                                                |
 | `checkpoint`           | `str \| Path \| None`                        | `None`     | Checkpoint file for resumable runs — completed items load from disk on rerun. **Contains pickle: treat the file like code** — never resume from a file you didn't create ([details](https://oneryalcin.github.io/pyarallel/user-guide/advanced-features/#checkpoint-resume))                          |
 | `checkpoint_key`       | `Callable[[T], str \| int \| bytes] \| None` | `None`     | Stable per-item identity — rows keyed by identity instead of position, so evolving inputs keep their completed work. Requires `checkpoint=`                                                                                                                                                           |
 | `checkpoint_version`   | `str \| int \| bytes \| tuple \| None`       | `None`     | Semantic token joining checkpoint identity — the config function inspection can't see (prompt, model). Changed token fails closed with both versions in the error. Requires `checkpoint=`                                                                                                             |
@@ -80,9 +84,85 @@ results = parallel_map(embed, chunks, checkpoint="embeddings.ckpt")
 results = parallel_map(fetch, urls, workers=10, max_errors=10)
 ```
 
+### Handle Results as They Complete
+
+Use `on_result=` when each result should be logged, measured, or handed to a fast synchronous sink without waiting for the complete `ParallelResult`:
+
+```
+from pyarallel import ItemResult, parallel_map
+
+
+def divide(value: int) -> float:
+    return 100 / value
+
+
+def record(item: ItemResult[float]) -> None:
+    if item.ok:
+        print(
+            f"item {item.index}: {item.value} "
+            f"({item.attempts} attempt(s), {item.duration:.3f}s)"
+        )
+    else:
+        print(f"item {item.index} failed: {item.error}")
+
+
+result = parallel_map(divide, [5, 0, 4], workers=3, on_result=record)
+```
+
+The callback receives both successes and failures in completion order. A checkpoint hit is reported too, with `attempts=0` and `duration=0.0` because no work ran for that item during the resumed call.
+
+Keep result callbacks fast
+
+`on_result` runs inline on the driver thread. A slow or blocking callback delays completion processing and can hold up admission of more work. Hand off expensive persistence or network I/O to another queue, or consume `parallel_iter` when result handling is the main workload. For async code, use `async_parallel_iter` when handling must be awaited.
+
+### Identify Results by Application Key
+
+Use `item_key=` when the source position is not the identity your logs, callbacks, or recovery tooling use. The function is synchronous and receives the original source item once as that item is admitted:
+
+```
+from pyarallel import ItemResult, parallel_map
+
+
+customers = [
+    {"id": "customer-8f2", "email": "ada@example.com"},
+    {"id": "customer-a17", "email": "grace@example.com"},
+]
+
+
+def send_welcome(customer: dict[str, str]) -> str:
+    return f"sent:{customer['email']}"
+
+
+def audit(receipt: ItemResult[str]) -> None:
+    if receipt.ok:
+        print(f"{receipt.key}: {receipt.value}")
+    else:
+        print(f"{receipt.key}: failed: {receipt.error}")
+
+
+run = parallel_map(
+    send_welcome,
+    customers,
+    item_key=lambda customer: customer["id"],
+    on_result=audit,
+)
+
+# Collected receipts carry the same identity in input order.
+assert [receipt.key for receipt in run.item_results()] == [
+    "customer-8f2",
+    "customer-a17",
+]
+```
+
+`ItemResult.index` remains the zero-based source position and remains the ordering field. Keys need not be unique; they are labels, not dictionary keys. The uniqueness rule applies only when an identity is also used for checkpoint rows through `checkpoint_key=`.
+
+Key functions run inline
+
+`item_key` must be a fast synchronous scalar function returning `str`, `int`, or `bytes`. It runs on the driver or event-loop thread before the task starts, so blocking I/O delays admission. Async key functions and other return types raise `TypeError`.
+
 ### Debug Mode with `sequential=True`
 
-`sequential=True` runs every item inline in the calling thread: no pool, no futures — real stack traces, working breakpoints, deterministic input order. It honors `rate_limit`, `retry`, `checkpoint`, `on_progress`, and `max_errors`; `timeout` is checked between items only (an in-flight item cannot be interrupted). `workers` is ignored rather than rejected, so a single flag can flip production code into debug mode:
+`sequential=True` runs every item inline in the calling thread: no pool, no futures — real stack traces, working breakpoints, deterministic input order. It honors `rate_limit`, `retry`, `checkpoint`, `on_progress`, and `on_result`, and `max_errors`; `timeout` is checked between items only (an in-flight item cannot be interrupted). `workers` is ignored rather than rejected, so a single flag can flip production code into debug mode:
 
 ```
 results = parallel_map(fetch, urls, workers=10,
@@ -140,6 +220,40 @@ Rows are then keyed by identity — prepending an item runs only the new item, r
 
 Available on `parallel_map`, `async_parallel_map`, and `.map()` — not on starmap or the streaming APIs.
 
+### Inspect an Existing Checkpoint
+
+`checkpoint_info(path)` reads operational metadata without loading any pickled result value:
+
+```
+from pyarallel import checkpoint_info
+
+
+EXPECTED_VERSION = ("classify-v3", "gpt-5")
+info = checkpoint_info("classify.ckpt")
+
+if info.checkpoint_version != EXPECTED_VERSION:
+    raise RuntimeError("checkpoint belongs to a different campaign")
+
+print(f"{info.completed} persisted rows in {info.size_bytes} bytes")
+```
+
+It returns a frozen `CheckpointInfo` with these fields:
+
+| Field                | Type                                   | Meaning                                                                               |
+| -------------------- | -------------------------------------- | ------------------------------------------------------------------------------------- |
+| `path`               | `Path`                                 | The supplied checkpoint location                                                      |
+| `schema_version`     | `str`                                  | Pyarallel's stored checkpoint schema version                                          |
+| `checkpoint_version` | `str \| int \| bytes \| tuple \| None` | Decoded semantic token supplied when the run was created                              |
+| `task_signature`     | `str`                                  | Stored mapped-function identity                                                       |
+| `completed`          | `int`                                  | Number of result rows persisted in the inspected SQLite snapshot                      |
+| `size_bytes`         | `int`                                  | Primary database file size observed before SQLite opens it; excludes WAL/SHM sidecars |
+
+The reader validates the version-2 table shapes, reads metadata and the row count in one SQLite snapshot, and never selects `results.value`. Missing files raise `FileNotFoundError`; malformed, foreign, or unsupported files raise `CheckpointError`.
+
+Inspection is not resume validation or total progress
+
+`checkpoint_info()` reports what the file contains. It does not compare the stored signature or version with a live callable, does not know the original input total, and cannot prove that results reached an external sink. Treat `completed` as persisted rows, not a percentage or successful-run status. SQLite may create or update `-wal`/`-shm` sidecars while reading a WAL-mode database, even though the database is opened logically read-only.
+
 ### Notes on Progress and Unsized Iterables
 
 When `items` has a known length, `on_progress(done, total)` reports the final total.
@@ -155,7 +269,7 @@ Decorator that adds `.map()` for parallel execution. The decorated function **ke
 ```
 @parallel(workers=4, executor="thread", rate_limit=None,
           retry=None, timeout=None, window_size=None,
-          max_errors=None, on_progress=None)
+          max_errors=None, on_progress=None, on_result=None)
 def fn(item): ...
 ```
 
@@ -163,18 +277,19 @@ def fn(item): ...
 
 Decorator defaults are *properties of the function's behavior* — "this fetcher retries 429s" belongs at the decorator. Any per-call keyword overrides them (presence is the sentinel: unpassed inherits, explicit — even `None` — overrides).
 
-| Parameter     | Type                                     | Default    | Description                                                                                               |
-| ------------- | ---------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------- |
-| `workers`     | `int \| None`                            | `None`     | Default worker count for `.map()`                                                                         |
-| `executor`    | `"thread" \| "process" \| "interpreter"` | `"thread"` | Default executor type                                                                                     |
-| `rate_limit`  | `Limiter \| RateLimit \| float \| None`  | `None`     | Default rate limiting                                                                                     |
-| `retry`       | `Retry \| None`                          | `None`     | Default retry policy (v0.10)                                                                              |
-| `timeout`     | `float \| None`                          | `None`     | Default total timeout for `.map()`/`.starmap()` — ignored by `.stream()` (no total deadline in streaming) |
-| `window_size` | `int \| None`                            | `None`     | Default admission window                                                                                  |
-| `max_errors`  | `int \| None`                            | `None`     | Default early-abort threshold                                                                             |
-| `on_progress` | `Callable \| None`                       | `None`     | Default progress callback                                                                                 |
+| Parameter     | Type                                     | Default    | Description                                                                                                             |
+| ------------- | ---------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `workers`     | `int \| None`                            | `None`     | Default worker count for `.map()`                                                                                       |
+| `executor`    | `"thread" \| "process" \| "interpreter"` | `"thread"` | Default executor type                                                                                                   |
+| `rate_limit`  | `Limiter \| RateLimit \| float \| None`  | `None`     | Default rate limiting                                                                                                   |
+| `retry`       | `Retry \| None`                          | `None`     | Default retry policy (v0.10)                                                                                            |
+| `timeout`     | `float \| None`                          | `None`     | Default total timeout for `.map()`/`.starmap()` — ignored by `.stream()` (no total deadline in streaming)               |
+| `window_size` | `int \| None`                            | `None`     | Default admission window                                                                                                |
+| `max_errors`  | `int \| None`                            | `None`     | Default early-abort threshold                                                                                           |
+| `on_progress` | `Callable \| None`                       | `None`     | Default progress callback                                                                                               |
+| `on_result`   | `Callable[[ItemResult], None] \| None`   | `None`     | Default live result callback for `.map()`/`.starmap()` — ignored by `.stream()`, which already yields each `ItemResult` |
 
-**Deliberately not accepted** (run-scoped, not function-scoped): `checkpoint`/`checkpoint_key`/`checkpoint_version` — a checkpoint file names a *run*; two `.map()` calls sharing a default file would collide keys and serve wrong resumes. `stop` — a token is a campaign latch. Pass these per call.
+**Deliberately not accepted** (run-scoped, not function-scoped): `item_key` and `checkpoint`/`checkpoint_key`/`checkpoint_version` — identities describe the input collection for a particular run, while a checkpoint file names a *run*; two `.map()` calls sharing a default file would collide keys and serve wrong resumes. `stop` — a token is a campaign latch. Pass these per call.
 
 ### Usage
 
@@ -192,6 +307,7 @@ results = fetch.map(urls, workers=16)           # override workers
 results = fetch.map(urls, rate_limit=100)       # override rate limit
 results = fetch.map(urls, timeout=30.0)         # add timeout
 results = fetch.map(urls, on_progress=callback) # add progress
+results = fetch.map(urls, on_result=save_result) # handle each completion
 
 # Bare decorator (uses all defaults)
 @parallel
@@ -231,7 +347,7 @@ from pyarallel import parallel_starmap
 results = parallel_starmap(fn, [(arg1, arg2), (arg3, arg4), ...])
 ```
 
-Takes the same options as `parallel_map` (workers, executor, rate_limit, timeout, window_size, retry).
+Takes the same applicable options as `parallel_map`, including `on_result=` and `item_key=`. The key function receives the original source tuple, before it is unpacked into `fn(*args)`.
 
 ### Examples
 
@@ -280,19 +396,20 @@ for item in parallel_iter(fn, items, workers=4):
 
 ### Parameters
 
-Same as `parallel_map` except no `timeout` or `on_progress` (results stream as they complete).
+Same execution controls as `parallel_map`, except no total `timeout`, checkpointing, `stop`, or `on_result` — the iterator already yields each `ItemResult` as work completes. `on_progress` remains available.
 
-| Parameter     | Type                                     | Default    | Description                                                                                    |
-| ------------- | ---------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------- |
-| `fn`          | `Callable`                               | required   | Function to apply to each item                                                                 |
-| `items`       | `Iterable`                               | required   | Any iterable                                                                                   |
-| `workers`     | `int \| None`                            | `None`     | Number of parallel workers (stdlib default when `None`)                                        |
-| `executor`    | `"thread" \| "process" \| "interpreter"` | `"thread"` | Thread pool, process pool, or (3.14+) sub-interpreter pool — see [parallel_map](#parallel_map) |
-| `rate_limit`  | `Limiter \| RateLimit \| float \| None`  | `None`     | Rate limiting                                                                                  |
-| `window_size` | `int \| None`                            | `None`     | Maximum items in flight (default `2 × workers`)                                                |
-| `retry`       | `Retry \| None`                          | `None`     | Per-item retry                                                                                 |
-| `ordered`     | `bool`                                   | `False`    | Yield in input order instead of completion order                                               |
-| `on_progress` | `Callable[[int, int], None] \| None`     | `None`     | `callback(done, total)` per completed item                                                     |
+| Parameter     | Type                                         | Default    | Description                                                                                          |
+| ------------- | -------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------- |
+| `fn`          | `Callable`                                   | required   | Function to apply to each item                                                                       |
+| `items`       | `Iterable`                                   | required   | Any iterable                                                                                         |
+| `workers`     | `int \| None`                                | `None`     | Number of parallel workers (stdlib default when `None`)                                              |
+| `executor`    | `"thread" \| "process" \| "interpreter"`     | `"thread"` | Thread pool, process pool, or (3.14+) sub-interpreter pool — see [parallel_map](#parallel_map)       |
+| `rate_limit`  | `Limiter \| RateLimit \| float \| None`      | `None`     | Rate limiting                                                                                        |
+| `window_size` | `int \| None`                                | `None`     | Maximum items in flight (default `2 × workers`)                                                      |
+| `retry`       | `Retry \| None`                              | `None`     | Per-item retry                                                                                       |
+| `item_key`    | `Callable[[T], str \| int \| bytes] \| None` | `None`     | Synchronous application identity attached to each yielded `ItemResult`; duplicate values are allowed |
+| `ordered`     | `bool`                                       | `False`    | Yield in input order instead of completion order                                                     |
+| `on_progress` | `Callable[[int, int], None] \| None`         | `None`     | `callback(done, total)` per completed item                                                           |
 
 Changed in v0.5 (streaming) and v0.6 (everywhere)
 
@@ -300,7 +417,7 @@ Changed in v0.5 (streaming) and v0.6 (everywhere)
 
 ### Yields
 
-`ItemResult[T]` — each item includes `.index`, `.ok`, `.value`, and `.error`. Results arrive in **completion order** by default; pass `ordered=True` for input order.
+`ItemResult[T]` — each item includes `.index`, `.key`, `.ok`, `.value`, and `.error`. Results arrive in **completion order** by default; pass `ordered=True` for input order.
 
 ### Ordered streaming
 
@@ -340,14 +457,15 @@ Single streaming result item returned by `parallel_iter`, `async_parallel_iter`,
 
 ### Properties
 
-| Member      | Returns             | Description                                                                                                                     |
-| ----------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `.index`    | `int`               | Original input index                                                                                                            |
-| `.ok`       | `bool`              | `True` when this item succeeded                                                                                                 |
-| `.value`    | `T \| None`         | Result value for successful items. May legitimately be `None`                                                                   |
-| `.error`    | `Exception \| None` | Exception for failed items                                                                                                      |
-| `.attempts` | `int`               | Attempts actually made (`1` = no retry needed)                                                                                  |
-| `.duration` | `float`             | Seconds from the start of the first attempt to the final outcome — **including** retry backoff sleeps, **excluding** queue wait |
+| Member      | Returns                       | Description                                                                                                                     |
+| ----------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `.index`    | `int`                         | Original input index                                                                                                            |
+| `.key`      | `str \| int \| bytes \| None` | Optional application identity supplied by `item_key=` (or inherited from `checkpoint_key=`). Does not affect ordering           |
+| `.ok`       | `bool`                        | `True` when this item succeeded                                                                                                 |
+| `.value`    | `T \| None`                   | Result value for successful items. May legitimately be `None`                                                                   |
+| `.error`    | `Exception \| None`           | Exception for failed items                                                                                                      |
+| `.attempts` | `int`                         | Attempts actually made (`1` = no retry needed)                                                                                  |
+| `.duration` | `float`                       | Seconds from the start of the first attempt to the final outcome — **including** retry backoff sleeps, **excluding** queue wait |
 
 ### Invariant
 
@@ -380,23 +498,23 @@ Container for parallel execution results. Behaves like a `list` when the run com
 
 ### Properties and Methods
 
-| Member                | Returns                       | Description                                                                                                                                                                                                                                             |
-| --------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.ok`                 | `bool`                        | `True` when the run **completed** and every task succeeded                                                                                                                                                                                              |
-| `.status`             | `RunStatus`                   | How the run ended: `COMPLETED`, `TIMED_OUT`, or `ABORTED`                                                                                                                                                                                               |
-| `.complete`           | `bool`                        | Source exhausted, every item resolved — independent of failures: a run can be complete and not ok                                                                                                                                                       |
-| `.timed_out`          | `bool`                        | Derived: `status is RunStatus.TIMED_OUT`                                                                                                                                                                                                                |
-| `.aborted`            | `bool`                        | Derived: `status is RunStatus.ABORTED`                                                                                                                                                                                                                  |
-| `.values()`           | `list[R]`                     | All results in order. Raises `TimeoutError`/`Aborted` on truncation (checked first), `ExceptionGroup` on failure                                                                                                                                        |
-| `.ok_values()`        | `list[R]`                     | Values of successful tasks only, in input order. Never raises                                                                                                                                                                                           |
-| `.successes()`        | `list[tuple[int, R]]`         | `(index, value)` for each success                                                                                                                                                                                                                       |
-| `.failures()`         | `list[tuple[int, Exception]]` | `(index, exception)` for each failure                                                                                                                                                                                                                   |
-| `.item_results()`     | `list[ItemResult[R]]`         | Every item as an `ItemResult` (index/value/error/**attempts/duration**), input order. Never raises. The collected mirror of streaming `ItemResult`. Checkpoint hits and truncation placeholders carry `attempts=0, duration=0.0` (nothing ran this run) |
-| `.raise_on_failure()` | `None`                        | Raises `ExceptionGroup` if any task failed; each sub-exception carries its item index as a PEP 678 note (`except*` matching untouched)                                                                                                                  |
-| `len(result)`         | `int`                         | Number of tasks with a result entry                                                                                                                                                                                                                     |
-| `result[i]`           | `R`                           | Index into values (raises on failure/truncation)                                                                                                                                                                                                        |
-| `list(result)`        | `list[R]`                     | Iterate values (raises on failure/truncation)                                                                                                                                                                                                           |
-| `bool(result)`        | `bool`                        | `True` if any tasks were submitted                                                                                                                                                                                                                      |
+| Member                | Returns                       | Description                                                                                                                                                                                                                                                 |
+| --------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.ok`                 | `bool`                        | `True` when the run **completed** and every task succeeded                                                                                                                                                                                                  |
+| `.status`             | `RunStatus`                   | How the run ended: `COMPLETED`, `TIMED_OUT`, or `ABORTED`                                                                                                                                                                                                   |
+| `.complete`           | `bool`                        | Source exhausted, every item resolved — independent of failures: a run can be complete and not ok                                                                                                                                                           |
+| `.timed_out`          | `bool`                        | Derived: `status is RunStatus.TIMED_OUT`                                                                                                                                                                                                                    |
+| `.aborted`            | `bool`                        | Derived: `status is RunStatus.ABORTED`                                                                                                                                                                                                                      |
+| `.values()`           | `list[R]`                     | All results in order. Raises `TimeoutError`/`Aborted` on truncation (checked first), `ExceptionGroup` on failure                                                                                                                                            |
+| `.ok_values()`        | `list[R]`                     | Values of successful tasks only, in input order. Never raises                                                                                                                                                                                               |
+| `.successes()`        | `list[tuple[int, R]]`         | `(index, value)` for each success                                                                                                                                                                                                                           |
+| `.failures()`         | `list[tuple[int, Exception]]` | `(index, exception)` for each failure                                                                                                                                                                                                                       |
+| `.item_results()`     | `list[ItemResult[R]]`         | Every item as an `ItemResult` (index/key/value/error/**attempts/duration**), input order. Never raises. The collected mirror of streaming `ItemResult`. Checkpoint hits and truncation placeholders carry `attempts=0, duration=0.0` (nothing ran this run) |
+| `.raise_on_failure()` | `None`                        | Raises `ExceptionGroup` if any task failed; each sub-exception carries its item index as a PEP 678 note (`except*` matching untouched)                                                                                                                      |
+| `len(result)`         | `int`                         | Number of tasks with a result entry                                                                                                                                                                                                                         |
+| `result[i]`           | `R`                           | Index into values (raises on failure/truncation)                                                                                                                                                                                                            |
+| `list(result)`        | `list[R]`                     | Iterate values (raises on failure/truncation)                                                                                                                                                                                                               |
+| `bool(result)`        | `bool`                        | `True` if any tasks were submitted                                                                                                                                                                                                                          |
 
 ### Example
 

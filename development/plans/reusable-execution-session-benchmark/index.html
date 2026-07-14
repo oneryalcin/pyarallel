@@ -1,0 +1,2197 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="Mehmet Oner Yalcin">
+      
+      
+        <link rel="canonical" href="https://oneryalcin.github.io/pyarallel/development/plans/reusable-execution-session-benchmark/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Reusable Execution Session Benchmark Spike - Pyarallel</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#reusable-execution-session-benchmark-spike" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Pyarallel" class="md-header__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Pyarallel
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Reusable Execution Session Benchmark Spike
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Pyarallel" class="md-nav__button md-logo" aria-label="Pyarallel" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Pyarallel
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/oneryalcin/pyarallel" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    oneryalcin/pyarallel
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/choosing-an-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which API Should I Use?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/comparison/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cookbook
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cookbook
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/llm-batch-calls/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch LLM Calls
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/embeddings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Batch Embedding Generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/dataset-enrichment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Enrichment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/web-scraping/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web Scraping
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/bulk-file-download/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bulk File Download
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/github-bulk-repo-changes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bulk GitHub Repo Changes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/docker-registry-cleanup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker Registry Cleanup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/secrets-rotation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Secrets Rotation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/streaming-etl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Streaming ETL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/ncbi-entrez-batch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NCBI / Entrez Batch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../cookbook/cpu-fanout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CPU-Bound Fan-Out
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/advanced-features/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Advanced Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/best-practices/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Best Practices
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/async/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Async
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api-reference/rate-limiting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rate Limiting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../policies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Compatibility & Policies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../devx-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DevX Principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture & History
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture & History
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.5.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.5.0 Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.6-engine-unification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.6 Engine Unification Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.6-ledger-refactor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.6 Ledger Refactor Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.7-free-threaded-and-interpreters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.7 Free-Threaded & Interpreters Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../v0.8-honest-contract/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    v0.8 Honest Contract Plan
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design-spikes-pre-1.0/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-1.0 Design Spike Records
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#goal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Goal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision-this-spike-can-make" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision This Spike Can Make
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#measurement-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Measurement Principles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#benchmark-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Benchmark Shape
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Benchmark Shape">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exact-gate-cells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exact Gate Cells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sampling-and-noise-control" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sampling and Noise Control
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decision-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decision Gates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#files-and-implementation-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Files and Implementation Steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#correctness-checks-for-the-harness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Correctness Checks for the Harness
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#explicit-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Explicit Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks and Mitigations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stop-condition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stop Condition
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="reusable-execution-session-benchmark-spike">Reusable Execution Session Benchmark Spike<a class="headerlink" href="#reusable-execution-session-benchmark-spike" title="Permanent link">&para;</a></h1>
+<h2 id="goal">Goal<a class="headerlink" href="#goal" title="Permanent link">&para;</a></h2>
+<p>Determine whether reusing process or interpreter workers across repeated small
+maps saves enough real wall time to justify designing a public execution-session
+API. The spike measures the opportunity; it does not add <code>ParallelPool</code>, change
+engine lifecycle, or start <code>0.11.0</code>.</p>
+<p>The current contract is deliberately simple: every non-sequential
+<code>parallel_map()</code> and <code>parallel_iter()</code> call creates a fresh executor
+(<code>pyarallel/core.py:267-304</code>, <code>pyarallel/core.py:652-657</code>,
+<code>pyarallel/core.py:1428-1446</code>) and shuts it down before the call or stream owns
+no more work (<code>pyarallel/core.py:1012-1022</code>, <code>pyarallel/core.py:1525-1529</code>). The
+committed benchmark lab already records cold first-result cost and states that
+process/interpreter startup is paid on every call (<code>benchmarks/bench.py:24-35</code>,
+<code>benchmarks/bench.py:152-166</code>, <code>benchmarks/README.md:59-69</code>). This spike tests
+whether eliminating that repeated cost matters in user-shaped repeated calls.</p>
+<h2 id="decision-this-spike-can-make">Decision This Spike Can Make<a class="headerlink" href="#decision-this-spike-can-make" title="Permanent link">&para;</a></h2>
+<p>The result is one of three explicit outcomes:</p>
+<ol>
+<li><strong>Advance to API design:</strong> ordinary repeated process maps show material
+   savings without relying on a synthetic expensive initializer. Write and
+   review a separate lifecycle/API plan before changing <code>pyarallel/</code>.</li>
+<li><strong>Initializer-specific evidence only:</strong> reuse is compelling only when
+   <code>worker_init</code> is deliberately expensive. Keep the candidate open, publish
+   the break-even numbers, and wait for a concrete model-loading user before
+   designing an API.</li>
+<li><strong>Defer:</strong> savings are small, unstable, or explained by a biased harness.
+   Record the negative result and do not create a public abstraction.</li>
+</ol>
+<p>A positive benchmark does <strong>not</strong> authorize implementation directly. It earns a
+separate design pass covering ownership, concurrent calls, failure recovery,
+shutdown, cancellation, and state isolation.</p>
+<h2 id="measurement-principles">Measurement Principles<a class="headerlink" href="#measurement-principles" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Measure the smallest claim: worker reuse, not a hypothetical scheduler.</li>
+<li>Compare like with like and expose unavoidable differences.</li>
+<li>Record absolute time and ratios; a large ratio over microseconds is not a
+  product reason.</li>
+<li>Keep every workload importable and stdlib-only, matching the existing lab
+  contract (<code>benchmarks/_workloads.py:1-11</code>).</li>
+<li>Treat thread execution as a negative control because its startup is already
+  near zero in recorded runs (<code>benchmarks/RESULTS.md:31-34</code>).</li>
+<li>Never turn noisy shared-runner wall time into CI pass/fail criteria
+  (<code>benchmarks/README.md:71-80</code>).</li>
+</ul>
+<h2 id="benchmark-shape">Benchmark Shape<a class="headerlink" href="#benchmark-shape" title="Permanent link">&para;</a></h2>
+<p>Add one <code>execution-session</code> section to the existing harness rather than a
+second script. For each supported executor, measure three strategies:</p>
+<ol>
+<li><strong><code>pyarallel_fresh</code>:</strong> repeated public <code>parallel_map()</code> calls. This is the
+   current user cost and includes Pyarallel's driver.</li>
+<li><strong><code>stdlib_fresh</code>:</strong> construct the equivalent stdlib executor for every map,
+   run <code>Executor.map()</code>, then shut it down. This isolates executor startup from
+   Pyarallel's driver cost.</li>
+<li><strong><code>stdlib_reused</code>:</strong> construct one stdlib executor, run all maps through it,
+   then shut it down. This is an optimistic lower bound on what a future
+   Pyarallel session could achieve.</li>
+</ol>
+<p>Do not compare <code>pyarallel_fresh</code> directly with <code>stdlib_reused</code> and call the
+difference “reuse savings.” Report two separate quantities:</p>
+<ul>
+<li><strong>raw reuse opportunity:</strong> <code>stdlib_fresh / stdlib_reused</code> and absolute
+  milliseconds saved per additional call;</li>
+<li><strong>current integration tax:</strong> <code>pyarallel_fresh - stdlib_fresh</code>, reported so a
+  future design knows how much of the remaining cost belongs to the engine.</li>
+</ul>
+<p>The raw stdlib lane intentionally does not exercise retries, rate limiting,
+checkpointing, callbacks, or <code>ItemResult</code>; those are lifecycle design work, not
+evidence about pool startup.</p>
+<h3 id="exact-gate-cells">Exact Gate Cells<a class="headerlink" href="#exact-gate-cells" title="Permanent link">&para;</a></h3>
+<p>One timed sample constructs everything its strategy owns, performs every map in
+the cell, verifies results and worker receipts, and completes shutdown. The
+default pass contains exactly these required cells:</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th style="text-align: right;">Executor</th>
+<th style="text-align: right;">Workers</th>
+<th style="text-align: right;">Calls</th>
+<th style="text-align: right;">Items/call</th>
+<th>Task</th>
+<th>Initializer</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>P1</code></td>
+<td style="text-align: right;">process</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">8</td>
+<td>calibrated 5 ms spin</td>
+<td>none</td>
+<td>Equivalent one-call ownership control</td>
+</tr>
+<tr>
+<td><code>P3</code></td>
+<td style="text-align: right;">process</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">8</td>
+<td>calibrated 5 ms spin</td>
+<td>none</td>
+<td>Early amortization gate</td>
+</tr>
+<tr>
+<td><code>P10</code></td>
+<td style="text-align: right;">process</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">8</td>
+<td>calibrated 5 ms spin</td>
+<td>none</td>
+<td>Primary ordinary-reuse gate</td>
+</tr>
+<tr>
+<td><code>P64</code></td>
+<td style="text-align: right;">process</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">64</td>
+<td>calibrated 5 ms spin</td>
+<td>none</td>
+<td>Startup-amortized consistency gate</td>
+</tr>
+<tr>
+<td><code>T10</code></td>
+<td style="text-align: right;">thread</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">8</td>
+<td>calibrated 5 ms spin</td>
+<td>none</td>
+<td>Low-startup negative control</td>
+</tr>
+<tr>
+<td><code>PI3</code></td>
+<td style="text-align: right;">process</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">8</td>
+<td>initialized no-op receipt</td>
+<td>calibrated 100 ms CPU initializer</td>
+<td>Initializer-only gate</td>
+</tr>
+<tr>
+<td><code>PI10</code></td>
+<td style="text-align: right;">process</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">10</td>
+<td style="text-align: right;">8</td>
+<td>initialized no-op receipt</td>
+<td>calibrated 100 ms CPU initializer</td>
+<td>Initializer amortization gate</td>
+</tr>
+</tbody>
+</table>
+<p>On a standard GIL-enabled Python 3.14 build, mirror <code>P1/P3/P10/P64/PI3/PI10</code>
+with <code>executor="interpreter"</code> and <code>I</code>-prefixed IDs. These cells are required in
+the published record when that build is available but do not change the process
+owned verdict. The default standard-Python pass therefore has seven cells on
+3.12/3.13 and thirteen on 3.14, not a Cartesian product.</p>
+<p><code>--quick</code> runs <code>P1</code>, <code>P3</code>, and <code>T10</code> with three samples as a wiring smoke test
+and emits <code>verdict="smoke-only"</code>. <code>--diagnostic</code> adds explicitly labelled
+one-worker, one-item, and no-op cells; diagnostics never feed the classifier.
+The harness prints the exact cell and timed-sample count before it starts and
+asserts that the generated IDs equal the declared set.</p>
+<p>The existing <code>spin()</code> workload remains the CPU primitive
+(<code>benchmarks/_workloads.py:15-26</code>). Calibrate its loop count once, before any
+warmup or timed sample, with bounded exponential search followed by at most twelve
+binary-search steps. Accept a median single-process duration from 3-8 ms around
+the 5 ms target or abort without a verdict. Calibrate the initializer loop the
+same way against a 100 ms target, accepting 75-150 ms. Publish both loop counts
+and calibration samples. Pass the initializer count through a benchmark-only
+environment variable read by the importable initializer so process spawn and
+subinterpreter re-import see the same value.</p>
+<p>Every task returns a receipt containing its ordinary value, <code>(pid, thread_id)</code>
+worker identity, initialized-state flag, and worker-local initializer duration
+when present. The initializer measures its own <code>perf_counter_ns()</code> interval and
+persists it under the run-scoped temporary directory before tasks are published.
+The task reads that evidence by worker identity; callable globals are not assumed
+to persist across CPython subinterpreter calls.</p>
+<p>To prove equivalent four-worker ownership without warming the measured pool,
+each call receives a unique pre-created rendezvous directory. Its first tasks
+atomically create one marker named from <code>(pid, thread_id)</code> with
+<code>os.open(..., O_CREAT | O_EXCL | O_WRONLY)</code> and poll until four distinct markers
+exist before doing the declared no-op/spin. Four blocked tasks force the executor
+to materialize four workers; a five-second timeout invalidates the harness
+instead of hanging. Directory creation and input construction occur before
+timing, while marker creation/waiting occurs inside every strategy's timed map.
+Each call uses a fresh empty directory, including calls through a reused
+executor. All rendezvous directories live under one run-scoped
+<code>TemporaryDirectory</code> outside the repository and are removed in <code>finally</code> on
+success, timeout, or validation failure, so stale markers cannot bias another
+sample or dirty the workspace. Receipts and marker names must agree on exactly
+four identities. Initializer tasks also check state inside this timed work, so
+no untimed probe can move initialization outside the boundary.</p>
+<h3 id="sampling-and-noise-control">Sampling and Noise Control<a class="headerlink" href="#sampling-and-noise-control" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Warm up one complete sample per strategy/cell outside timing. Warmup pools are
+  closed and never reused by a timed sample.</li>
+<li>Collect seven timed samples by default and three under <code>--quick</code>.</li>
+<li>Use the fixed six-permutation cycle <code>ABC, BCA, CAB, CBA, ACB, BAC</code> for
+  (<code>pyarallel_fresh</code>, <code>stdlib_fresh</code>, <code>stdlib_reused</code>); the seventh repetition
+  uses <code>ABC</code>. Tests pin this exact order.</li>
+<li>Report every raw sample in <code>--json</code>, plus median, median absolute deviation,
+  ratio, and absolute milliseconds saved per additional call. For one call,
+  report only the raw fresh/reused difference; per-additional-call savings is
+  undefined because there is no reused call to amortize.</li>
+<li>Mark a scenario <code>noisy</code> when <code>MAD / median &gt; 0.10</code> for either stdlib lane.
+  No noisy scenario may satisfy an advance gate.</li>
+<li>Generate inputs before timing and compare all receipt values with the same
+  expected list inside the sample. A wrong value, false initializer flag,
+  non-positive initializer duration, or worker-count mismatch invalidates the
+  run rather than becoming a timing number.</li>
+<li>Use <code>time.perf_counter_ns()</code> and derive displayed milliseconds only after
+  aggregation.</li>
+<li>Record <code>multiprocessing.get_context().get_start_method()</code> in machine context;
+  process launch cost is not comparable without fork/spawn/forkserver identity.</li>
+</ul>
+<h2 id="decision-gates">Decision Gates<a class="headerlink" href="#decision-gates" title="Permanent link">&para;</a></h2>
+<p>The classifier consumes medians only after correctness/ownership checks. For
+each cell, define <code>speedup = fresh_median / reused_median</code>. For calls greater
+than one, define <code>saved_per_extra_call_ms = (fresh_median - reused_median) /
+(calls - 1)</code>. Calls=1 has no per-extra-call value. A zero/negative median,
+missing cell/strategy, wrong receipt, or worker-count mismatch yields
+<code>verdict="invalid-harness"</code>; no product conclusion may be published.</p>
+<p>Controls must pass before product gates:</p>
+<ul>
+<li><code>P1</code>: <code>abs(stdlib_fresh - stdlib_reused) &lt;= max(10 ms, 15% of
+  stdlib_fresh)</code>. Failure means ownership/timing is not equivalent and yields
+  <code>invalid-harness</code>.</li>
+<li><code>T10</code>: <code>saved_per_extra_call_ms &lt;= 10 ms</code>. Failure yields
+  <code>invalid-harness</code>; the low-startup control says the harness is measuring
+  something besides pool reuse.</li>
+<li>Every required cell must have <code>MAD / median &lt;= 0.10</code> for both stdlib
+  strategies. Run the full default pass exactly twice. If either pass is noisy,
+  the two-clean-pass requirement is unmet and the combined outcome is
+  <code>defer-noisy</code>, not a hand-picked winner.</li>
+<li>Two clean default passes must produce the same classifier outcome. Any
+  disagreement, including values straddling a threshold without tripping the
+  noise rule, yields outcome 3 (<code>defer-unstable</code>). Do not take a third run as a
+  tie-breaker.</li>
+</ul>
+<p>With valid controls, outcome 1 (<code>advance-to-design</code>) requires <strong>all</strong> ordinary
+predicates:</p>
+<table>
+<thead>
+<tr>
+<th>Cell</th>
+<th>Required raw stdlib result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>P3</code></td>
+<td>speedup &gt;= 1.25 and saved/extra call &gt;= 10 ms</td>
+</tr>
+<tr>
+<td><code>P10</code></td>
+<td>speedup &gt;= 1.50 and saved/extra call &gt;= 20 ms</td>
+</tr>
+<tr>
+<td><code>P64</code></td>
+<td>speedup &gt;= 1.10 and saved/extra call &gt;= 5 ms</td>
+</tr>
+</tbody>
+</table>
+<p>If any ordinary predicate fails, outcome 2 (<code>initializer-specific</code>) requires
+both <code>PI3</code> and <code>PI10</code> to have speedup &gt;= 2.00 and saved/extra call &gt;= 50 ms,
+with exactly four worker identities per call and every receipt confirming that
+the initializer ran with a positive measured duration. Initializers persist
+that proof to the run-scoped temporary directory before tasks are published;
+receipts read it back by <code>(pid, thread_id)</code>. This works across processes and
+subinterpreters without assuming that callable globals are shared. The once-per-run
+initializer calibration must remain inside the accepted 75-150 ms band;
+per-worker elapsed durations are published as diagnostics but are not compared
+to that band because four concurrent CPU-bound initializers can be stretched by
+scheduler contention without changing the calibrated work. Otherwise the result
+is outcome 3 (<code>defer</code>). These Boolean rules are implemented in a pure function
+and pinned with boundary-value tests, including equality, just-below thresholds,
+zero/negative medians, calls=1, missing cells, invalid controls, and noise.</p>
+<p><code>pyarallel_fresh</code> is reported beside both stdlib strategies but does not enter
+the reuse classifier: it is a different engine. Its median integration delta is
+recorded for a later design plan, and the prose must not convert that delta into
+reuse savings. Interpreter mirrors and free-threaded runs are context only.</p>
+<h2 id="files-and-implementation-steps">Files and Implementation Steps<a class="headerlink" href="#files-and-implementation-steps" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Extend <code>benchmarks/_workloads.py</code> with importable calibrated spin,
+   initializer, receipt task, and persisted run-scoped evidence. Keep it dependency-free
+   and safe under process spawn/interpreter import
+   (<code>benchmarks/_workloads.py:1-31</code>).</li>
+<li>Add <code>benchmarks/_session_bench.py</code> as the importable deterministic seam:
+   scenario dataclasses, exact cell enumeration, six-permutation scheduling,
+   aggregation, control validation, and pure verdict classification. It imports
+   workloads with package-relative imports. <code>benchmarks/bench.py</code> retains its
+   script entry point and uses a dual import (<code>from benchmarks...</code> when imported,
+   sibling import when executed directly) so both <code>python benchmarks/bench.py</code>
+   and <code>import benchmarks._session_bench</code> work. Require the repository root in
+   <code>PYTHONPATH</code> at process startup for standard 3.14 interpreter runs; CPython
+   subinterpreters initialize an isolated <code>sys.path</code> and do not inherit a
+   main-interpreter-only <code>sys.path.insert()</code> or a late environment mutation.
+   Fail fast with the exact launch instruction when this capability is absent.</li>
+<li>Extend <code>benchmarks/bench.py</code> with calibration, strategy execution,
+   correctness/worker-receipt checks, JSON fields, and a concise human
+   <code>execution-session</code> table. Preserve all existing JSON keys and output
+   sections (<code>benchmarks/bench.py:169-186</code>, <code>benchmarks/bench.py:189-267</code>). Add
+   <code>tests/test_session_benchmark.py</code> for deterministic helpers only; its CI
+   command is the normal <code>pytest -q</code> suite, with no timing threshold assertions.</li>
+<li>Update <code>benchmarks/README.md</code> with the exact command, interpretation rules,
+   and the warning that <code>stdlib_reused</code> is an optimistic lower bound, not a
+   promised Pyarallel speedup (<code>benchmarks/README.md:15-36</code>,
+   <code>benchmarks/README.md:51-84</code>).</li>
+<li>Run the default benchmark twice on the standard local Python, then on a
+   standard GIL-enabled Python 3.14 for interpreter evidence. Add labelled raw
+   output and the explicit outcome verdict to <code>benchmarks/RESULTS.md</code>, following
+   its existing machine/build/date format (<code>benchmarks/RESULTS.md:1-17</code>).</li>
+<li>Update issue #32 and the roadmap with outcome 1, 2, or 3. For outcome 1,
+   create a separately reviewed lifecycle/API plan; do not turn benchmark code
+   into production code in the same change.</li>
+</ol>
+<h2 id="correctness-checks-for-the-harness">Correctness Checks for the Harness<a class="headerlink" href="#correctness-checks-for-the-harness" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Every strategy returns the same ordered values for every call.</li>
+<li>Every call reports exactly four distinct worker identities in gate cells; the
+  initializer task also reports true initialized state and a positive
+  worker-local initializer duration for every receipt.</li>
+<li>Strategy-owned pools close even when result validation raises.</li>
+<li>The run-scoped rendezvous temporary directory is removed on success and every
+  failure path; a regression test injects a validation failure and finds no
+  remaining sample directory or workspace artifact.</li>
+<li>Process targets remain importable under spawn; interpreter targets remain
+  importable on Python 3.14, following the constraints already tested in
+  <code>tests/test_parity.py:317-330</code> and <code>tests/test_interpreter.py:186-196</code>.</li>
+<li>JSON output is deterministic in shape and contains machine context, scenario
+  dimensions, raw samples, aggregates, noise flags, thresholds, and verdict.</li>
+<li><code>--quick</code> exercises exactly <code>P1/P3/T10</code> with fewer samples; it is a smoke mode
+  and cannot produce the published verdict.</li>
+<li>Existing CPU-scaling, engine-overhead, and worker-startup output remains
+  present and semantically unchanged.</li>
+</ul>
+<p><code>tests/test_session_benchmark.py</code> imports <code>benchmarks._session_bench</code> and covers
+exact scenario enumeration, the six-permutation order, aggregation, every
+classifier boundary, and JSON shape. Do not assert wall-clock thresholds in
+pytest or CI.</p>
+<h2 id="explicit-non-goals">Explicit Non-goals<a class="headerlink" href="#explicit-non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>No <code>ParallelPool</code>, <code>Session</code>, executor injection, or public API prototype.</li>
+<li>No edits under <code>pyarallel/</code> during this spike.</li>
+<li>No promise that raw stdlib reuse equals an eventual Pyarallel speedup.</li>
+<li>No concurrent calls, nested maps, async session, checkpoint sharing, limiter
+  ownership, retry state, callback isolation, or cancellation design.</li>
+<li>No CI performance gate and no benchmark on shared GitHub runners.</li>
+<li>No claim based only on the deliberately expensive initializer lane.</li>
+<li>No <code>0.11.0</code> version, release, or changelog feature entry.</li>
+</ul>
+<h2 id="risks-and-mitigations">Risks and Mitigations<a class="headerlink" href="#risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Apples-to-oranges comparison:</strong> separate raw reuse opportunity from current
+  integration tax; never label the full Pyarallel-vs-reused gap as reuse.</li>
+<li><strong>Synthetic initializer proves its own premise:</strong> ordinary no-initializer
+  evidence owns the advance gate; initializer-only wins remain outcome 2.</li>
+<li><strong>Thermal/noisy timing:</strong> rotate order, retain raw samples, report MAD, rerun
+  the default pass, and refuse noisy winners.</li>
+<li><strong>Spawn/import artifacts:</strong> keep all targets in <code>_workloads.py</code> and verify
+  process plus interpreter lanes explicitly.</li>
+<li><strong>Benchmark grows too slow:</strong> the default owns exactly seven process/thread
+  cells (thirteen with interpreter mirrors), <code>--quick</code> owns three smoke cells,
+  and <code>--diagnostic</code> expands one-worker/one-item cases. With three strategies,
+  one warmup, and seven samples, the standard default schedules 147 timed plus
+  21 warmup strategy-samples (273 plus 39 on 3.14). Print these counts before
+  running and assert them in deterministic tests; do not silently omit a cell.</li>
+<li><strong>Premature API design:</strong> stop at the verdict. Lifecycle semantics require a
+  new plan because current engines own shutdown and cancellation deeply
+  (<code>pyarallel/core.py:903-1022</code>, <code>pyarallel/core.py:1493-1529</code>).</li>
+</ul>
+<h2 id="verification">Verification<a class="headerlink" href="#verification" title="Permanent link">&para;</a></h2>
+<p>Before publishing a result:</p>
+<ol>
+<li>Ruff and strict mypy pass for the benchmark files and deterministic harness
+   tests.</li>
+<li>The existing full pytest suite and strict MkDocs build pass; benchmark
+   changes must not affect runtime behavior.</li>
+<li><code>benchmarks/bench.py --quick --json</code> parses as JSON and covers every declared
+   quick cell and all three strategies. Executor coverage belongs to the
+   default record, not the smoke pass.</li>
+<li>Two default process-capable runs yield the same gate verdict.</li>
+<li>A standard GIL-enabled Python 3.14 run records interpreter results; the
+   harness prints GIL state so a free-threaded build cannot be mislabeled.</li>
+<li>One normal and one adversarial reviewer inspect the harness for biased
+   ownership, accidental warm-pool leakage, incorrect timing boundaries,
+   result-check omission, noisy-threshold abuse, and overclaimed prose.</li>
+</ol>
+<h2 id="stop-condition">Stop Condition<a class="headerlink" href="#stop-condition" title="Permanent link">&para;</a></h2>
+<p>The spike is complete when <code>RESULTS.md</code> contains labelled raw evidence, noise
+statistics, and exactly one of the three verdicts; the roadmap and issue #32
+match that verdict; deterministic tests and repository gates pass; and no
+production/public API code was added.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
