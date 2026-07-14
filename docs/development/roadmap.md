@@ -187,13 +187,16 @@ Criteria, not features. No headline feature ships in 1.0.
 Tracked in one place —
 [issue #32](https://github.com/oneryalcin/pyarallel/issues/32) — so 1.0
 ships lean. All are additive (none would require a breaking change,
-which is why none block the freeze). `on_result=` and stable item identity
-(`item_key=` / `ItemResult.key`) were selected from this list and are
-implemented in Unreleased. The next candidate selected for planning is
-read-only checkpoint inspection. Weighted/composite quotas (see the
-[design spike record](plans/design-spikes-pre-1.0.md)) and a reusable
-execution session remain candidates. Selection happens on real user
-feedback, not speculation.
+which is why none block the freeze). `on_result=`, stable item identity
+(`item_key=` / `ItemResult.key`), and read-only checkpoint inspection
+(`checkpoint_info()`) were selected from this list and are implemented in
+Unreleased. A reusable execution session is selected for a
+[benchmark spike](plans/reusable-execution-session-benchmark.md) only; no
+public API is approved until measured savings earn the abstraction.
+Weighted/composite quotas (see the
+[design spike record](plans/design-spikes-pre-1.0.md)) remain deferred until
+real user demand appears. Selection happens on evidence and feedback, not
+speculation.
 
 ## Distribution
 
