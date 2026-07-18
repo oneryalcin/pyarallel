@@ -826,7 +826,7 @@ test = [
 benchmark = [
     { name = "pytest", specifier = ">=8.3.4" },
     { name = "pytest-asyncio", specifier = ">=0.23" },
-    { name = "pytest-codspeed", specifier = ">=3.0.0" },
+    { name = "pytest-codspeed", specifier = ">=4.3.0" },
 ]
 dev = [
     { name = "mkdocs-git-revision-date-plugin", specifier = ">=0.3.2" },

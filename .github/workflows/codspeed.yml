@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  benchmarks:
-    name: Public API benchmarks
+  simulation:
+    name: CPU simulation benchmarks
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,8 +20,27 @@ jobs:
           python-version: "3.12"
       - name: Install benchmark dependencies
         run: uv sync --no-default-groups --group benchmark
-      - name: Run CodSpeed pilot
+      - name: Run CPU simulation benchmarks
         uses: CodSpeedHQ/action@v4
         with:
           mode: simulation
-          run: uv run --no-sync pytest benchmarks/codspeed --codspeed
+          run: uv run --no-sync pytest benchmarks/codspeed/test_public_api.py --codspeed
+
+  memory:
+    name: Memory scaling benchmarks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Install benchmark dependencies
+        run: uv sync --no-default-groups --group benchmark
+      - name: Run memory scaling benchmarks
+        uses: CodSpeedHQ/action@v4
+        with:
+          mode: memory
+          run: uv run --no-sync pytest benchmarks/codspeed/test_memory.py --codspeed
