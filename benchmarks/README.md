@@ -134,3 +134,16 @@ startup remain machine- and build-sensitive measurements owned by `bench.py`.
 The CodSpeed workflow is observational while the project establishes a stable
 baseline. Its dashboard or badge should not be presented as coverage of the
 executor comparisons documented above.
+
+The workflow also runs a separate memory instrument over two input sizes:
+
+- `parallel_iter` is drained without retaining outputs, so its peak memory
+  should be governed mainly by the fixed 64-item window rather than total input
+  size.
+- `parallel_map` retains all results and provides the expected O(n) comparison.
+
+Both paths run at 1,000 and 10,000 items with four thread workers. CodSpeed
+records peak memory, total allocated bytes, and allocation count. This probe is
+observational: its first purpose is to establish whether streaming peak memory
+stays materially flatter than collected-map peak memory across the 10x input
+increase.

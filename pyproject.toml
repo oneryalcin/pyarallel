@@ -65,7 +65,7 @@ test = [
 ]
 benchmark = [
     { include-group = "test" },
-    "pytest-codspeed>=3.0.0",
+    "pytest-codspeed>=4.3.0",
 ]
 dev = [
     { include-group = "test" },
