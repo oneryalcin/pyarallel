@@ -122,3 +122,15 @@ produces.
 Recorded runs from the author's machine live in [RESULTS.md](RESULTS.md),
 each labelled with platform / Python / GIL status, with a verdict on whether
 each documented claim reproduced.
+
+## Continuous regression pilot
+
+`benchmarks/codspeed/` contains a deliberately narrower CodSpeed suite for
+continuous pull-request comparisons. It tracks deterministic public-API
+overhead through the sequential and thread executors. It does not replace this
+lab: process and interpreter execution, free-threaded scaling, and cold-worker
+startup remain machine- and build-sensitive measurements owned by `bench.py`.
+
+The CodSpeed workflow is observational while the project establishes a stable
+baseline. Its dashboard or badge should not be presented as coverage of the
+executor comparisons documented above.

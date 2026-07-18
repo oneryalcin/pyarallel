@@ -1,8 +1,19 @@
-# Pyarallel
+<div align="center">
+  <h1>Pyarallel</h1>
+</div>
+<div align="center">
+  <h3>The fan-out layer for rate-limited APIs — parallel map with rate limiting, retry, resume, and structured errors.</h3>
+</div>
+<div align="center">
+  <a href="https://github.com/oneryalcin/pyarallel/actions/workflows/ci.yml?query=branch%3Amain"><img src="https://github.com/oneryalcin/pyarallel/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://codspeed.io/oneryalcin/pyarallel?utm_source=badge"><img src="https://img.shields.io/badge/CodSpeed-Performance%20Tracked-blue?logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNOCAwTDAgOEw4IDE2TDE2IDhMOCAwWiIgZmlsbD0id2hpdGUiLz48L3N2Zz4=" alt="CodSpeed"></a>
+  <a href="https://pypi.org/project/pyarallel/"><img src="https://img.shields.io/pypi/v/pyarallel" alt="PyPI"></a>
+  <a href="https://pepy.tech/project/pyarallel"><img src="https://static.pepy.tech/badge/pyarallel/month" alt="PyPI downloads"></a>
+  <a href="https://pypi.org/project/pyarallel/"><img src="https://img.shields.io/pypi/pyversions/pyarallel" alt="Python versions"></a>
+  <a href="https://github.com/oneryalcin/pyarallel/blob/main/LICENSE.md"><img src="https://img.shields.io/github/license/oneryalcin/pyarallel" alt="License"></a>
+</div>
 
-[![PyPI version](https://img.shields.io/pypi/v/pyarallel)](https://pypi.org/project/pyarallel/) [![PyPI Downloads](https://static.pepy.tech/badge/pyarallel/month)](https://pepy.tech/project/pyarallel)
-
-The fan-out layer for rate-limited APIs — one function over many inputs, with rate limiting, retry, resume, and structured errors. Sync and async.
+---
 
 Fanning out over a service that throttles you — LLM calls, embeddings, scraping, any SaaS API — means the same hand-rolled stack every time: a semaphore, tenacity, a token bucket, ad-hoc 429 handling, and a "TODO: resume" you never get to. Pyarallel is that stack, already built and tested. Not DAGs, not queues, not a distributed system — just `concurrent.futures` and `asyncio` with the policies and result handling already built in.
 

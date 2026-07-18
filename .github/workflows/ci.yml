@@ -25,8 +25,8 @@ jobs:
         run: uv sync --group dev
       - name: Lint
         run: |
-          uv run ruff check pyarallel tests
-          uv run ruff format --check pyarallel tests
+          uv run ruff check pyarallel tests benchmarks/codspeed
+          uv run ruff format --check pyarallel tests benchmarks/codspeed
       - name: Type check (strict, package + typing assertions)
         run: uv run mypy pyarallel tests/typing_assertions.py
       # Second checker, one matrix entry: the unary .map() item typing is
