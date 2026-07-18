@@ -10,6 +10,9 @@ jobs:
   benchmarks:
     name: Public API benchmarks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
