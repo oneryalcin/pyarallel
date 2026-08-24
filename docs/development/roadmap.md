@@ -21,7 +21,12 @@ This roadmap should be read together with the [DevX Principles](devx-principles.
 
 ### Near Term
 
-- **`max_errors`** — stop early after N failures instead of processing all items. When hitting a dead API, don't waste 10,000 calls when the first 10 all failed. Returns partial results.
+- **`max_errors`** ([#50](https://github.com/oneryalcin/pyarallel/issues/50)) — stop early after N failures instead of processing all items. When hitting a dead API, don't waste 10,000 calls when the first 10 all failed. Returns partial results.
+- **Reusable shared limiter** ([#49](https://github.com/oneryalcin/pyarallel/issues/49)) — expose a `Limiter` that shares one rate-limit budget across multiple map calls, decorators, and sync/async workloads. The current `rate_limit=` bucket is shared only within one operation.
+- **Retry result predicates and HTTP policy helpers** ([#43](https://github.com/oneryalcin/pyarallel/issues/43)) — retry on returned results such as HTTP 429/503, support `Retry-After`, and provide opt-in helpers for common HTTP retry policies and terminal errors.
+- **Shared retry budgets** ([#42](https://github.com/oneryalcin/pyarallel/issues/42)) — cap total retries across concurrent operations to prevent retry storms against a failing service.
+- **Structured task events** ([#44](https://github.com/oneryalcin/pyarallel/issues/44)) — add an optional event hook for task start, retry, rate limiting, success, failure, timeout, and cancellation. Emit data; do not add a metrics backend.
+- **Cancellation and graceful shutdown semantics** ([#45](https://github.com/oneryalcin/pyarallel/issues/45)) — define stop-submitting, cancel-pending, cooperative cancellation, and draining behavior for sync and async operations.
 - **Ordered streaming** — `parallel_iter(..., ordered=True)` yields results in input order instead of completion order. Essential for ETL, CSV writing, and pipelines where output order must match input.
 - **`async_parallel_map` with `timeout=`** — sync `parallel_map` has total wall-clock timeout, async doesn't. Add parity so async workloads can enforce an overall deadline.
 - **Context variable propagation** — copy `contextvars.Context` into worker threads so structured logging (correlation IDs) and request tracing work correctly. Without this, correlation IDs and request traces silently disappear in worker threads.
@@ -33,14 +38,24 @@ This roadmap should be read together with the [DevX Principles](devx-principles.
 ### Exploring
 
 - **`.then()` chaining** — `parallel_map(fn, items).then(fn2)` for lightweight pipelines without building a DAG engine. Chain a second parallel operation on results without extracting values manually.
-- **Circuit breaker** — composable with `Retry` for API-heavy workloads. When a downstream service is failing, stop hammering it and fail fast for a cooldown period.
+- **Circuit breaker** ([#47](https://github.com/oneryalcin/pyarallel/issues/47)) — composable with `Retry` for API-heavy workloads. When a downstream service is failing, stop hammering it and fail fast for a cooldown period. The breaker should be reusable across operations.
+- **Shared bulkhead** ([#46](https://github.com/oneryalcin/pyarallel/issues/46)) — reusable cross-operation concurrency budget for one downstream service or local resource. Per-call `workers`/`concurrency` limits are not sufficient when several jobs run together.
 - **Shared kwargs** — `kwargs={"timeout": 5}` passed to every `fn` call alongside the item. Convenience over `functools.partial`, but partial is one line and well-known.
 - **Free-threading support** — leverage Python 3.13+ no-GIL for true thread parallelism.
 - **Per-task timeout (sync)** — Python threads can't be cancelled mid-execution, so this is a hard problem. For now, use `timeout=` for total wall-clock or put timeouts inside your function.
+- **Optional resilience-policy integration** ([#48](https://github.com/oneryalcin/pyarallel/issues/48)) — evaluate an adapter or documented boundary for pyresilience, tenacity, or application-owned policies without copying those systems into the core package.
 
 ## Not Planned
 
-Things we've considered and decided against. Pyarallel is a parallelization library, not a distributed computing framework.
+Things we've considered and decided against for the current scope. These decisions are subject to change if repeated user demand, measured operational pain, or a clear boundary-preserving design justifies revisiting them.
+
+Pyarallel is a parallelization library, not a general resilience or distributed-systems framework. Record alternatives here before adding them so the scope decision is explicit.
+
+- **Result caching** — caching policy belongs near the data or service client and needs application-specific cache keys, invalidation, and consistency rules.
+- **Generic fallback handling** — do not silently convert failures into values in the execution layer. Use `ParallelResult.failures()` or an explicit caller policy.
+- **Framework integrations** — no built-in FastAPI, Django, Flask, or web-framework lifecycle integrations.
+- **Global resilience registries and health endpoints** — callers can expose state through their own service registry and health system.
+- **Direct Prometheus/OpenTelemetry integrations** — provide structured event hooks, but keep telemetry exporters and backend dependencies outside the core package.
 
 - **Telemetry / metrics dashboards** — use your existing observability stack (OpenTelemetry, Prometheus, Datadog). We give you `on_progress` and `ParallelResult`; instrument from there.
 - **CLI tools** — no dashboard, no profiler. Use `htop`, `py-spy`, or your IDE.
