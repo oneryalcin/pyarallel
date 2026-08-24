@@ -561,8 +561,10 @@ async def _async_collected_map(
         # simpler here: the deadline gate lives in asyncio.timeout()
         # around this whole call (plus the pre-check for timeout<=0),
         # and there is no mid-fill sweep — task creation never blocks,
-        # limiter waits happen inside tasks, which are cancelled on
-        # abort before they can call the API.
+        # limiter waits happen inside tasks. On abort those tasks are
+        # cancelled: queued ones never reach fn; one already past the
+        # semaphore may enter fn once and is cancelled at its next
+        # await — the documented abort-plus-one-window bound.
         while True:
             while not halt.stopped and len(in_flight) < window and await _submit_next():
                 pass
