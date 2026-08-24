@@ -99,7 +99,8 @@ Behavior:
 - A failed item counts once toward the limit. An item whose retries are
   exhausted also counts once, not once per attempt.
 - After the limit, no new work starts. Queued tasks are cancelled; tasks
-  already running finish and their outcomes are kept.
+  already running finish and their outcomes are kept. The total `timeout=`
+  still bounds this drain — unfinished work is marked as a timeout failure.
 - The result keeps one slot per input. Items never executed hold
   `MaxErrorsReached` in `.failures()`, as shown above.
 - Streaming (`parallel_iter`, `async_parallel_iter`) ends after the current

@@ -1,18 +1,22 @@
 """Tests for max_errors — fail-fast after N item failures with partial results."""
 
 import asyncio
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
 from pyarallel import (
     MaxErrorsReached,
+    RateLimit,
     Retry,
     async_parallel_iter,
     async_parallel_map,
     parallel_iter,
     parallel_map,
 )
-from pyarallel.core import parallel_starmap
+from pyarallel.core import _PENDING, _cancel_and_drain, _ErrorBudget, parallel_starmap
 
 
 def make_boom(calls: list):
@@ -129,6 +133,50 @@ class TestParallelMapMaxErrors:
         assert len(calls) == 2
         assert len(result) == 10
 
+    def test_drain_records_finished_but_unprocessed_futures(self):
+        """Futures that completed while the main loop was breaking keep their
+        real outcomes instead of being swept as MaxErrorsReached."""
+        pool = ThreadPoolExecutor(max_workers=3)
+        released = threading.Event()
+        try:
+            f0 = pool.submit(lambda: 5)
+            f1 = pool.submit(lambda: 7)
+            f2 = pool.submit(released.wait, True)
+            while not (f0.done() and f1.done()):
+                time.sleep(0.001)
+
+            results: list = [_PENDING] * 3
+            budget = _ErrorBudget(1)
+            budget.record_failure()
+            hit_deadline = _cancel_and_drain(
+                {f0: 0, f1: 1, f2: 2}, results, budget, None, None
+            )
+
+            assert not hit_deadline
+            assert results[0] == 5
+            assert results[1] == 7
+        finally:
+            released.set()
+            pool.shutdown(wait=True)
+
+    def test_total_timeout_bounds_drain_after_limit(self):
+        """A slow in-flight task cannot extend the operation past timeout=."""
+
+        def fn(x):
+            if x == 0:
+                time.sleep(0.02)
+                raise ValueError("fail")
+            time.sleep(5.0)
+            return x
+
+        start = time.perf_counter()
+        result = parallel_map(fn, range(2), workers=2, max_errors=1, timeout=0.05)
+        elapsed = time.perf_counter() - start
+
+        assert elapsed < 2.0
+        slow_error = result.failures()[1][1]
+        assert isinstance(slow_error, TimeoutError)
+
 
 class TestParallelIterMaxErrors:
     def test_stream_stops_yielding_after_limit(self):
@@ -222,6 +270,34 @@ class TestAsyncParallelMapMaxErrors:
         result, attempts = asyncio.run(main())
         assert len(attempts) == 6
 
+    def test_async_budget_rechecked_after_rate_limit_wait(self):
+        """A task that passes the guard but then waits for a rate-limit slot
+        must not call fn once the budget is spent."""
+
+        async def main():
+            calls: list = []
+
+            async def boom(x):
+                calls.append(x)
+                await asyncio.sleep(0.05)
+                raise ValueError("no")
+
+            return (
+                await async_parallel_map(
+                    boom,
+                    range(2),
+                    concurrency=2,
+                    rate_limit=RateLimit(5, "second"),
+                    max_errors=1,
+                ),
+                calls,
+            )
+
+        result, calls = asyncio.run(main())
+        assert len(calls) == 1
+        skipped = [e for _, e in result.failures() if isinstance(e, MaxErrorsReached)]
+        assert len(skipped) == 1
+
 
 class TestAsyncParallelIterMaxErrors:
     def test_async_stream_ends_after_current_batch(self):
@@ -251,3 +327,32 @@ class TestAsyncParallelIterMaxErrors:
         assert len(real_errors) == 2
         assert len(markers) == 3  # rest of the final batch, skipped by guard
         assert all(it.index < 5 for it in items)
+
+    def test_async_stream_guard_rechecked_after_semaphore(self):
+        """Tasks queued on the semaphore re-check the budget before calling
+        fn, so a mid-batch failure stops the remaining tasks in that batch."""
+
+        async def main():
+            calls: list = []
+
+            async def boom(x):
+                calls.append(x)
+                await asyncio.sleep(0)
+                raise ValueError("no")
+
+            return (
+                [
+                    it
+                    async for it in async_parallel_iter(
+                        boom, range(10), batch_size=10, concurrency=1, max_errors=1
+                    )
+                ],
+                calls,
+            )
+
+        items, calls = asyncio.run(main())
+        assert len(calls) == 1
+        real = [it for it in items if not isinstance(it.error, MaxErrorsReached)]
+        markers = [it for it in items if isinstance(it.error, MaxErrorsReached)]
+        assert len(real) == 1
+        assert len(markers) == 9

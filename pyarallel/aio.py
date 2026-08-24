@@ -150,16 +150,25 @@ async def async_parallel_map[R](
     budget = _ErrorBudget(max_errors) if max_errors is not None else None
     completed = 0
 
+    def _mark_skipped(i: int) -> None:
+        assert budget is not None
+        results[i] = _Failure(
+            MaxErrorsReached(f"Not executed: max_errors={budget.limit} reached")
+        )
+
     async def _run(i: int, item: Any) -> None:
         nonlocal completed
         async with semaphore:
             if budget is not None and budget.exhausted():
-                results[i] = _Failure(
-                    MaxErrorsReached(f"Not executed: max_errors={budget.limit} reached")
-                )
+                _mark_skipped(i)
                 return
             if limiter:
                 await limiter.wait()
+                # The budget may be spent while this task waited for its
+                # rate-limit slot.
+                if budget is not None and budget.exhausted():
+                    _mark_skipped(i)
+                    return
             try:
                 if retry is not None:
                     result = await _async_run_with_retry(
@@ -264,20 +273,25 @@ async def async_parallel_iter(
     budget = _ErrorBudget(max_errors) if max_errors is not None else None
     queue: asyncio.Queue[ItemResult[Any] | None] = asyncio.Queue()
 
+    def _skip_item(i: int) -> ItemResult[Any]:
+        assert budget is not None
+        return ItemResult(
+            i,
+            error=MaxErrorsReached(f"Not executed: max_errors={budget.limit} reached"),
+        )
+
     async def _run(i: int, item: Any) -> None:
-        if budget is not None and budget.exhausted():
-            await queue.put(
-                ItemResult(
-                    i,
-                    error=MaxErrorsReached(
-                        f"Not executed: max_errors={budget.limit} reached"
-                    ),
-                )
-            )
-            return
         async with semaphore:
+            if budget is not None and budget.exhausted():
+                await queue.put(_skip_item(i))
+                return
             if limiter:
                 await limiter.wait()
+                # The budget may be spent while this task waited for its
+                # rate-limit slot.
+                if budget is not None and budget.exhausted():
+                    await queue.put(_skip_item(i))
+                    return
             try:
                 if retry is not None:
                     result = await _async_run_with_retry(

@@ -355,27 +355,50 @@ def _cancel_and_drain(
     futures: dict[Future[Any], int],
     results: list[Any],
     budget: _ErrorBudget,
-) -> None:
-    """After ``max_errors``: cancel queued futures, record the running ones.
+    timeout: float | None,
+    deadline: float | None,
+) -> bool:
+    """After ``max_errors``: cancel queued futures, record the rest.
 
-    Futures already resolved were recorded by the caller's loop and are
-    left untouched.
+    Slots already resolved by the caller's loop are left untouched; futures
+    that finished but were not yet consumed are still recorded so their
+    real outcomes are not replaced by skip markers. Waits only until
+    *deadline*; unfinished work is marked as a ``TimeoutError`` failure.
+
+    Returns True when the drain hit the deadline.
     """
     outstanding = []
-    for f in futures:
+    for f, idx in futures.items():
+        if results[idx] is not _PENDING:
+            continue
         if f.cancel():
             continue
-        if not f.done():
-            outstanding.append(f)
-    for f in as_completed(outstanding):
-        idx = futures[f]
-        try:
-            results[idx] = f.result()
-        except Exception as exc:
-            if budget is None:
-                results[idx] = _Failure(exc)
-            else:
-                _record_failure(exc, results, idx, budget)
+        outstanding.append(f)
+    chunk_timeout: float | None = None
+    if deadline is not None:
+        assert timeout is not None
+        chunk_timeout = max(0.0, deadline - time.monotonic())
+    try:
+        for f in as_completed(outstanding, timeout=chunk_timeout):
+            idx = futures[f]
+            try:
+                results[idx] = f.result()
+            except Exception as exc:
+                if budget is None:
+                    results[idx] = _Failure(exc)
+                else:
+                    _record_failure(exc, results, idx, budget)
+    except TimeoutError:
+        assert timeout is not None
+        for f in outstanding:
+            if f.done():
+                continue
+            f.cancel()
+            idx = futures[f]
+            if results[idx] is _PENDING:
+                results[idx] = _timeout_failure(timeout, idx)
+        return True
+    return False
 
 
 def _mark_timeout_indices(
@@ -586,7 +609,9 @@ def parallel_map[R](
         max_errors: Stop early after this many item failures. Once the
             limit is observed, no further batches are started and queued
             tasks are cancelled; tasks already running drain and their
-            outcomes are recorded. Items that were never executed appear
+            outcomes are recorded. Draining respects ``timeout=``: work
+            still unfinished at the deadline is marked as a
+            ``TimeoutError`` failure. Items that were never executed appear
             in ``failures()`` holding ``MaxErrorsReached``. Enforcement is
             reactive: with fast-failing functions and no ``batch_size``,
             every task may already be submitted before the limit is seen —
@@ -712,7 +737,8 @@ def parallel_map[R](
 
         if stopped_early:
             assert budget is not None
-            _cancel_and_drain(futures, results, budget)
+            if _cancel_and_drain(futures, results, budget, timeout, deadline):
+                timed_out = True
             _finalize_max_errors(results, plan.remaining, budget)
     finally:
         pool.shutdown(wait=not timed_out, cancel_futures=timed_out)
