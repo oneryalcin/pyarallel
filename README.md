@@ -49,6 +49,7 @@ result = parallel_map(
     workers=10,
     rate_limit=RateLimit(100, "minute"),
     retry=Retry(attempts=3, on=(ConnectionError, TimeoutError)),
+    max_errors=10,  # dead API? stop after 10 failures, keep partial results
 )
 
 for idx, val in result.successes():

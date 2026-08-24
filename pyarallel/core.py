@@ -29,6 +29,18 @@ _PENDING = object()
 _MISSING = object()
 
 
+class MaxErrorsReached(RuntimeError):
+    """Raised in place of ``fn`` when the ``max_errors`` budget is exhausted.
+
+    Items that were never executed appear in ``ParallelResult.failures()``
+    holding this exception. Filter it out to separate real task failures
+    from skipped work::
+
+        real = [(i, e) for i, e in result.failures()
+                if not isinstance(e, MaxErrorsReached)]
+    """
+
+
 # ---------------------------------------------------------------------------
 # Configuration objects — small, frozen, composable
 # ---------------------------------------------------------------------------
@@ -146,6 +158,32 @@ class _Failure:
         self.exception = exception
 
 
+class _ErrorBudget:
+    """Thread-safe failure counter for ``max_errors`` fail-fast."""
+
+    __slots__ = ("limit", "_count", "_lock")
+
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
+        self._count = 0
+        self._lock = threading.Lock()
+
+    @property
+    def count(self) -> int:
+        with self._lock:
+            return self._count
+
+    def exhausted(self) -> bool:
+        with self._lock:
+            return self._count >= self.limit
+
+    def record_failure(self) -> None:
+        """Count one task failure. Overshoot past *limit* is allowed and
+        bounded by the number of concurrently running tasks."""
+        with self._lock:
+            self._count += 1
+
+
 @dataclass(slots=True)
 class _CollectedMapPlan:
     """Shared input plan for collected sync/async map execution."""
@@ -260,6 +298,84 @@ def _plan_collected_map(
 def _timeout_failure(timeout: float, idx: int) -> _Failure:
     """Create a consistent timeout failure wrapper."""
     return _Failure(TimeoutError(f"Task {idx} did not complete within {timeout}s"))
+
+
+def _skipped_failure(budget: _ErrorBudget) -> _Failure:
+    """Create a skip marker for an item that was never executed."""
+    return _Failure(
+        MaxErrorsReached(
+            f"Not executed: max_errors={budget.limit} was reached after "
+            f"{budget.count} task failure(s)"
+        )
+    )
+
+
+def _sweep_skipped(results: list[Any], budget: _ErrorBudget) -> None:
+    """Fill every still-pending slot with a ``MaxErrorsReached`` marker."""
+    for i, r in enumerate(results):
+        if r is _PENDING:
+            results[i] = _skipped_failure(budget)
+
+
+def _finalize_max_errors(
+    results: list[Any],
+    remaining: Iterator[Any] | None,
+    budget: _ErrorBudget,
+) -> None:
+    """Complete the result list after an early stop: append markers for
+    input never pulled from the iterator, then fill any pending slots."""
+    if remaining is not None:
+        for _item in remaining:
+            results.append(_skipped_failure(budget))
+    _sweep_skipped(results, budget)
+
+
+def _record_failure(
+    exc: Exception, results: list[Any], idx: int, budget: _ErrorBudget
+) -> bool:
+    """Store a task failure. Returns True when the error budget is now spent.
+
+    Skip markers raised by the guard do not consume budget.
+    """
+    results[idx] = _Failure(exc)
+    if isinstance(exc, MaxErrorsReached):
+        return False
+    budget.record_failure()
+    return budget.exhausted()
+
+
+def _guard_task(task_fn: Callable[..., Any], item: Any, budget: _ErrorBudget) -> Any:
+    """Run *task_fn(item)* unless the error budget is already spent."""
+    if budget.exhausted():
+        raise MaxErrorsReached(f"Not executed: max_errors={budget.limit} reached")
+    return task_fn(item)
+
+
+def _cancel_and_drain(
+    futures: dict[Future[Any], int],
+    results: list[Any],
+    budget: _ErrorBudget,
+) -> None:
+    """After ``max_errors``: cancel queued futures, record the running ones.
+
+    Futures already resolved were recorded by the caller's loop and are
+    left untouched.
+    """
+    outstanding = []
+    for f in futures:
+        if f.cancel():
+            continue
+        if not f.done():
+            outstanding.append(f)
+    for f in as_completed(outstanding):
+        idx = futures[f]
+        try:
+            results[idx] = f.result()
+        except Exception as exc:
+            if budget is None:
+                results[idx] = _Failure(exc)
+            else:
+                _record_failure(exc, results, idx, budget)
 
 
 def _mark_timeout_indices(
@@ -442,6 +558,7 @@ def parallel_map[R](
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    max_errors: int | None = None,
     task_timeout: float | None = None,
 ) -> ParallelResult[R]:
     """Execute *fn* over *items* in parallel, returning ordered results.
@@ -463,7 +580,19 @@ def parallel_map[R](
             set, unsized iterables (for example generators) are consumed
             lazily one batch at a time. Without batching, all items are
             submitted at once.
-        retry: ``Retry`` object for per-item retry with backoff.
+        retry: ``Retry`` object for per-item retry with backoff. An item
+            whose retries are exhausted counts as one failure toward
+            ``max_errors``.
+        max_errors: Stop early after this many item failures. Once the
+            limit is observed, no further batches are started and queued
+            tasks are cancelled; tasks already running drain and their
+            outcomes are recorded. Items that were never executed appear
+            in ``failures()`` holding ``MaxErrorsReached``. Enforcement is
+            reactive: with fast-failing functions and no ``batch_size``,
+            every task may already be submitted before the limit is seen —
+            pass ``batch_size`` to bound wasted work strictly. A task whose
+            retries are exhausted counts as one failure. Requires
+            ``max_errors >= 1``.
 
     Returns:
         ``ParallelResult`` — acts like a list when all tasks succeed.
@@ -473,6 +602,8 @@ def parallel_map[R](
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if workers is not None and workers < 1:
         raise ValueError(f"workers must be >= 1, got {workers}")
+    if max_errors is not None and max_errors < 1:
+        raise ValueError(f"max_errors must be >= 1, got {max_errors}")
     if executor not in ("thread", "process"):
         raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
     if task_timeout is not None:
@@ -512,9 +643,13 @@ def parallel_map[R](
 
     pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
     bucket = _TokenBucket(rate_limit) if rate_limit else None
+    budget = _ErrorBudget(max_errors) if max_errors is not None else None
+    if budget is not None and executor == "thread":
+        task_fn = functools.partial(_guard_task, task_fn, budget=budget)
     completed = 0
     deadline = (time.monotonic() + timeout) if timeout is not None else None
     timed_out = False
+    stopped_early = False
 
     plan = _plan_collected_map(items, batch_size)
     if plan.total == 0:
@@ -522,6 +657,7 @@ def parallel_map[R](
     results = plan.results
 
     pool = pool_cls(max_workers=workers)
+    futures: dict[Future[Any], int] = {}
     try:
         for batch in plan.batches:
             if batch_size is not None:
@@ -541,7 +677,7 @@ def parallel_map[R](
                     timed_out = True
                     break
 
-            futures: dict[Future[R], int] = {}
+            futures = {}
             for idx, item in batch:
                 if bucket:
                     bucket.wait()
@@ -553,7 +689,11 @@ def parallel_map[R](
                     try:
                         results[idx] = future.result()
                     except Exception as exc:
-                        results[idx] = _Failure(exc)
+                        if budget is None:
+                            results[idx] = _Failure(exc)
+                        elif _record_failure(exc, results, idx, budget):
+                            stopped_early = True
+                            break
                     completed += 1
                     if on_progress:
                         on_progress(completed, _progress_total(plan.total, results))
@@ -566,6 +706,14 @@ def parallel_map[R](
                 _mark_timeout_indices(results, futures.values(), timeout)
                 _append_timeout_failures(results, plan.remaining, timeout)
                 break
+
+            if stopped_early:
+                break
+
+        if stopped_early:
+            assert budget is not None
+            _cancel_and_drain(futures, results, budget)
+            _finalize_max_errors(results, plan.remaining, budget)
     finally:
         pool.shutdown(wait=not timed_out, cancel_futures=timed_out)
 
@@ -589,6 +737,7 @@ def parallel_starmap[R](
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    max_errors: int | None = None,
 ) -> ParallelResult[R]:
     """Like ``parallel_map`` but unpacks each item as ``fn(*args)``.
 
@@ -615,6 +764,7 @@ def parallel_starmap[R](
                 on_progress=on_progress,
                 batch_size=batch_size,
                 retry=retry,
+                max_errors=max_errors,
             )
 
     packed = [(fn, args) for args in items]
@@ -628,6 +778,7 @@ def parallel_starmap[R](
         on_progress=on_progress,
         batch_size=batch_size,
         retry=retry,
+        max_errors=max_errors,
     )
 
 
@@ -640,12 +791,19 @@ def parallel_iter[R](
     rate_limit: RateLimit | float | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    max_errors: int | None = None,
 ) -> Iterator[ItemResult[R]]:
     """Execute *fn* over *items* in parallel, yielding ``ItemResult`` in
     completion order.
 
     Unlike ``parallel_map``, results are not accumulated in memory — they
     are yielded as they complete.
+
+    With ``max_errors``, iteration stops promptly after that many item
+    failures: no further input is consumed, queued tasks are cancelled, and
+    tasks already running in worker threads are abandoned (their outcomes
+    are not yielded). Remaining items are simply never attempted — there
+    are no markers for them.
 
     Example::
 
@@ -661,6 +819,8 @@ def parallel_iter[R](
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if workers is not None and workers < 1:
         raise ValueError(f"workers must be >= 1, got {workers}")
+    if max_errors is not None and max_errors < 1:
+        raise ValueError(f"max_errors must be >= 1, got {max_errors}")
     if executor not in ("thread", "process"):
         raise ValueError(f'executor must be "thread" or "process", got {executor!r}')
 
@@ -692,12 +852,16 @@ def parallel_iter[R](
 
     pool_cls = ThreadPoolExecutor if executor == "thread" else ProcessPoolExecutor
     bucket = _TokenBucket(rate_limit) if rate_limit else None
+    budget = _ErrorBudget(max_errors) if max_errors is not None else None
+    if budget is not None and executor == "thread":
+        task_fn = functools.partial(_guard_task, task_fn, budget=budget)
     it = iter(items)
     index = 0
+    stopped = False
 
     pool = pool_cls(max_workers=workers)
     try:
-        while True:
+        while not stopped:
             # Consume one chunk from the iterable lazily
             chunk_items: list[tuple[int, Any]] = []
             for item in it:
@@ -720,6 +884,11 @@ def parallel_iter[R](
                     yield ItemResult(idx, value=future.result())
                 except Exception as exc:
                     yield ItemResult(idx, error=exc)
+                    if budget is not None and not isinstance(exc, MaxErrorsReached):
+                        budget.record_failure()
+                        if budget.exhausted():
+                            stopped = True
+                            break
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 
@@ -752,6 +921,7 @@ class _BoundParallel:
         on_progress: Callable[[int, int], None] | None = None,
         batch_size: int | None = None,
         retry: Retry | None = None,
+        max_errors: int | None = None,
     ) -> ParallelResult[Any]:
         """Run this function over *items* in parallel."""
         return parallel_map(
@@ -766,6 +936,7 @@ class _BoundParallel:
                 on_progress=on_progress,
                 batch_size=batch_size,
                 retry=retry,
+                max_errors=max_errors,
             ),
         )
 
@@ -831,6 +1002,7 @@ class _ParallelFunc:
         on_progress: Callable[[int, int], None] | None = None,
         batch_size: int | None = None,
         retry: Retry | None = None,
+        max_errors: int | None = None,
     ) -> ParallelResult[Any]:
         """Run this function over *items* in parallel."""
         return parallel_map(
@@ -845,6 +1017,7 @@ class _ParallelFunc:
                 on_progress=on_progress,
                 batch_size=batch_size,
                 retry=retry,
+                max_errors=max_errors,
             ),
         )
 

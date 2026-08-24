@@ -12,6 +12,7 @@ This roadmap should be read together with the [DevX Principles](devx-principles.
 - `ParallelResult` with structured error handling (`ExceptionGroup`)
 - `RateLimit` — token bucket rate limiting (sync and async)
 - `Retry` — per-item retry with exponential backoff, jitter, and exception filtering
+- `max_errors` ([#50](https://github.com/oneryalcin/pyarallel/issues/50)) — fail-fast after N item failures with partial results; never-executed items are marked with `MaxErrorsReached`
 - `batch_size` — process items in chunks to control memory
 - Progress callbacks via `on_progress`
 - Timeout support (`timeout` for sync total, `task_timeout` for async per-task)
@@ -21,7 +22,6 @@ This roadmap should be read together with the [DevX Principles](devx-principles.
 
 ### Near Term
 
-- **`max_errors`** ([#50](https://github.com/oneryalcin/pyarallel/issues/50)) — stop early after N failures instead of processing all items. When hitting a dead API, don't waste 10,000 calls when the first 10 all failed. Returns partial results.
 - **Reusable shared limiter** ([#49](https://github.com/oneryalcin/pyarallel/issues/49)) — expose a `Limiter` that shares one rate-limit budget across multiple map calls, decorators, and sync/async workloads. The current `rate_limit=` bucket is shared only within one operation.
 - **Retry result predicates and HTTP policy helpers** ([#43](https://github.com/oneryalcin/pyarallel/issues/43)) — retry on returned results such as HTTP 429/503, support `Retry-After`, and provide opt-in helpers for common HTTP retry policies and terminal errors.
 - **Shared retry budgets** ([#42](https://github.com/oneryalcin/pyarallel/issues/42)) — cap total retries across concurrent operations to prevent retry storms against a failing service.

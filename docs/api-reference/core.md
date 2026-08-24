@@ -18,6 +18,7 @@ results = parallel_map(
     on_progress=None,                # callback(completed, total)
     batch_size=None,                 # Lazy batch consumption for unsized iterables
     retry=None,                      # Retry(attempts=3, backoff=1.0)
+    max_errors=None,                 # Stop early after N item failures
 )
 ```
 
@@ -36,6 +37,7 @@ results = parallel_map(
 | `on_progress` | `Callable[[int, int], None] \| None` | `None` | Progress callback `(completed, total)`. For unsized iterables with batching, `total` is items seen so far |
 | `batch_size` | `int \| None` | `None` | Process items in chunks of this size. With unsized iterables, input is consumed lazily one batch at a time |
 | `retry` | `Retry \| None` | `None` | Per-item retry with backoff |
+| `max_errors` | `int \| None` | `None` | Stop early after this many item failures. Never-executed items appear in `failures()` holding `MaxErrorsReached` |
 
 ### Examples
 
@@ -144,7 +146,7 @@ from pyarallel import parallel_starmap
 results = parallel_starmap(fn, [(arg1, arg2), (arg3, arg4), ...])
 ```
 
-Takes the same options as `parallel_map` (workers, executor, rate_limit, timeout, batch_size, retry).
+Takes the same options as `parallel_map` (workers, executor, rate_limit, timeout, batch_size, retry, max_errors).
 
 ### Examples
 
@@ -203,6 +205,7 @@ Same as `parallel_map` except no `timeout` or `on_progress` (results stream as t
 | `rate_limit` | `RateLimit \| float \| None` | `None` | Rate limiting |
 | `batch_size` | `int \| None` | `None` | Process in chunks (controls memory) |
 | `retry` | `Retry \| None` | `None` | Per-item retry |
+| `max_errors` | `int \| None` | `None` | Stop early after this many item failures; the stream ends after the current batch drains |
 
 ### Yields
 

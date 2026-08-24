@@ -15,11 +15,14 @@ from typing import Any
 from .core import (
     _PENDING,
     ItemResult,
+    MaxErrorsReached,
     ParallelResult,
     RateLimit,
     Retry,
     _coerce_rate_limit,
+    _ErrorBudget,
     _Failure,
+    _finalize_max_errors,
     _iter_batches,
     _make_chunks,
     _merge_opts,
@@ -95,6 +98,7 @@ async def async_parallel_map[R](
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    max_errors: int | None = None,
 ) -> ParallelResult[R]:
     """Execute an async *fn* over *items* concurrently.
 
@@ -111,7 +115,20 @@ async def async_parallel_map[R](
         batch_size: Process items in chunks. With ``batch_size`` set,
             unsized iterables (for example generators) are consumed lazily
             one batch at a time.
-        retry: ``Retry`` object for per-item retry with backoff.
+        retry: ``Retry`` object for per-item retry with backoff. An item
+            whose retries are exhausted counts as one failure toward
+            ``max_errors``.
+        max_errors: Stop early after this many item failures. Once the
+            limit is observed, later batches are not started, and tasks
+            that have not started calling *fn* record a
+            ``MaxErrorsReached`` marker instead (no rate-limit budget is
+            consumed for them). In-flight tasks drain and their outcomes
+            are recorded; items never executed appear in ``failures()``
+            holding ``MaxErrorsReached``. Enforcement is reactive — with
+            fast-failing functions and no ``batch_size``, every task may
+            already be submitted before the limit is seen. A task whose
+            retries are exhausted counts as one failure. Requires
+            ``max_errors >= 1``.
 
     Returns:
         ``ParallelResult`` — same container as the sync API.
@@ -121,6 +138,8 @@ async def async_parallel_map[R](
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if concurrency < 1:
         raise ValueError(f"concurrency must be >= 1, got {concurrency}")
+    if max_errors is not None and max_errors < 1:
+        raise ValueError(f"max_errors must be >= 1, got {max_errors}")
 
     plan = _plan_collected_map(items, batch_size)
     if plan.total == 0:
@@ -128,11 +147,17 @@ async def async_parallel_map[R](
     results = plan.results
     semaphore = asyncio.Semaphore(concurrency)
     limiter = _AsyncTokenBucket(rate_limit) if rate_limit else None
+    budget = _ErrorBudget(max_errors) if max_errors is not None else None
     completed = 0
 
     async def _run(i: int, item: Any) -> None:
         nonlocal completed
         async with semaphore:
+            if budget is not None and budget.exhausted():
+                results[i] = _Failure(
+                    MaxErrorsReached(f"Not executed: max_errors={budget.limit} reached")
+                )
+                return
             if limiter:
                 await limiter.wait()
             try:
@@ -147,6 +172,8 @@ async def async_parallel_map[R](
                 results[i] = result
             except Exception as exc:
                 results[i] = _Failure(exc)
+                if budget is not None and not isinstance(exc, MaxErrorsReached):
+                    budget.record_failure()
             completed += 1
             if on_progress:
                 on_progress(completed, _progress_total(plan.total, results))
@@ -157,6 +184,9 @@ async def async_parallel_map[R](
         async with asyncio.TaskGroup() as tg:
             for i, item in batch:
                 tg.create_task(_run(i, item))
+        if budget is not None and budget.exhausted():
+            _finalize_max_errors(results, plan.remaining, budget)
+            break
 
     return ParallelResult(results)
 
@@ -171,6 +201,7 @@ async def async_parallel_starmap[R](
     on_progress: Callable[[int, int], None] | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    max_errors: int | None = None,
 ) -> ParallelResult[R]:
     """Like ``async_parallel_map`` but unpacks each item as ``fn(*args)``."""
 
@@ -186,6 +217,7 @@ async def async_parallel_starmap[R](
         on_progress=on_progress,
         batch_size=batch_size,
         retry=retry,
+        max_errors=max_errors,
     )
 
 
@@ -198,15 +230,22 @@ async def async_parallel_iter(
     task_timeout: float | None = None,
     batch_size: int | None = None,
     retry: Retry | None = None,
+    max_errors: int | None = None,
 ) -> AsyncIterator[ItemResult[Any]]:
     """Execute async *fn* over *items*, yielding ``ItemResult`` in
     completion order. Constant memory — results are not accumulated.
+
+    With ``max_errors``, the current batch finishes and yields, but no
+    further batches are started. Tasks skipped by the guard yield
+    ``MaxErrorsReached`` markers; remaining input is never attempted.
     """
     rate_limit = _coerce_rate_limit(rate_limit)
     if batch_size is not None and batch_size < 1:
         raise ValueError(f"batch_size must be >= 1, got {batch_size}")
     if concurrency < 1:
         raise ValueError(f"concurrency must be >= 1, got {concurrency}")
+    if max_errors is not None and max_errors < 1:
+        raise ValueError(f"max_errors must be >= 1, got {max_errors}")
 
     if batch_size is None:
         items_list = list(items)
@@ -222,9 +261,20 @@ async def async_parallel_iter(
 
     semaphore = asyncio.Semaphore(concurrency)
     limiter = _AsyncTokenBucket(rate_limit) if rate_limit else None
+    budget = _ErrorBudget(max_errors) if max_errors is not None else None
     queue: asyncio.Queue[ItemResult[Any] | None] = asyncio.Queue()
 
     async def _run(i: int, item: Any) -> None:
+        if budget is not None and budget.exhausted():
+            await queue.put(
+                ItemResult(
+                    i,
+                    error=MaxErrorsReached(
+                        f"Not executed: max_errors={budget.limit} reached"
+                    ),
+                )
+            )
+            return
         async with semaphore:
             if limiter:
                 await limiter.wait()
@@ -240,6 +290,8 @@ async def async_parallel_iter(
                 await queue.put(ItemResult(i, value=result))
             except Exception as exc:
                 await queue.put(ItemResult(i, error=exc))
+                if budget is not None and not isinstance(exc, MaxErrorsReached):
+                    budget.record_failure()
 
     active_tasks: list[asyncio.Task[None]] = []
     try:
@@ -260,6 +312,8 @@ async def async_parallel_iter(
             for t in chunk_tasks:
                 await t
             active_tasks.clear()
+            if budget is not None and budget.exhausted():
+                break
     finally:
         for t in active_tasks:
             t.cancel()
@@ -295,6 +349,7 @@ class _BoundAsyncParallel:
         on_progress: Callable[[int, int], None] | None = None,
         batch_size: int | None = None,
         retry: Retry | None = None,
+        max_errors: int | None = None,
     ) -> ParallelResult[Any]:
         return await async_parallel_map(
             self._fn,
@@ -307,6 +362,7 @@ class _BoundAsyncParallel:
                 on_progress=on_progress,
                 batch_size=batch_size,
                 retry=retry,
+                max_errors=max_errors,
             ),
         )
 
@@ -361,6 +417,7 @@ class _AsyncParallelFunc:
         on_progress: Callable[[int, int], None] | None = None,
         batch_size: int | None = None,
         retry: Retry | None = None,
+        max_errors: int | None = None,
     ) -> ParallelResult[Any]:
         return await async_parallel_map(
             self.__wrapped__,
@@ -373,6 +430,7 @@ class _AsyncParallelFunc:
                 on_progress=on_progress,
                 batch_size=batch_size,
                 retry=retry,
+                max_errors=max_errors,
             ),
         )
 

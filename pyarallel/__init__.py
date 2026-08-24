@@ -8,6 +8,7 @@ from .aio import (
 )
 from .core import (
     ItemResult,
+    MaxErrorsReached,
     ParallelResult,
     RateLimit,
     Retry,
@@ -23,6 +24,7 @@ __all__ = [
     "ItemResult",
     "RateLimit",
     "Retry",
+    "MaxErrorsReached",
     "parallel",
     "parallel_iter",
     "parallel_map",

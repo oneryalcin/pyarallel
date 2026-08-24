@@ -77,6 +77,43 @@ results = await async_parallel_map(fetch, urls, concurrency=10, task_timeout=5.0
 # Each individual task gets 5 seconds before timing out
 ```
 
+## Fail Fast with `max_errors`
+
+When a downstream service is dead, don't waste 10,000 calls to learn it —
+stop after N failures and keep the partial results:
+
+```python
+from pyarallel import parallel_map, MaxErrorsReached
+
+results = parallel_map(fetch, ten_thousand_urls, workers=20, max_errors=10)
+
+if not results.ok:
+    real = [(i, e) for i, e in results.failures()
+            if not isinstance(e, MaxErrorsReached)]
+    skipped = [(i, e) for i, e in results.failures()
+               if isinstance(e, MaxErrorsReached)]
+    print(f"{len(real)} failed, {len(skipped)} never attempted")
+```
+
+How it behaves, explicitly:
+
+- **What counts as an error:** one item failure. An item whose retries are
+  all exhausted counts once.
+- **Stop semantics:** once the limit is observed, no new work starts. Queued
+  tasks are cancelled; tasks already running finish and their outcomes are
+  recorded.
+- **Partial results:** the result list keeps every input slot. Items that
+  were never executed hold `MaxErrorsReached` in `.failures()` — filter them
+  out as shown above.
+- **Streaming:** `parallel_iter` / `async_parallel_iter` end after the
+  current batch; remaining input is simply never attempted.
+- **Honest caveat:** enforcement is reactive. With fast-failing functions
+  and no `batch_size`, every task may already be submitted before the limit
+  is seen. Pass `batch_size=` to bound wasted work strictly.
+
+Works the same on `parallel_starmap`, `async_parallel_map`, and the
+decorators' `.map()` methods.
+
 ## Method Support
 
 The `@parallel` decorator works with instance methods via the descriptor protocol:
