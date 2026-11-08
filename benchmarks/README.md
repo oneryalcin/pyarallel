@@ -108,6 +108,25 @@ the steady-state ratio; `--quick` uses 40 and its interpreter ratio is
 start-up-bound and low. Read the ratio at the item count that matches how
 you actually call the library.
 
+## Adaptive rate limiting simulator (#53)
+
+`adaptive_sim.py` is a validation gate, not a performance claim. It drives the
+real `async_parallel_map` + `Limiter` + `Retry.for_http` path against an
+in-process fake API with a hidden token-bucket quota and lognormal (LLM-shaped)
+latency, and compares the fixed `Limiter` with a prototype AIMD subclass
+defined in the script (multiplicative decrease on 429, at most one cut per
+overload; additive increase on success, capped at the configured rate).
+
+```bash
+uv run --with . python benchmarks/adaptive_sim.py --seeds 2      # ~8 min
+uv run --with . python benchmarks/adaptive_sim.py --only rejects # one family
+```
+
+Scenarios: steady quota, quota drop mid-run, a shared key whose real quota is
+half the configured one — each with and without `Retry-After`, and with
+rejected requests either free or counted against the quota. Time is
+compressed (100 req/s, 0.4 s median latency) and real wall-clock.
+
 ## Why this is not in CI
 
 CI runs on shared cloud runners with noisy neighbours, throttled/burstable
